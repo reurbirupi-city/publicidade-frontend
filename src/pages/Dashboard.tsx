@@ -28,7 +28,9 @@ import {
   UserPlus,
   Link2,
   Copy,
-  Check
+  Check,
+  FileText,
+  MessageSquare
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
@@ -36,6 +38,8 @@ import ModalGestaoAdmins from '../components/ModalGestaoAdmins';
 import { getSystemStats } from '../services/dataIntegration';
 import { useAuth } from '../contexts/AuthContext';
 import { isWebmaster, getAdminByEmail, Admin } from '../services/adminService';
+import { db } from '../services/firebase';
+import { collection, query, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -44,6 +48,13 @@ const Dashboard: React.FC = () => {
   const [showGestaoAdmins, setShowGestaoAdmins] = useState(false);
   const [adminData, setAdminData] = useState<Admin | null>(null);
   const [linkCopiado, setLinkCopiado] = useState(false);
+  const [activities, setActivities] = useState<Array<{
+    id: string;
+    type: 'success' | 'info' | 'warning';
+    message: string;
+    time: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }>>([]);
   const settingsRef = useRef<HTMLDivElement>(null);
   
   const { user } = useAuth();
@@ -51,6 +62,156 @@ const Dashboard: React.FC = () => {
   
   // Carrega estatísticas integradas do sistema
   const systemStats = getSystemStats();
+
+  // Função para formatar tempo relativo
+  const formatTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Agora mesmo';
+    if (diffMins < 60) return `${diffMins} min atrás`;
+    if (diffHours < 24) return `${diffHours} hora${diffHours > 1 ? 's' : ''} atrás`;
+    if (diffDays < 7) return `${diffDays} dia${diffDays > 1 ? 's' : ''} atrás`;
+    return date.toLocaleDateString('pt-BR');
+  };
+
+  // Buscar atividades recentes do Firebase
+  useEffect(() => {
+    const buscarAtividades = async () => {
+      try {
+        const atividadesReais: Array<{
+          id: string;
+          type: 'success' | 'info' | 'warning';
+          message: string;
+          time: string;
+          icon: React.ComponentType<{ className?: string }>;
+          timestamp: Date;
+        }> = [];
+
+        // Buscar projetos recentes
+        const projetosQuery = query(
+          collection(db, 'projetos'),
+          orderBy('dataCriacao', 'desc'),
+          limit(3)
+        );
+        const projetosSnap = await getDocs(projetosQuery);
+        projetosSnap.forEach(doc => {
+          const data = doc.data();
+          const dataCriacao = data.dataCriacao instanceof Timestamp 
+            ? data.dataCriacao.toDate() 
+            : new Date(data.dataCriacao);
+          atividadesReais.push({
+            id: `proj-${doc.id}`,
+            type: 'success',
+            message: `Projeto criado: ${data.nome || data.titulo || 'Novo projeto'}`,
+            time: formatTimeAgo(dataCriacao),
+            icon: Briefcase,
+            timestamp: dataCriacao
+          });
+        });
+
+        // Buscar solicitações recentes
+        const solicitacoesQuery = query(
+          collection(db, 'solicitacoes_clientes'),
+          orderBy('dataCriacao', 'desc'),
+          limit(3)
+        );
+        const solicitacoesSnap = await getDocs(solicitacoesQuery);
+        solicitacoesSnap.forEach(doc => {
+          const data = doc.data();
+          const dataCriacao = data.dataCriacao instanceof Timestamp 
+            ? data.dataCriacao.toDate() 
+            : new Date(data.dataCriacao);
+          atividadesReais.push({
+            id: `sol-${doc.id}`,
+            type: 'info',
+            message: `Nova solicitação: ${data.tipo || data.servico || 'Solicitação de cliente'}`,
+            time: formatTimeAgo(dataCriacao),
+            icon: MessageSquare,
+            timestamp: dataCriacao
+          });
+        });
+
+        // Buscar transações financeiras recentes
+        const financeiroQuery = query(
+          collection(db, 'financeiro'),
+          orderBy('data', 'desc'),
+          limit(3)
+        );
+        const financeiroSnap = await getDocs(financeiroQuery);
+        financeiroSnap.forEach(doc => {
+          const data = doc.data();
+          const dataTransacao = data.data instanceof Timestamp 
+            ? data.data.toDate() 
+            : new Date(data.data);
+          const isPago = data.status === 'pago' || data.pago;
+          atividadesReais.push({
+            id: `fin-${doc.id}`,
+            type: isPago ? 'success' : 'warning',
+            message: isPago 
+              ? `Pagamento recebido: ${data.descricao || 'Transação'}` 
+              : `Pagamento pendente: ${data.descricao || 'Transação'}`,
+            time: formatTimeAgo(dataTransacao),
+            icon: DollarSign,
+            timestamp: dataTransacao
+          });
+        });
+
+        // Buscar conteúdos de social media recentes
+        const socialQuery = query(
+          collection(db, 'socialMedia'),
+          orderBy('dataCriacao', 'desc'),
+          limit(2)
+        );
+        const socialSnap = await getDocs(socialQuery);
+        socialSnap.forEach(doc => {
+          const data = doc.data();
+          const dataCriacao = data.dataCriacao instanceof Timestamp 
+            ? data.dataCriacao.toDate() 
+            : new Date(data.dataCriacao);
+          atividadesReais.push({
+            id: `social-${doc.id}`,
+            type: 'success',
+            message: `Post ${data.status === 'publicado' ? 'publicado' : 'agendado'}: ${data.titulo || data.plataforma || 'Conteúdo'}`,
+            time: formatTimeAgo(dataCriacao),
+            icon: Megaphone,
+            timestamp: dataCriacao
+          });
+        });
+
+        // Ordenar por timestamp e pegar os 5 mais recentes
+        atividadesReais.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        const top5 = atividadesReais.slice(0, 5).map(({ timestamp, ...rest }) => rest);
+        
+        // Se não houver atividades, mostrar mensagem padrão
+        if (top5.length === 0) {
+          setActivities([{
+            id: 'empty',
+            type: 'info',
+            message: 'Nenhuma atividade recente',
+            time: 'Aguardando dados...',
+            icon: Activity
+          }]);
+        } else {
+          setActivities(top5);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar atividades:', error);
+        setActivities([{
+          id: 'error',
+          type: 'warning',
+          message: 'Erro ao carregar atividades',
+          time: 'Tente novamente',
+          icon: AlertCircle
+        }]);
+      }
+    };
+
+    buscarAtividades();
+  }, []);
 
   // Carregar dados do admin logado
   useEffect(() => {
@@ -190,13 +351,6 @@ const Dashboard: React.FC = () => {
       path: '/solicitacoes',
       status: 'normal' as const
     }
-  ];
-
-  const activities = [
-    { id: 1, type: 'success', message: 'Novo projeto criado: Campanha Digital X', time: '5 min atrás', icon: Briefcase },
-    { id: 2, type: 'info', message: 'Cliente Maria Silva enviou mensagem', time: '12 min atrás', icon: Users },
-    { id: 3, type: 'warning', message: 'Pagamento pendente - Projeto ABC', time: '1 hora atrás', icon: DollarSign },
-    { id: 4, type: 'success', message: 'Post agendado com sucesso', time: '2 horas atrás', icon: Megaphone }
   ];
 
   const tips = [
