@@ -2179,7 +2179,7 @@ const ClientPortal: React.FC = () => {
                     <div className="border-t border-gray-200 dark:border-gray-600 pt-4 mb-4">
                       <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Inclui:</p>
                       <ul className="space-y-1">
-                        {servico.inclui.slice(0, 3).map((item, idx) => (
+                        {servico.inclui.slice(0, 3).map((item: string, idx: number) => (
                           <li key={idx} className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400">
                             <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
                             {item}
