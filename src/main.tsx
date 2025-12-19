@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { NotificacoesProvider } from './contexts/NotificacoesContext';
+import { TutorialProvider } from './contexts/TutorialContext';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -25,7 +26,8 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <NotificacoesProvider>
-          <BrowserRouter>
+          <TutorialProvider>
+            <BrowserRouter>
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
@@ -43,6 +45,7 @@ function App() {
               <Route path="/solicitacoes" element={<Solicitacoes />} />
             </Routes>
           </BrowserRouter>
+          </TutorialProvider>
         </NotificacoesProvider>
       </AuthProvider>
     </ThemeProvider>

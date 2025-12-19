@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
+import { TutorialOverlay } from '../components/TutorialOverlay';
 
 interface RecorrenciaEvento {
   ativa: boolean;
@@ -1637,13 +1638,15 @@ const Agenda: React.FC = () => {
               <button
                 onClick={() => setShowTemplateModal(false)}
                 className="px-6 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-              >
-                Fechar
+              >n                Fechar
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Tutorial Overlay */}
+      <TutorialOverlay page="agenda" />
     </div>
   );
 };

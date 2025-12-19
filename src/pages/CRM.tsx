@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
+import { TutorialOverlay } from '../components/TutorialOverlay';
 import { getClientes, saveClientes } from '../services/dataIntegration';
 import ModalCotacaoServicos from '../components/ModalCotacaoServicos';
 import ModalGerarProposta from '../components/ModalGerarProposta';
@@ -1237,6 +1238,9 @@ const CRM: React.FC = () => {
           onFinalizar={handleFinalizarServico}
         />
       )}
+
+      {/* Tutorial Overlay */}
+      <TutorialOverlay page="crm" />
     </div>
   );
 };

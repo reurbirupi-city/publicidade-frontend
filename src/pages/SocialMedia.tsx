@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
+import { TutorialOverlay } from '../components/TutorialOverlay';
 import { getClientes } from '../services/dataIntegration';
 import ModalCriarConteudo from '../components/ModalCriarConteudo';
 import ModalVisualizarConteudo from '../components/ModalVisualizarConteudo';
@@ -1065,6 +1066,9 @@ const SocialMedia: React.FC = () => {
         conteudo={conteudoSelecionado}
         onConfirm={handleConteudoDeletado}
       />
+
+      {/* Tutorial Overlay */}
+      <TutorialOverlay page="social-media" />
     </div>
   );
 };

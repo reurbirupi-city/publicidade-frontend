@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useTutorial } from '../contexts/TutorialContext';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import {
@@ -30,6 +31,7 @@ import {
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
+import { TutorialOverlay, TutorialSettingsButton } from '../components/TutorialOverlay';
 import ModalGerarProposta from '../components/ModalGerarProposta';
 import ModalContratoAssinatura from '../components/ModalContratoAssinatura';
 import ChatWhatsApp from '../components/ChatWhatsApp';
@@ -44,10 +46,17 @@ import {
 const ClientPortal: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { setUserType } = useTutorial();
   const [clientData, setClientData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [contactMessage, setContactMessage] = useState('');
+  
+  // Definir tipo de usuário como cliente para o tutorial
+  useEffect(() => {
+    setUserType('cliente');
+  }, [setUserType]);
+  
   const [showServicesModal, setShowServicesModal] = useState(false);
   const [showCustomServiceModal, setShowCustomServiceModal] = useState(false);
   const [selectedService, setSelectedService] = useState<any>(null);
@@ -1235,6 +1244,7 @@ const ClientPortal: React.FC = () => {
               </button>
               <ThemeToggle />
               <NotificacoesBell />
+              <TutorialSettingsButton />
               <div className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg">
                 <img 
                   src={clientData.avatar} 
@@ -2375,6 +2385,9 @@ const ClientPortal: React.FC = () => {
         statusDestinatario="online"
         isAdmin={false}
       />
+
+      {/* Tutorial Overlay */}
+      <TutorialOverlay page="portal" />
     </div>
   );
 };

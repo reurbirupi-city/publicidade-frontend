@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
+import { TutorialOverlay } from '../components/TutorialOverlay';
 import ModalCriarProjeto from '../components/ModalCriarProjeto';
 import ModalVisualizarProjeto from '../components/ModalVisualizarProjeto';
 import ModalEditarProjeto from '../components/ModalEditarProjeto';
@@ -1496,6 +1497,9 @@ const Projetos: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Tutorial Overlay */}
+      <TutorialOverlay page="projetos" />
     </div>
   );
 };

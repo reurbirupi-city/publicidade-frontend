@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
+import { TutorialOverlay } from '../components/TutorialOverlay';
 import ModalVisualizarPortfolio from '../components/ModalVisualizarPortfolio';
 import ModalAdicionarPortfolio from '../components/ModalAdicionarPortfolio';
 import ModalEditarPortfolio from '../components/ModalEditarPortfolio';
@@ -960,6 +961,9 @@ const Portfolio: React.FC = () => {
               item={itemSelecionado}
             />
           )}
+
+          {/* Tutorial Overlay */}
+          <TutorialOverlay page="portfolio" />
         </>
       )}
     </div>

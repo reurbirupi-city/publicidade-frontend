@@ -35,8 +35,10 @@ import {
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
 import ModalGestaoAdmins from '../components/ModalGestaoAdmins';
+import { TutorialOverlay, TutorialSettingsButton } from '../components/TutorialOverlay';
 import { getSystemStats } from '../services/dataIntegration';
 import { useAuth } from '../contexts/AuthContext';
+import { useTutorial } from '../contexts/TutorialContext';
 import { isWebmaster, getAdminByEmail, Admin } from '../services/adminService';
 import { db } from '../services/firebase';
 import { collection, query, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
@@ -58,7 +60,13 @@ const Dashboard: React.FC = () => {
   const settingsRef = useRef<HTMLDivElement>(null);
   
   const { user } = useAuth();
+  const { setUserType } = useTutorial();
   const userIsWebmaster = user?.email ? isWebmaster(user.email) : false;
+  
+  // Definir tipo de usuário como admin para o tutorial
+  useEffect(() => {
+    setUserType('admin');
+  }, [setUserType]);
   
   // Carrega estatísticas integradas do sistema
   const systemStats = getSystemStats();
@@ -398,6 +406,9 @@ const Dashboard: React.FC = () => {
               {/* Notifications */}
               <NotificacoesBell />
 
+              {/* Tutorial Settings */}
+              <TutorialSettingsButton />
+
               {/* Settings */}
               <div className="relative z-[60]" ref={settingsRef}>
                 <button 
@@ -676,6 +687,9 @@ const Dashboard: React.FC = () => {
         isOpen={showGestaoAdmins}
         onClose={() => setShowGestaoAdmins(false)}
       />
+
+      {/* Tutorial Overlay */}
+      <TutorialOverlay page="dashboard" />
     </div>
   );
 };

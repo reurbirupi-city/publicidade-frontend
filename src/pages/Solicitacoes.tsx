@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
+import { TutorialOverlay } from '../components/TutorialOverlay';
 import ChatWhatsAppAdmin from '../components/ChatWhatsAppAdmin';
 import { getClientes, getProjetos, saveProjetos, atualizarStatusCliente } from '../services/dataIntegration';
 
@@ -913,6 +914,9 @@ const Solicitacoes: React.FC = () => {
         conversas={obterConversasParaChat()}
         onEnviarMensagem={handleEnviarMensagemChatFlutuante}
       />
+
+      {/* Tutorial Overlay */}
+      <TutorialOverlay page="solicitacoes" />
     </div>
   );
 };

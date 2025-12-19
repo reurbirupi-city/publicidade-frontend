@@ -20,6 +20,7 @@ import {
 import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import ModalCriarEditarServico from '../components/ModalCriarEditarServico';
+import { TutorialOverlay } from '../components/TutorialOverlay';
 
 // Tipos
 interface Servico {
@@ -717,6 +718,9 @@ const Servicos: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Tutorial Overlay */}
+      <TutorialOverlay page="servicos" />
     </div>
   );
 };

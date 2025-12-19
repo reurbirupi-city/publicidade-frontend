@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
+import { TutorialOverlay } from '../components/TutorialOverlay';
 import ModalCriarTransacao from '../components/ModalCriarTransacao';
 import ModalVisualizarTransacao from '../components/ModalVisualizarTransacao';
 import ModalEditarTransacao from '../components/ModalEditarTransacao';
@@ -875,6 +876,9 @@ const Financeiro: React.FC = () => {
         transacao={transacaoSelecionada}
         onConfirm={handleConfirmarDelecao}
       />
+
+      {/* Tutorial Overlay */}
+      <TutorialOverlay page="financeiro" />
     </div>
   );
 };
