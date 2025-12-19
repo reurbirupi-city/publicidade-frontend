@@ -2136,49 +2136,86 @@ const ClientPortal: React.FC = () => {
                 </div>
               ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {catalogoServicos.map((servico) => (
+                {catalogoServicos.map((servico, index) => {
+                  // Cores variadas para as bordas superiores
+                  const borderColors = [
+                    'border-t-purple-500',
+                    'border-t-pink-500',
+                    'border-t-blue-500',
+                    'border-t-green-500',
+                    'border-t-orange-500',
+                    'border-t-cyan-500',
+                    'border-t-red-500',
+                    'border-t-indigo-500',
+                    'border-t-teal-500',
+                    'border-t-amber-500',
+                  ];
+                  const borderColor = borderColors[index % borderColors.length];
+                  
+                  // Cores de fundo do ícone por categoria
+                  const iconBgColors: Record<string, string> = {
+                    'Branding': 'bg-purple-100 dark:bg-purple-900/40',
+                    'Social Media': 'bg-pink-100 dark:bg-pink-900/40',
+                    'Web Design': 'bg-blue-100 dark:bg-blue-900/40',
+                    'Marketing Digital': 'bg-green-100 dark:bg-green-900/40',
+                    'Design Gráfico': 'bg-orange-100 dark:bg-orange-900/40',
+                    'Audiovisual': 'bg-red-100 dark:bg-red-900/40',
+                  };
+                  const iconBg = iconBgColors[servico.categoria] || 'bg-gray-100 dark:bg-gray-800';
+                  
+                  return (
                   <div
                     key={servico.id}
-                    className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl p-6 hover:shadow-xl transition-all relative"
+                    className={`bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 border-t-4 ${borderColor} rounded-xl overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 relative group`}
                   >
                     {servico.popular && (
-                      <div className="absolute -top-3 right-4 bg-gradient-to-r from-yellow-400 to-orange-400 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-lg">
+                      <div className="absolute -top-0 right-4 bg-gradient-to-r from-yellow-400 to-orange-400 text-white text-xs font-bold px-3 py-1.5 rounded-b-lg flex items-center gap-1 shadow-lg z-10">
                         <Star className="w-3 h-3" />
                         POPULAR
                       </div>
                     )}
 
-                    <div className="text-4xl mb-4">{servico.icone}</div>
+                    <div className="p-6">
+                      <div className={`w-16 h-16 ${iconBg} rounded-2xl flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform duration-300`}>
+                        {servico.icone}
+                      </div>
                     
-                    <div className="mb-4">
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-                        {servico.titulo}
-                      </h3>
-                      <span className="inline-block px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs rounded-full mb-3">
-                        {servico.categoria}
-                      </span>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {servico.descricao}
-                      </p>
-                    </div>
-
-                    <div className="space-y-3 mb-4">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500 dark:text-gray-400">Prazo:</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">{servico.prazo}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-500 dark:text-gray-400">Valor:</span>
-                        <span className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                          R$ {servico.preco.toLocaleString('pt-BR')}
-                          {servico.recorrente && <span className="text-sm">/mês</span>}
+                      <div className="mb-4">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                          {servico.titulo}
+                        </h3>
+                        <span className="inline-block px-3 py-1 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-full mb-3">
+                          {servico.categoria}
                         </span>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                          {servico.descricao}
+                        </p>
+                      </div>
+
+                      <div className="space-y-3 mb-4">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            Prazo:
+                          </span>
+                          <span className="font-semibold text-gray-900 dark:text-white">{servico.prazo}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                            <DollarSign className="w-4 h-4" />
+                            Valor:
+                          </span>
+                          <span className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                            R$ {servico.preco.toLocaleString('pt-BR')}
+                            {servico.recorrente && <span className="text-sm font-normal">/mês</span>}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="border-t border-gray-200 dark:border-gray-600 pt-4 mb-4">
+                    <div className="border-t border-gray-200 dark:border-gray-600 p-6 pt-4 bg-gray-50 dark:bg-gray-800/50">
                       <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Inclui:</p>
-                      <ul className="space-y-1">
+                      <ul className="space-y-1.5 mb-4">
                         {servico.inclui.slice(0, 3).map((item: string, idx: number) => (
                           <li key={idx} className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400">
                             <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
@@ -2186,22 +2223,23 @@ const ClientPortal: React.FC = () => {
                           </li>
                         ))}
                         {servico.inclui.length > 3 && (
-                          <li className="text-xs text-purple-600 dark:text-purple-400 font-medium">
+                          <li className="text-xs text-purple-600 dark:text-purple-400 font-medium mt-2">
                             + {servico.inclui.length - 3} itens adicionais
                           </li>
                         )}
                       </ul>
-                    </div>
 
-                    <button
-                      onClick={() => setSelectedService(servico)}
-                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all flex items-center justify-center gap-2"
-                    >
-                      <ShoppingCart className="w-5 h-5" />
-                      Solicitar Serviço
-                    </button>
+                      <button
+                        onClick={() => setSelectedService(servico)}
+                        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-pink-700 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+                      >
+                        <ShoppingCart className="w-5 h-5" />
+                        Solicitar Serviço
+                      </button>
+                    </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               )}
             </div>
