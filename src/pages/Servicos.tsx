@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Search,
@@ -15,10 +16,13 @@ import {
   TrendingUp,
   Award,
   Zap,
-  Lock
+  Lock,
+  ArrowLeft
 } from 'lucide-react';
 import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import ThemeToggle from '../components/ThemeToggle';
+import NotificacoesBell from '../components/NotificacoesBell';
 import ModalCriarEditarServico from '../components/ModalCriarEditarServico';
 import { TutorialOverlay } from '../components/TutorialOverlay';
 
@@ -322,6 +326,7 @@ const CATEGORIAS: Record<string, { nome: string; cor: string; icone: React.React
 };
 
 const Servicos: React.FC = () => {
+  const navigate = useNavigate();
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -473,21 +478,40 @@ const Servicos: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Catálogo de Serviços</h1>
-          <p className="text-gray-600 dark:text-gray-400">Gerencie os serviços oferecidos pela agência</p>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Header com Navegação */}
+      <header className="sticky top-0 z-40 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                title="Voltar ao Dashboard"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              </button>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">Catálogo de Serviços</h1>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Gerencie os serviços oferecidos</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleCreate}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                Novo Serviço
+              </button>
+              <ThemeToggle />
+              <NotificacoesBell />
+            </div>
+          </div>
         </div>
-        <button
-          onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Novo Serviço
-        </button>
-      </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
       {/* Estatísticas */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -721,6 +745,7 @@ const Servicos: React.FC = () => {
 
       {/* Tutorial Overlay */}
       <TutorialOverlay page="servicos" />
+      </div>
     </div>
   );
 };

@@ -129,8 +129,80 @@ const ClientPortal: React.FC = () => {
     fetchClientData();
   }, [user, authLoading, navigate]);
 
-  // Catálogo de Serviços
-  const catalogoServicos = [
+  // Estado para catálogo de serviços dinâmico do Firebase
+  const [catalogoServicos, setCatalogoServicos] = useState<any[]>([]);
+  const [loadingServicos, setLoadingServicos] = useState(true);
+
+  // Buscar catálogo de serviços do Firebase
+  useEffect(() => {
+    const carregarServicos = async () => {
+      setLoadingServicos(true);
+      try {
+        const servicosRef = collection(db, 'servicos_catalogo');
+        const snapshot = await getDocs(servicosRef);
+        
+        if (!snapshot.empty) {
+          const servicosFirebase = snapshot.docs
+            .map(doc => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                titulo: data.nome,
+                categoria: getCategoriaLabel(data.categoria),
+                descricao: data.descricao,
+                preco: data.preco,
+                prazo: data.tempo_estimado,
+                icone: getCategoriaIcone(data.categoria),
+                popular: data.destaque,
+                recorrente: data.tempo_estimado?.toLowerCase().includes('mensal'),
+                inclui: data.recursos || [],
+                ativo: data.ativo
+              };
+            })
+            .filter(s => s.ativo);
+          setCatalogoServicos(servicosFirebase);
+        } else {
+          // Fallback para catálogo padrão se não houver serviços no Firebase
+          setCatalogoServicos(catalogoServicosPadrao);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar catálogo de serviços:', error);
+        setCatalogoServicos(catalogoServicosPadrao);
+      }
+      setLoadingServicos(false);
+    };
+
+    carregarServicos();
+  }, []);
+
+  // Mapeamento de categorias para labels
+  const getCategoriaLabel = (categoria: string): string => {
+    const labels: Record<string, string> = {
+      'branding': 'Branding',
+      'social-media': 'Social Media',
+      'web': 'Web Design',
+      'marketing': 'Marketing Digital',
+      'design': 'Design Gráfico',
+      'video': 'Audiovisual'
+    };
+    return labels[categoria] || categoria;
+  };
+
+  // Mapeamento de categorias para ícones
+  const getCategoriaIcone = (categoria: string): string => {
+    const icones: Record<string, string> = {
+      'branding': '🎨',
+      'social-media': '📱',
+      'web': '🌐',
+      'marketing': '📊',
+      'design': '✨',
+      'video': '🎬'
+    };
+    return icones[categoria] || '📦';
+  };
+
+  // Catálogo padrão como fallback
+  const catalogoServicosPadrao = [
     {
       id: 1,
       titulo: 'Identidade Visual Completa',
@@ -2029,7 +2101,7 @@ const ClientPortal: React.FC = () => {
             <div className="p-6">
               {/* Botão de Serviço Personalizado */}
               <div className="mb-6 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div className="p-4 bg-white/20 rounded-lg">
                       <Sparkles className="w-8 h-8" />
@@ -2044,7 +2116,7 @@ const ClientPortal: React.FC = () => {
                       setShowServicesModal(false);
                       setShowCustomServiceModal(true);
                     }}
-                    className="bg-white text-purple-600 px-6 py-3 rounded-lg font-semibold hover:bg-purple-50 transition-colors flex items-center gap-2"
+                    className="bg-white text-purple-600 px-6 py-3 rounded-lg font-semibold hover:bg-purple-50 transition-colors flex items-center gap-2 whitespace-nowrap"
                   >
                     <Plus className="w-5 h-5" />
                     Criar Solicitação
@@ -2052,7 +2124,17 @@ const ClientPortal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Grid de Serviços */}
+              {/* Loading ou Grid de Serviços */}
+              {loadingServicos ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+                </div>
+              ) : catalogoServicos.length === 0 ? (
+                <div className="text-center py-12">
+                  <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400">Nenhum serviço disponível no momento</p>
+                </div>
+              ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {catalogoServicos.map((servico) => (
                   <div
@@ -2121,6 +2203,7 @@ const ClientPortal: React.FC = () => {
                   </div>
                 ))}
               </div>
+              )}
             </div>
           </div>
         </div>
