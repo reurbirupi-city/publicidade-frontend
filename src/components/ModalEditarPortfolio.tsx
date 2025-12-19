@@ -1,0 +1,596 @@
+import React, { useState, useEffect } from 'react';
+import {
+  X,
+  Upload,
+  Image as ImageIcon,
+  Plus,
+  Trash2,
+  Star,
+  CheckCircle,
+  AlertCircle,
+  Link as LinkIcon,
+  Tag,
+  Calendar,
+  Building,
+  User,
+  FileText,
+  Sparkles,
+  Edit
+} from 'lucide-react';
+
+// ============================================================================
+// INTERFACES
+// ============================================================================
+
+type CategoriaPortfolio = 'branding' | 'web' | 'social' | 'marketing' | 'design' | 'video';
+
+interface ItemPortfolio {
+  id: string;
+  projetoId: string;
+  clienteId: string;
+  clienteNome: string;
+  clienteEmpresa: string;
+  titulo: string;
+  descricao: string;
+  categoria: CategoriaPortfolio;
+  autorizadoPublicacao: boolean;
+  imagemCapa: string;
+  imagensGaleria: string[];
+  tags: string[];
+  destaque: boolean;
+  dataFinalizacao: string;
+  alcance?: string;
+  engajamento?: string;
+  conversao?: string;
+  roi?: string;
+  testemunhoTexto?: string;
+  testemunhoAutor?: string;
+  testemunhoCargo?: string;
+  testemunhoAvatar?: string;
+  testemunhoRating?: number;
+  criadoEm: string;
+}
+
+interface ModalEditarPortfolioProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSalvar: (item: ItemPortfolio) => void;
+  item: ItemPortfolio | null;
+}
+
+const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
+  isOpen,
+  onClose,
+  onSalvar,
+  item
+}) => {
+  const [formData, setFormData] = useState<ItemPortfolio | null>(null);
+  const [novaTag, setNovaTag] = useState('');
+  const [novaImagemUrl, setNovaImagemUrl] = useState('');
+  const [erros, setErros] = useState<string[]>([]);
+
+  // Inicializa o formulário quando o item mudar
+  useEffect(() => {
+    if (item) {
+      setFormData({ ...item });
+      setErros([]);
+    }
+  }, [item]);
+
+  if (!isOpen || !formData) return null;
+
+  // ============================================================================
+  // VALIDAÇÃO
+  // ============================================================================
+
+  const validarFormulario = (): boolean => {
+    const novosErros: string[] = [];
+
+    if (!formData.titulo.trim()) novosErros.push('Título é obrigatório');
+    if (!formData.descricao.trim()) novosErros.push('Descrição é obrigatória');
+    if (!formData.clienteNome.trim()) novosErros.push('Nome do cliente é obrigatório');
+    if (!formData.clienteEmpresa.trim()) novosErros.push('Empresa do cliente é obrigatória');
+    if (!formData.imagemCapa.trim()) novosErros.push('Imagem de capa é obrigatória');
+    if (formData.imagensGaleria.length === 0) novosErros.push('Adicione ao menos 1 imagem na galeria');
+    if (formData.tags.length === 0) novosErros.push('Adicione ao menos 1 tag');
+
+    setErros(novosErros);
+    return novosErros.length === 0;
+  };
+
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
+
+  const handleSubmit = () => {
+    if (validarFormulario()) {
+      onSalvar(formData);
+      onClose();
+    }
+  };
+
+  const handleAdicionarTag = () => {
+    if (novaTag.trim() && !formData.tags.includes(novaTag.trim())) {
+      setFormData({
+        ...formData,
+        tags: [...formData.tags, novaTag.trim()]
+      });
+      setNovaTag('');
+    }
+  };
+
+  const handleRemoverTag = (tag: string) => {
+    setFormData({
+      ...formData,
+      tags: formData.tags.filter(t => t !== tag)
+    });
+  };
+
+  const handleAdicionarImagem = () => {
+    if (novaImagemUrl.trim() && !formData.imagensGaleria.includes(novaImagemUrl.trim())) {
+      setFormData({
+        ...formData,
+        imagensGaleria: [...formData.imagensGaleria, novaImagemUrl.trim()]
+      });
+      setNovaImagemUrl('');
+    }
+  };
+
+  const handleRemoverImagem = (url: string) => {
+    setFormData({
+      ...formData,
+      imagensGaleria: formData.imagensGaleria.filter(img => img !== url)
+    });
+  };
+
+  const getCategoriaInfo = (categoria: CategoriaPortfolio) => {
+    const infos = {
+      branding: { label: 'Branding', color: 'purple' },
+      web: { label: 'Web Design', color: 'blue' },
+      social: { label: 'Social Media', color: 'pink' },
+      marketing: { label: 'Marketing', color: 'green' },
+      design: { label: 'Design', color: 'orange' },
+      video: { label: 'Vídeo', color: 'red' }
+    };
+    return infos[categoria];
+  };
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <Edit className="w-7 h-7" />
+                Editar Item do Portfolio
+              </h2>
+              <p className="text-white/90 mt-1">Atualize as informações do projeto</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+
+        {/* Erros de Validação */}
+        {erros.length > 0 && (
+          <div className="mx-6 mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">
+                  Corrija os seguintes erros:
+                </h3>
+                <ul className="list-disc list-inside space-y-1">
+                  {erros.map((erro, index) => (
+                    <li key={index} className="text-sm text-red-700 dark:text-red-300">
+                      {erro}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Body - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="space-y-6">
+            {/* SEÇÃO 1: INFORMAÇÕES DO CLIENTE */}
+            <div className="border-l-4 border-blue-500 pl-4">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                <User className="w-5 h-5" />
+                Cliente
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Nome do Cliente *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.clienteNome}
+                    onChange={(e) => setFormData({ ...formData, clienteNome: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                    placeholder="Ex: João Silva"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Empresa *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.clienteEmpresa}
+                    onChange={(e) => setFormData({ ...formData, clienteEmpresa: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                    placeholder="Ex: Silva & Associados"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* SEÇÃO 2: INFORMAÇÕES DO PROJETO */}
+            <div className="border-l-4 border-purple-500 pl-4">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Projeto
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Título do Projeto *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.titulo}
+                    onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                    placeholder="Ex: Identidade Visual Completa"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Descrição do Projeto *
+                  </label>
+                  <textarea
+                    value={formData.descricao}
+                    onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                    rows={4}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white resize-none"
+                    placeholder="Descreva o projeto, objetivos e resultados alcançados..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Categoria *
+                    </label>
+                    <select
+                      value={formData.categoria}
+                      onChange={(e) => setFormData({ ...formData, categoria: e.target.value as CategoriaPortfolio })}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                    >
+                      <option value="branding">Branding</option>
+                      <option value="web">Web Design</option>
+                      <option value="social">Social Media</option>
+                      <option value="marketing">Marketing</option>
+                      <option value="design">Design</option>
+                      <option value="video">Vídeo</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Data de Finalização *
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.dataFinalizacao}
+                      onChange={(e) => setFormData({ ...formData, dataFinalizacao: e.target.value })}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.autorizadoPublicacao}
+                      onChange={(e) => setFormData({ ...formData, autorizadoPublicacao: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      Cliente autorizou publicação
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.destaque}
+                      onChange={(e) => setFormData({ ...formData, destaque: e.target.checked })}
+                      className="w-4 h-4 text-yellow-600 bg-gray-100 border-gray-300 rounded focus:ring-yellow-500 dark:focus:ring-yellow-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                      <Star className="w-4 h-4 text-yellow-500" />
+                      Projeto em destaque
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* SEÇÃO 3: IMAGENS */}
+            <div className="border-l-4 border-pink-500 pl-4">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                <ImageIcon className="w-5 h-5" />
+                Imagens
+              </h3>
+
+              {/* Imagem de Capa */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  URL da Imagem de Capa *
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={formData.imagemCapa}
+                    onChange={(e) => setFormData({ ...formData, imagemCapa: e.target.value })}
+                    className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                    placeholder="https://..."
+                  />
+                </div>
+                {formData.imagemCapa && (
+                  <div className="mt-3 relative rounded-lg overflow-hidden">
+                    <img
+                      src={formData.imagemCapa}
+                      alt="Preview Capa"
+                      className="w-full h-48 object-cover"
+                    />
+                    <div className="absolute top-2 right-2">
+                      <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded-full">
+                        Capa
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Galeria de Imagens */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Galeria de Imagens * (mínimo 1)
+                </label>
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="url"
+                    value={novaImagemUrl}
+                    onChange={(e) => setNovaImagemUrl(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAdicionarImagem()}
+                    className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                    placeholder="https://... (Enter para adicionar)"
+                  />
+                  <button
+                    onClick={handleAdicionarImagem}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Adicionar
+                  </button>
+                </div>
+
+                {/* Grid de Imagens */}
+                {formData.imagensGaleria.length > 0 && (
+                  <div className="grid grid-cols-3 gap-3">
+                    {formData.imagensGaleria.map((url, index) => (
+                      <div key={index} className="relative group rounded-lg overflow-hidden">
+                        <img
+                          src={url}
+                          alt={`Galeria ${index + 1}`}
+                          className="w-full h-32 object-cover"
+                        />
+                        <button
+                          onClick={() => handleRemoverImagem(url)}
+                          className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* SEÇÃO 4: TAGS */}
+            <div className="border-l-4 border-green-500 pl-4">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                <Tag className="w-5 h-5" />
+                Tags *
+              </h3>
+              <div className="flex gap-2 mb-3">
+                <input
+                  type="text"
+                  value={novaTag}
+                  onChange={(e) => setNovaTag(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAdicionarTag()}
+                  className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                  placeholder="Ex: Logo, Identidade, Brand (Enter para adicionar)"
+                />
+                <button
+                  onClick={handleAdicionarTag}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar
+                </button>
+              </div>
+              {formData.tags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {formData.tags.map((tag, index) => (
+                    <span
+                      key={index}
+                      className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full text-sm flex items-center gap-2"
+                    >
+                      {tag}
+                      <button
+                        onClick={() => handleRemoverTag(tag)}
+                        className="hover:text-red-600 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* SEÇÃO 5: RESULTADOS (Opcional) */}
+            <div className="border-l-4 border-orange-500 pl-4">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                <Sparkles className="w-5 h-5" />
+                Resultados (Opcional)
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Alcance
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.alcance || ''}
+                    onChange={(e) => setFormData({ ...formData, alcance: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                    placeholder="Ex: 50.000 pessoas"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Engajamento
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.engajamento || ''}
+                    onChange={(e) => setFormData({ ...formData, engajamento: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                    placeholder="Ex: 5.2%"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Conversão
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.conversao || ''}
+                    onChange={(e) => setFormData({ ...formData, conversao: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                    placeholder="Ex: 3.8%"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    ROI
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.roi || ''}
+                    onChange={(e) => setFormData({ ...formData, roi: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                    placeholder="Ex: 320%"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* SEÇÃO 6: TESTEMUNHO (Opcional) */}
+            <div className="border-l-4 border-yellow-500 pl-4">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                <Star className="w-5 h-5" />
+                Testemunho do Cliente (Opcional)
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Testemunho
+                  </label>
+                  <textarea
+                    value={formData.testemunhoTexto || ''}
+                    onChange={(e) => setFormData({ ...formData, testemunhoTexto: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white resize-none"
+                    placeholder="Depoimento do cliente sobre o projeto..."
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Nome do Autor
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.testemunhoAutor || ''}
+                      onChange={(e) => setFormData({ ...formData, testemunhoAutor: e.target.value })}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                      placeholder="Ex: João Silva"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Cargo
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.testemunhoCargo || ''}
+                      onChange={(e) => setFormData({ ...formData, testemunhoCargo: e.target.value })}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                      placeholder="Ex: CEO"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-gray-200 dark:border-gray-700 p-6 bg-gray-50 dark:bg-gray-800/50">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              * Campos obrigatórios
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSubmit}
+                className="px-6 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-lg transition-all flex items-center gap-2 shadow-lg hover:shadow-xl"
+              >
+                <CheckCircle className="w-5 h-5" />
+                Salvar Alterações
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ModalEditarPortfolio;
