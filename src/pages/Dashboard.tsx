@@ -30,7 +30,8 @@ import {
   Copy,
   Check,
   FileText,
-  MessageSquare
+  MessageSquare,
+  HelpCircle
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
@@ -454,6 +455,23 @@ const Dashboard: React.FC = () => {
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">Configurações</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
                     </div>
+
+                    {/* Link para Instruções */}
+                    <button
+                      onClick={() => {
+                        setShowSettingsMenu(false);
+                        navigate('/instrucoes');
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors text-left"
+                    >
+                      <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
+                        <HelpCircle className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">Como Usar o Sistema</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Guia completo de instruções</p>
+                      </div>
+                    </button>
 
                     {/* Opção de Gestão de Admins - apenas para webmaster */}
                     {userIsWebmaster && (

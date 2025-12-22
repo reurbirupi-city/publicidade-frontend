@@ -29,7 +29,8 @@ import {
   FileSignature,
   ClipboardCheck,
   LogOut,
-  Upload
+  Upload,
+  HelpCircle
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
@@ -1499,6 +1500,13 @@ const ClientPortal: React.FC = () => {
               <ThemeToggle />
               <NotificacoesBell />
               <TutorialSettingsButton />
+              <button
+                onClick={() => navigate('/instrucoes')}
+                className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors group"
+                title="Como usar o sistema"
+              >
+                <HelpCircle className="w-5 h-5 text-gray-600 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
+              </button>
               <button
                 onClick={async () => {
                   await signOut();

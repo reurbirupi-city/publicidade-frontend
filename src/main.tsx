@@ -19,6 +19,7 @@ import Portfolio from './pages/Portfolio';
 import Servicos from './pages/Servicos';
 import ClientPortal from './pages/ClientPortal';
 import Solicitacoes from './pages/Solicitacoes';
+import Instrucoes from './pages/Instrucoes';
 import './index.css';
 
 // Componente principal
@@ -44,6 +45,7 @@ function App() {
               <Route path="/portal" element={<ClientPortal />} />
               <Route path="/client-portal" element={<ClientPortal />} />
               <Route path="/solicitacoes" element={<Solicitacoes />} />
+              <Route path="/instrucoes" element={<Instrucoes />} />
             </Routes>
             {/* Chat Global - Aparece em todas as páginas para admins */}
             <ChatGlobalAdmin />
