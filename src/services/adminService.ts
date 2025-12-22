@@ -331,9 +331,10 @@ export const promoverClienteParaAdmin = async (
       console.log('Cliente não encontrado na coleção clientes');
     }
 
-    // Atualizar users também
+    // Atualizar users também - IMPORTANTE: role deve ser 'admin' para o Login redirecionar corretamente
     try {
       await updateDoc(doc(db, 'users', clienteId), { 
+        role: 'admin',
         isAdmin: true,
         adminRole: role
       });
