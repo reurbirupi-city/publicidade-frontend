@@ -31,7 +31,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
 import { TutorialOverlay } from '../components/TutorialOverlay';
 import ChatWhatsAppAdmin from '../components/ChatWhatsAppAdmin';
-import { getClientes, getProjetos, saveProjetos, atualizarStatusCliente } from '../services/dataIntegration';
+import { getClientes, getProjetos, createProjetoWithSync, atualizarStatusCliente } from '../services/dataIntegration';
 
 // Função para baixar contrato assinado do Firestore
 const baixarContratoAssinado = async (solicitacaoId: string) => {
@@ -429,9 +429,8 @@ const Solicitacoes: React.FC = () => {
         solicitacaoId: solicitacao.id
       };
 
-      // Salvar projeto no localStorage
-      const projetosAtualizados = [...projetos, novoProjeto];
-      saveProjetos(projetosAtualizados);
+      // Salvar projeto no localStorage E no Firestore (para sincronizar com cliente)
+      await createProjetoWithSync(novoProjeto);
 
       // Atualizar status do cliente para "ativo" com etapa "contratado"
       await atualizarStatusCliente(cliente.id, 'ativo', 'contratado');

@@ -315,10 +315,15 @@ export const createProjetoWithSync = async (projeto: any): Promise<void> => {
   projetos.push(projeto);
   saveProjetos(projetos);
   
+  // Buscar dados adicionais do cliente para garantir que o projeto possa ser encontrado
+  const cliente = getClienteById(projeto.clienteId);
+  
   // Salvar no Firestore
   try {
     const projetoParaFirestore = {
       ...projeto,
+      // Incluir email do cliente para facilitar busca no portal do cliente
+      clienteEmail: cliente?.email || projeto.clienteEmail || '',
       syncedAt: new Date().toISOString(),
     };
     

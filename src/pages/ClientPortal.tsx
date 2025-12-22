@@ -403,34 +403,57 @@ const ClientPortal: React.FC = () => {
 
   // ✅ CARREGAR PROJETOS DO FIRESTORE (criados pelo admin) - COM ATUALIZAÇÃO EM TEMPO REAL
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || !clientData) return;
 
     const carregarProjetosDoFirestore = async () => {
       try {
-        console.log('🔍 Buscando projetos do Firestore para cliente:', user.uid);
+        console.log('🔍 Buscando projetos do Firestore para cliente:', user.uid, user.email);
         
-        const q = query(
-          collection(db, 'projetos'),
-          where('clienteId', '==', user.uid)
-        );
-        
-        const querySnapshot = await getDocs(q);
-        const projetos: any[] = [];
+        // Buscar TODOS os projetos e filtrar localmente
+        // Isso permite encontrar projetos por clienteId (uid Firebase), email ou nome
+        const projetosRef = collection(db, 'projetos');
+        const querySnapshot = await getDocs(projetosRef);
+        const todosProjetos: any[] = [];
         
         querySnapshot.forEach((doc) => {
-          projetos.push({ ...doc.data(), id: doc.id });
+          todosProjetos.push({ ...doc.data(), id: doc.id });
         });
         
-        if (projetos.length > 0) {
-          console.log('✅ Encontrados', projetos.length, 'projetos do Firestore');
-          setProjetosAdmin(projetos);
+        // Filtrar projetos que pertencem a este cliente
+        // Busca por: clienteId (uid), clienteEmail, ou nome do cliente
+        const clienteEmail = user.email?.toLowerCase() || '';
+        const clienteNome = clientData?.nome?.toLowerCase() || '';
+        const clienteEmpresa = clientData?.empresa?.toLowerCase() || '';
+        
+        const projetosDoCliente = todosProjetos.filter(projeto => {
+          // Match por clienteId (uid do Firebase)
+          if (projeto.clienteId === user.uid) return true;
+          
+          // Match por email do cliente (campo pode ser clienteEmail ou dentro de cliente)
+          const projetoEmail = (projeto.clienteEmail || projeto.email || '').toLowerCase();
+          if (projetoEmail && projetoEmail === clienteEmail) return true;
+          
+          // Match por nome do cliente
+          const projetoClienteNome = (projeto.clienteNome || '').toLowerCase();
+          if (projetoClienteNome && projetoClienteNome === clienteNome) return true;
+          
+          // Match por empresa
+          const projetoEmpresa = (projeto.clienteEmpresa || '').toLowerCase();
+          if (projetoEmpresa && projetoEmpresa === clienteEmpresa && clienteEmpresa !== 'não informada') return true;
+          
+          return false;
+        });
+        
+        if (projetosDoCliente.length > 0) {
+          console.log('✅ Encontrados', projetosDoCliente.length, 'projetos do Firestore');
+          setProjetosAdmin(projetosDoCliente);
           
           // ✅ REMOVER PROJETOS LOCAIS que já existem no Firestore (evitar duplicação)
           // Se um projeto foi criado pelo admin no Firestore com o mesmo solicitacaoId,
           // remover o projeto local criado automaticamente na assinatura do contrato
           setProjetosDoContrato(prev => {
-            const idsFirestore = projetos.map(p => p.solicitacaoId).filter(Boolean);
-            const contratoIdsFirestore = projetos.map(p => p.contratoId).filter(Boolean);
+            const idsFirestore = projetosDoCliente.map(p => p.solicitacaoId).filter(Boolean);
+            const contratoIdsFirestore = projetosDoCliente.map(p => p.contratoId).filter(Boolean);
             
             const projetosLocaisFiltrados = prev.filter(local => {
               // Manter apenas projetos locais que NÃO existem no Firestore
@@ -471,7 +494,7 @@ const ClientPortal: React.FC = () => {
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [user?.uid]);
+  }, [user?.uid, user?.email, clientData?.nome, clientData?.empresa]);
 
   // ✅ CARREGAR PROPOSTAS E RESPOSTAS DO FIRESTORE (em tempo real com onSnapshot)
   useEffect(() => {
