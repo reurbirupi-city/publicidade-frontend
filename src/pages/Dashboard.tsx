@@ -41,7 +41,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTutorial } from '../contexts/TutorialContext';
 import { isWebmaster, getAdminByEmail, Admin } from '../services/adminService';
 import { db } from '../services/firebase';
-import { collection, query, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, Timestamp, where } from 'firebase/firestore';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -51,6 +51,7 @@ const Dashboard: React.FC = () => {
   const [adminData, setAdminData] = useState<Admin | null>(null);
   const [linkCopiado, setLinkCopiado] = useState(false);
   const [linkAdminCopiado, setLinkAdminCopiado] = useState(false);
+  const [solicitacoesPendentes, setSolicitacoesPendentes] = useState(0);
   const [activities, setActivities] = useState<Array<{
     id: string;
     type: 'success' | 'info' | 'warning';
@@ -71,6 +72,27 @@ const Dashboard: React.FC = () => {
   
   // Carrega estatísticas integradas do sistema
   const systemStats = getSystemStats();
+  
+  // Buscar solicitações pendentes do Firestore
+  useEffect(() => {
+    const buscarSolicitacoesPendentes = async () => {
+      try {
+        const q = query(
+          collection(db, 'solicitacoes_clientes'),
+          where('status', 'in', ['nova', 'analisando', 'proposta-criada'])
+        );
+        const snapshot = await getDocs(q);
+        setSolicitacoesPendentes(snapshot.size);
+      } catch (error) {
+        console.error('Erro ao buscar solicitações:', error);
+      }
+    };
+    
+    buscarSolicitacoesPendentes();
+    // Atualizar a cada 30 segundos
+    const interval = setInterval(buscarSolicitacoesPendentes, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Função para formatar tempo relativo
   const formatTimeAgo = (date: Date): string => {
@@ -355,10 +377,10 @@ const Dashboard: React.FC = () => {
       icon: Bell,
       title: 'Solicitações',
       description: 'Pedidos de Clientes',
-      count: '0 novas',
+      count: `${solicitacoesPendentes} ${solicitacoesPendentes === 1 ? 'nova' : 'novas'}`,
       gradient: 'from-red-500 to-orange-500',
       path: '/solicitacoes',
-      status: 'normal' as const
+      status: solicitacoesPendentes > 0 ? 'notification' as const : 'normal' as const
     }
   ];
 
@@ -650,6 +672,7 @@ const Dashboard: React.FC = () => {
                           <p className="text-xs text-gray-500 dark:text-gray-400">{module.description}</p>
                         </div>
                         <div className={`w-2 h-2 rounded-full ${
+                          module.status === 'notification' ? 'bg-red-500 animate-pulse' :
                           module.status === 'active' ? 'bg-green-500 animate-pulse' :
                           module.status === 'warning' ? 'bg-yellow-500 animate-pulse' :
                           'bg-gray-400'

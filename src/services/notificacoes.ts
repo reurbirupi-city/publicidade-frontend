@@ -242,6 +242,31 @@ export const escutarNotificacoes = (
 // ============================================================================
 
 /**
+ * Notifica webmaster sobre novo admin cadastrado
+ */
+export const notificarNovoAdmin = async (
+  adminNome: string,
+  adminEmail: string,
+  adminRole: string
+): Promise<void> => {
+  console.log('📤 notificarNovoAdmin chamada:', { adminNome, adminEmail, adminRole });
+  
+  const roleLabel = adminRole === 'webmaster' ? 'Webmaster' : 'Administrador';
+  
+  await criarNotificacao({
+    tipo: 'sistema',
+    titulo: '👑 Novo Administrador Cadastrado!',
+    mensagem: `${adminNome} (${adminEmail}) foi cadastrado como ${roleLabel}. O novo admin já pode acessar o sistema.`,
+    destinatarioTipo: 'admin',
+    destinatarioId: 'webmaster',
+    remetenteNome: adminNome,
+    link: '/dashboard',
+    icone: '👑',
+    prioridade: 'alta'
+  });
+};
+
+/**
  * Notifica admin sobre novo cliente cadastrado
  * @param adminId - ID específico do admin (se cliente veio por link de convite)
  *                  Se não fornecido, notifica o webmaster (sistema)
@@ -262,7 +287,7 @@ export const notificarNovoCliente = async (
   await criarNotificacao({
     tipo: 'novo_cliente',
     titulo: '👤 Novo Cliente Cadastrado!',
-    mensagem: `${clienteNome} (${clienteEmpresa}) acabou de se cadastrar. Email: ${clienteEmail}`,
+    mensagem: `${clienteNome} (${clienteEmpresa}) acabou de se cadastrar. Email: ${clienteEmail}. 📌 Aguarde o cliente fazer uma solicitação de serviço para iniciar o fluxo de contratação.`,
     destinatarioTipo: 'admin',
     destinatarioId: destinatario,
     remetenteNome: clienteNome,
@@ -292,8 +317,8 @@ export const notificarNovaSolicitacao = async (
   
   await criarNotificacao({
     tipo: 'nova_solicitacao',
-    titulo: '📋 Nova Solicitação de Serviço',
-    mensagem: `${clienteNome} solicitou: ${servicoTitulo}`,
+    titulo: '📋 Nova Solicitação de Serviço!',
+    mensagem: `${clienteNome} solicitou: ${servicoTitulo}. 📌 PRÓXIMOS PASSOS: 1) Acesse Solicitações 2) Envie uma Proposta 3) Aguarde o cliente aceitar 4) Envie o Contrato 5) Após assinatura, crie o Projeto.`,
     destinatarioTipo: 'admin',
     destinatarioId: destinatario,
     remetenteNome: clienteNome,

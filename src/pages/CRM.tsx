@@ -342,7 +342,7 @@ const CRM: React.FC = () => {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (modalMode === 'create') {
       const newCliente: Cliente = {
         ...formData as Cliente,
@@ -350,6 +350,21 @@ const CRM: React.FC = () => {
         dataContato: new Date().toISOString().split('T')[0]
       };
       setClientes([...clientes, newCliente]);
+      
+      // Notificar sobre novo cliente cadastrado
+      try {
+        const { notificarNovoCliente } = await import('../services/notificacoes');
+        await notificarNovoCliente(
+          newCliente.nome,
+          newCliente.empresa,
+          newCliente.email,
+          newCliente.id,
+          user?.uid // Admin que criou
+        );
+        console.log('✅ Notificação de novo cliente enviada');
+      } catch (error) {
+        console.error('❌ Erro ao enviar notificação:', error);
+      }
     } else if (modalMode === 'edit' && selectedCliente) {
       setClientes(clientes.map(c => 
         c.id === selectedCliente.id ? { ...formData as Cliente, id: c.id } : c

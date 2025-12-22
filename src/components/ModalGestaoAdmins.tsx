@@ -122,6 +122,19 @@ const ModalGestaoAdmins: React.FC<ModalGestaoAdminsProps> = ({ isOpen, onClose }
         });
 
         if (resultado.success) {
+          // Notificar webmaster sobre novo admin
+          try {
+            const { notificarNovoAdmin } = await import('../services/notificacoes');
+            await notificarNovoAdmin(
+              formData.nome,
+              formData.email,
+              formData.role
+            );
+            console.log('✅ Notificação de novo admin enviada');
+          } catch (error) {
+            console.error('❌ Erro ao enviar notificação:', error);
+          }
+          
           setShowForm(false);
           resetForm();
         } else {
