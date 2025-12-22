@@ -323,57 +323,48 @@ const EntregasProjeto: React.FC<EntregasProjetoProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header com Upload (apenas admin) */}
+      {/* Aviso de funcionalidade em desenvolvimento */}
+      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-xl p-4">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-6 h-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-semibold text-yellow-800 dark:text-yellow-300">
+              Funcionalidade em Desenvolvimento
+            </h4>
+            <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
+              O sistema de upload de arquivos está temporariamente indisponível. 
+              Esta funcionalidade será habilitada em breve. Por enquanto, utilize 
+              outros meios para enviar os arquivos ao cliente (WhatsApp, Email, etc.).
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Header com Upload (apenas admin) - DESABILITADO TEMPORARIAMENTE */}
       {isAdmin && (
-        <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-xl p-6 border border-orange-200 dark:border-orange-800">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <Upload className="w-5 h-5 text-orange-500" />
+        <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 rounded-xl p-6 border border-gray-300 dark:border-gray-600 opacity-60">
+          <h3 className="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-4 flex items-center gap-2">
+            <Upload className="w-5 h-5 text-gray-400" />
             Enviar Entrega
+            <span className="text-xs bg-yellow-200 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-200 px-2 py-0.5 rounded-full ml-2">
+              Em breve
+            </span>
           </h3>
           
-          <div 
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              uploading 
-                ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/10' 
-                : 'border-gray-300 dark:border-gray-600 hover:border-orange-400'
-            }`}
-          >
-            {uploading ? (
-              <div className="space-y-3">
-                <Loader2 className="w-10 h-10 animate-spin text-orange-500 mx-auto" />
-                <p className="text-gray-600 dark:text-gray-400">Enviando arquivo...</p>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                  <div 
-                    className="bg-orange-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${uploadProgress}%` }}
-                  />
-                </div>
-                <p className="text-sm text-gray-500">{Math.round(uploadProgress)}%</p>
-              </div>
-            ) : (
-              <>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => handleUpload(e.target.files)}
-                  accept="image/*,video/*,.pdf,.psd,.ai,.eps,.doc,.docx,.xls,.xlsx,.zip,.rar"
-                />
-                <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600 dark:text-gray-400 mb-2">
-                  Arraste arquivos aqui ou clique para selecionar
-                </p>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors"
-                >
-                  Selecionar Arquivo
-                </button>
-                <p className="text-xs text-gray-500 mt-2">
-                  Suporta: Imagens, Vídeos, PDFs, PSD, AI, Documentos, ZIP
-                </p>
-              </>
-            )}
+          <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
+            <Upload className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+            <p className="text-gray-400 dark:text-gray-500 mb-2">
+              Upload de arquivos temporariamente indisponível
+            </p>
+            <button
+              disabled
+              className="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 rounded-lg cursor-not-allowed"
+            >
+              Selecionar Arquivo
+            </button>
+            <p className="text-xs text-gray-400 mt-2">
+              Esta funcionalidade será habilitada em breve
+            </p>
           </div>
         </div>
       )}
