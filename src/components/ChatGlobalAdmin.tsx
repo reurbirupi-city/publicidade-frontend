@@ -54,6 +54,8 @@ const ChatGlobalAdmin: React.FC = () => {
   const [clienteIdsDoAdmin, setClienteIdsDoAdmin] = useState<string[]>([]);
   const [isWebmasterUser, setIsWebmasterUser] = useState(false);
   const [menuAberto, setMenuAberto] = useState(false);
+  const [adminId, setAdminId] = useState<string | null>(null);
+  const [clientesCarregados, setClientesCarregados] = useState(false);
   const [modalConfirmacao, setModalConfirmacao] = useState<{
     tipo: 'limpar' | 'encerrar' | 'excluir' | null;
     conversaId?: string;
@@ -112,15 +114,26 @@ const ChatGlobalAdmin: React.FC = () => {
       }
       
       // Carregar IDs dos clientes deste admin
-      if (adminCheck && !webmasterCheck && adminData) {
-        try {
-          const clientes = await getClientesDoAdmin(adminData.id);
-          const ids = clientes.map(c => c.id);
-          setClienteIdsDoAdmin(ids);
-          console.log(`📋 Chat: Admin tem ${ids.length} clientes vinculados`);
-        } catch (error) {
-          console.error('❌ Erro ao carregar clientes do admin:', error);
+      if (adminCheck && !webmasterCheck) {
+        if (adminData) {
+          setAdminId(adminData.id);
+          try {
+            const clientes = await getClientesDoAdmin(adminData.id);
+            const ids = clientes.map(c => c.id);
+            setClienteIdsDoAdmin(ids);
+            setClientesCarregados(true);
+            console.log(`📋 Chat: Admin ${adminData.id} tem ${ids.length} clientes vinculados`);
+          } catch (error) {
+            console.error('❌ Erro ao carregar clientes do admin:', error);
+            setClientesCarregados(true);
+          }
+        } else {
+          // Admin sem dados no Firestore
+          console.log('⚠️ Admin sem registro no Firestore');
+          setClientesCarregados(true);
         }
+      } else if (webmasterCheck) {
+        setClientesCarregados(true);
       }
       
       console.log('🔐 ChatGlobalAdmin - User:', user?.email, '| isAdmin:', adminCheck, '| isWebmaster:', webmasterCheck);
@@ -138,14 +151,21 @@ const ChatGlobalAdmin: React.FC = () => {
   useEffect(() => {
     if (!isAdmin) return;
     
-    // Se não é webmaster e não tem clientes, não carregar
+    // Aguardar carregamento dos clientes
+    if (!clientesCarregados) {
+      console.log('⏳ Aguardando carregamento dos clientes...');
+      return;
+    }
+    
+    // Se não é webmaster e não tem clientes vinculados, mostrar mensagem
     if (!isWebmasterUser && clienteIdsDoAdmin.length === 0) {
-      console.log('⚠️ Admin sem clientes vinculados, aguardando...');
+      console.log('⚠️ Admin sem clientes vinculados');
       setConversas([]);
+      setCarregando(false);
       return;
     }
 
-    console.log('🔍 Carregando conversas para o admin...', isWebmasterUser ? '(webmaster - todas)' : `(${clienteIdsDoAdmin.length} clientes)`);
+    console.log('🔍 Carregando conversas para o admin...', isWebmasterUser ? '(webmaster - todas)' : `(${clienteIdsDoAdmin.length} clientes vinculados)`);
     setCarregando(true);
 
     const q = query(
@@ -158,9 +178,14 @@ const ChatGlobalAdmin: React.FC = () => {
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
         
-        // Filtrar: webmaster vê tudo, admin comum vê só seus clientes
-        if (!isWebmasterUser && !clienteIdsDoAdmin.includes(data.clienteId)) {
-          return; // Pular solicitações de clientes de outros admins
+        // Filtrar conversas:
+        // - Webmaster vê tudo
+        // - Admin comum vê apenas conversas de clientes vinculados a ele
+        if (!isWebmasterUser) {
+          // Verificar se o cliente está vinculado a este admin
+          if (!clienteIdsDoAdmin.includes(data.clienteId)) {
+            return; // Pular - cliente não vinculado
+          }
         }
         
         const respostas = data.respostas || [];
@@ -204,7 +229,7 @@ const ChatGlobalAdmin: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [isAdmin, isWebmasterUser, clienteIdsDoAdmin]);
+  }, [isAdmin, isWebmasterUser, clienteIdsDoAdmin, clientesCarregados]);
 
   // Marcar mensagens como lidas quando abrir a conversa
   useEffect(() => {
