@@ -29,7 +29,8 @@ import {
   ExternalLink,
   UserPlus,
   Crown,
-  Package
+  Package,
+  Download
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 
@@ -131,171 +132,359 @@ const Instrucoes: React.FC = () => {
           </p>
         </div>
 
-        {/* Fluxo Admin-Cliente */}
-        <Section title="🔄 Fluxo Completo: Admin ↔ Cliente" icon={<Users className="w-5 h-5" />} defaultOpen>
+        {/* Fluxo de Trabalho Completo */}
+        <Section title="🔄 Fluxo de Trabalho: Da Solicitação à Entrega" icon={<Users className="w-5 h-5" />} defaultOpen>
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Entenda como funciona a relação entre administrador e cliente no sistema.
+            Veja o passo a passo completo desde quando o cliente solicita um serviço até a entrega final.
           </p>
           
           {/* Diagrama Visual do Fluxo */}
           <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 mb-6">
-            <h4 className="font-bold text-gray-900 dark:text-white mb-4 text-center">📊 Visão Geral do Fluxo</h4>
+            <h4 className="font-bold text-gray-900 dark:text-white mb-4 text-center">📊 Visão Geral do Fluxo de Trabalho</h4>
             
-            <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
-              {/* Admin */}
-              <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-4 text-white text-center min-w-[140px]">
-                <Crown className="w-8 h-8 mx-auto mb-2" />
-                <p className="font-bold">ADMIN</p>
-                <p className="text-xs text-purple-200">Você</p>
+            <div className="flex flex-col items-center gap-2">
+              {/* Linha 1 */}
+              <div className="flex flex-col md:flex-row items-center justify-center gap-3 md:gap-6 w-full">
+                <div className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl p-3 text-white text-center min-w-[120px]">
+                  <Send className="w-6 h-6 mx-auto mb-1" />
+                  <p className="font-bold text-sm">1. Solicita</p>
+                  <p className="text-xs text-blue-200">Cliente</p>
+                </div>
+                <div className="text-gray-400 text-xl hidden md:block">→</div>
+                <div className="text-gray-400 text-xl md:hidden">↓</div>
+                <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-3 text-white text-center min-w-[120px]">
+                  <Eye className="w-6 h-6 mx-auto mb-1" />
+                  <p className="font-bold text-sm">2. Analisa</p>
+                  <p className="text-xs text-purple-200">Admin</p>
+                </div>
+                <div className="text-gray-400 text-xl hidden md:block">→</div>
+                <div className="text-gray-400 text-xl md:hidden">↓</div>
+                <div className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl p-3 text-white text-center min-w-[120px]">
+                  <FileText className="w-6 h-6 mx-auto mb-1" />
+                  <p className="font-bold text-sm">3. Proposta</p>
+                  <p className="text-xs text-amber-200">Admin</p>
+                </div>
+                <div className="text-gray-400 text-xl hidden md:block">→</div>
+                <div className="text-gray-400 text-xl md:hidden">↓</div>
+                <div className="bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl p-3 text-white text-center min-w-[120px]">
+                  <CheckCircle2 className="w-6 h-6 mx-auto mb-1" />
+                  <p className="font-bold text-sm">4. Aprova</p>
+                  <p className="text-xs text-green-200">Cliente</p>
+                </div>
               </div>
               
-              {/* Seta */}
-              <div className="flex flex-col items-center text-gray-400">
-                <div className="hidden md:block text-2xl">→</div>
-                <div className="md:hidden text-2xl">↓</div>
-                <p className="text-xs">Envia Link</p>
-              </div>
+              {/* Linha 2 */}
+              <div className="text-gray-400 text-xl">↓</div>
               
-              {/* Link */}
-              <div className="bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl p-4 text-white text-center min-w-[140px]">
-                <Link2 className="w-8 h-8 mx-auto mb-2" />
-                <p className="font-bold">LINK</p>
-                <p className="text-xs text-green-200">Código Único</p>
-              </div>
-              
-              {/* Seta */}
-              <div className="flex flex-col items-center text-gray-400">
-                <div className="hidden md:block text-2xl">→</div>
-                <div className="md:hidden text-2xl">↓</div>
-                <p className="text-xs">Cadastra</p>
-              </div>
-              
-              {/* Cliente */}
-              <div className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl p-4 text-white text-center min-w-[140px]">
-                <UserPlus className="w-8 h-8 mx-auto mb-2" />
-                <p className="font-bold">CLIENTE</p>
-                <p className="text-xs text-blue-200">Vinculado a você</p>
+              <div className="flex flex-col md:flex-row items-center justify-center gap-3 md:gap-6 w-full">
+                <div className="bg-gradient-to-br from-pink-500 to-rose-500 rounded-xl p-3 text-white text-center min-w-[120px]">
+                  <Briefcase className="w-6 h-6 mx-auto mb-1" />
+                  <p className="font-bold text-sm">5. Projeto</p>
+                  <p className="text-xs text-pink-200">Admin cria</p>
+                </div>
+                <div className="text-gray-400 text-xl hidden md:block">→</div>
+                <div className="text-gray-400 text-xl md:hidden">↓</div>
+                <div className="bg-gradient-to-br from-indigo-500 to-violet-500 rounded-xl p-3 text-white text-center min-w-[120px]">
+                  <Package className="w-6 h-6 mx-auto mb-1" />
+                  <p className="font-bold text-sm">6. Executa</p>
+                  <p className="text-xs text-indigo-200">Admin</p>
+                </div>
+                <div className="text-gray-400 text-xl hidden md:block">→</div>
+                <div className="text-gray-400 text-xl md:hidden">↓</div>
+                <div className="bg-gradient-to-br from-teal-500 to-cyan-500 rounded-xl p-3 text-white text-center min-w-[120px]">
+                  <Image className="w-6 h-6 mx-auto mb-1" />
+                  <p className="font-bold text-sm">7. Entrega</p>
+                  <p className="text-xs text-teal-200">Admin</p>
+                </div>
+                <div className="text-gray-400 text-xl hidden md:block">→</div>
+                <div className="text-gray-400 text-xl md:hidden">↓</div>
+                <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl p-3 text-white text-center min-w-[120px]">
+                  <CheckCircle2 className="w-6 h-6 mx-auto mb-1" />
+                  <p className="font-bold text-sm">8. Finaliza</p>
+                  <p className="text-xs text-emerald-200">Cliente aprova</p>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Etapas Detalhadas */}
-          <div className="space-y-4">
-            <h4 className="font-bold text-gray-900 dark:text-white">📋 Etapas do Processo:</h4>
+          {/* Seção do Cliente */}
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 bg-blue-500 rounded-lg">
+                <UserPlus className="w-5 h-5 text-white" />
+              </div>
+              <h4 className="font-bold text-lg text-gray-900 dark:text-white">O que o CLIENTE faz:</h4>
+            </div>
             
-            {/* Etapa 1 */}
-            <div className="flex gap-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border-l-4 border-purple-500">
-              <div className="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold">1</div>
-              <div>
-                <p className="font-bold text-gray-900 dark:text-white">Admin gera o link de convite</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Acesse ⚙️ Configurações no Dashboard → Copie o "Link para Clientes"
-                </p>
-                <div className="mt-2 p-2 bg-white dark:bg-gray-800 rounded-lg text-xs font-mono text-purple-600 dark:text-purple-400 break-all">
-                  seusite.com/register?ref=XSYALU3B
+            <div className="space-y-4">
+              {/* Passo 1 Cliente */}
+              <div className="flex gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border-l-4 border-blue-500">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">1</div>
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Acessa o Portal do Cliente</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Faz login com email e senha cadastrados.
+                  </p>
+                </div>
+              </div>
+              
+              {/* Passo 2 Cliente */}
+              <div className="flex gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border-l-4 border-blue-500">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">2</div>
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Solicita um novo serviço</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Clica em <strong>"Solicitar Serviço"</strong>, escolhe o tipo de serviço desejado e descreve o que precisa.
+                  </p>
+                  <div className="mt-2 p-3 bg-white dark:bg-gray-800 rounded-lg">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Exemplo de solicitação:</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 italic">"Preciso de um logo para minha nova loja de roupas femininas, com cores rosa e dourado..."</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Passo 3 Cliente */}
+              <div className="flex gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border-l-4 border-blue-500">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">3</div>
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Aguarda a proposta</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    O admin analisa a solicitação e envia uma proposta com valores e prazos.
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
+                    <Bell className="w-4 h-4" />
+                    <span>Recebe notificação quando a proposta estiver pronta</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Passo 4 Cliente */}
+              <div className="flex gap-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border-l-4 border-green-500">
+                <div className="flex-shrink-0 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-bold">4</div>
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Aprova a proposta e assina contrato</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Revisa os valores, aceita a proposta e assina o contrato digitalmente.
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <span className="text-sm text-green-600 dark:text-green-400">Projeto inicia automaticamente!</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Passo 5 Cliente */}
+              <div className="flex gap-4 p-4 bg-cyan-50 dark:bg-cyan-900/20 rounded-xl border-l-4 border-cyan-500">
+                <div className="flex-shrink-0 w-10 h-10 bg-cyan-500 rounded-full flex items-center justify-center text-white font-bold">5</div>
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Acompanha o projeto</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Visualiza o andamento do projeto, etapas concluídas e próximos passos.
+                  </p>
+                </div>
+              </div>
+              
+              {/* Passo 6 Cliente */}
+              <div className="flex gap-4 p-4 bg-teal-50 dark:bg-teal-900/20 rounded-xl border-l-4 border-teal-500">
+                <div className="flex-shrink-0 w-10 h-10 bg-teal-500 rounded-full flex items-center justify-center text-white font-bold">6</div>
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Recebe as entregas</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Visualiza e baixa os arquivos entregues pelo admin.
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-sm text-teal-600 dark:text-teal-400">
+                    <Download className="w-4 h-4" />
+                    <span>Pode baixar imagens, PDFs, vídeos, etc.</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Passo 7 Cliente */}
+              <div className="flex gap-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border-l-4 border-emerald-500">
+                <div className="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold">7</div>
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Aprova ou solicita ajustes</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Se estiver tudo certo, aprova a entrega. Se precisar de alterações, envia feedback.
+                  </p>
+                  <div className="mt-2 flex flex-col gap-1">
+                    <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span><strong>Aprovar:</strong> Finaliza o projeto</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                      <MessageSquare className="w-4 h-4" />
+                      <span><strong>Feedback:</strong> Solicita alterações</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-            
-            {/* Etapa 2 */}
-            <div className="flex gap-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border-l-4 border-green-500">
-              <div className="flex-shrink-0 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-bold">2</div>
-              <div>
-                <p className="font-bold text-gray-900 dark:text-white">Envie o link ao cliente</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Envie por WhatsApp, email ou qualquer meio de comunicação.
-                </p>
-                <div className="mt-2 flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-                  <MessageSquare className="w-4 h-4" />
-                  <span>"Olá! Use este link para se cadastrar no sistema..."</span>
-                </div>
+          </div>
+
+          {/* Seção do Admin */}
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 bg-purple-500 rounded-lg">
+                <Crown className="w-5 h-5 text-white" />
               </div>
+              <h4 className="font-bold text-lg text-gray-900 dark:text-white">O que o ADMIN faz:</h4>
             </div>
             
-            {/* Etapa 3 */}
-            <div className="flex gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border-l-4 border-blue-500">
-              <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">3</div>
-              <div>
-                <p className="font-bold text-gray-900 dark:text-white">Cliente se cadastra</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  O cliente acessa o link, preenche os dados e cria a conta.
-                </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-blue-500" />
-                  <span className="text-sm text-blue-600 dark:text-blue-400">Automaticamente vinculado a você!</span>
+            <div className="space-y-4">
+              {/* Passo 1 Admin */}
+              <div className="flex gap-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border-l-4 border-purple-500">
+                <div className="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold">1</div>
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Recebe notificação de nova solicitação</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    O sininho 🔔 mostra que há uma nova solicitação de cliente.
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400">
+                    <Bell className="w-4 h-4" />
+                    <span>Acesse o módulo <strong>"Solicitações"</strong> no Dashboard</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            {/* Etapa 4 */}
-            <div className="flex gap-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border-l-4 border-amber-500">
-              <div className="flex-shrink-0 w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center text-white font-bold">4</div>
-              <div>
-                <p className="font-bold text-gray-900 dark:text-white">Código regenera automaticamente</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Por segurança, cada código é de uso único. Após o cadastro, um novo código é gerado.
-                </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-amber-500" />
-                  <span className="text-sm text-amber-600 dark:text-amber-400">Link antigo não funciona mais!</span>
+              
+              {/* Passo 2 Admin */}
+              <div className="flex gap-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border-l-4 border-purple-500">
+                <div className="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold">2</div>
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Analisa a solicitação</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Leia o que o cliente precisa, tire dúvidas pelo chat se necessário.
+                  </p>
                 </div>
               </div>
-            </div>
-            
-            {/* Etapa 5 */}
-            <div className="flex gap-4 p-4 bg-cyan-50 dark:bg-cyan-900/20 rounded-xl border-l-4 border-cyan-500">
-              <div className="flex-shrink-0 w-10 h-10 bg-cyan-500 rounded-full flex items-center justify-center text-white font-bold">5</div>
-              <div>
-                <p className="font-bold text-gray-900 dark:text-white">Interação Admin ↔ Cliente</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Agora vocês podem interagir pelo sistema:
-                </p>
-                <ul className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                  <li className="flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-cyan-500" />
-                    Chat em tempo real
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Briefcase className="w-4 h-4 text-cyan-500" />
-                    Criar projetos para o cliente
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-cyan-500" />
-                    Enviar propostas e contratos
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Send className="w-4 h-4 text-cyan-500" />
-                    Cliente pode solicitar serviços
-                  </li>
-                </ul>
+              
+              {/* Passo 3 Admin */}
+              <div className="flex gap-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border-l-4 border-amber-500">
+                <div className="flex-shrink-0 w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center text-white font-bold">3</div>
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Cria e envia uma proposta</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Clique em <strong>"Gerar Proposta"</strong> na solicitação. Defina:
+                  </p>
+                  <ul className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400 ml-4 list-disc">
+                    <li>Serviços incluídos</li>
+                    <li>Valor total</li>
+                    <li>Forma de pagamento (à vista ou parcelado)</li>
+                    <li>Prazo de entrega</li>
+                  </ul>
+                </div>
+              </div>
+              
+              {/* Passo 4 Admin */}
+              <div className="flex gap-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border-l-4 border-green-500">
+                <div className="flex-shrink-0 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-bold">4</div>
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Cliente aprova → Contrato é assinado</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Quando o cliente aceitar, você recebe notificação. O contrato é gerado automaticamente.
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <span className="text-sm text-green-600 dark:text-green-400">Parcelas são criadas no Financeiro!</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Passo 5 Admin */}
+              <div className="flex gap-4 p-4 bg-pink-50 dark:bg-pink-900/20 rounded-xl border-l-4 border-pink-500">
+                <div className="flex-shrink-0 w-10 h-10 bg-pink-500 rounded-full flex items-center justify-center text-white font-bold">5</div>
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Cria o projeto</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Acesse <strong>"Projetos"</strong> e crie um novo projeto vinculado ao cliente.
+                  </p>
+                  <ul className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400 ml-4 list-disc">
+                    <li>Defina as etapas (Briefing, Criação, Revisão, etc.)</li>
+                    <li>Estabeleça prazos para cada etapa</li>
+                    <li>O cliente poderá acompanhar o progresso</li>
+                  </ul>
+                </div>
+              </div>
+              
+              {/* Passo 6 Admin */}
+              <div className="flex gap-4 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border-l-4 border-indigo-500">
+                <div className="flex-shrink-0 w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center text-white font-bold">6</div>
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Executa o trabalho</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Trabalhe no projeto e vá atualizando as etapas conforme avança.
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400">
+                    <Calendar className="w-4 h-4" />
+                    <span>Use a Agenda para organizar seus prazos</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Passo 7 Admin */}
+              <div className="flex gap-4 p-4 bg-teal-50 dark:bg-teal-900/20 rounded-xl border-l-4 border-teal-500">
+                <div className="flex-shrink-0 w-10 h-10 bg-teal-500 rounded-full flex items-center justify-center text-white font-bold">7</div>
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Faz as entregas</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    No projeto, acesse a aba <strong>"Entregas"</strong> e faça upload dos arquivos.
+                  </p>
+                  <ul className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400 ml-4 list-disc">
+                    <li>Adicione título e descrição para cada entrega</li>
+                    <li>O cliente será notificado</li>
+                    <li>Ele poderá baixar e visualizar os arquivos</li>
+                  </ul>
+                </div>
+              </div>
+              
+              {/* Passo 8 Admin */}
+              <div className="flex gap-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border-l-4 border-emerald-500">
+                <div className="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold">8</div>
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Recebe feedback e finaliza</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    O cliente pode aprovar ou pedir ajustes. Quando aprovado:
+                  </p>
+                  <div className="mt-2 flex flex-col gap-1">
+                    <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Projeto marcado como <strong>Concluído</strong></span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+                      <DollarSign className="w-4 h-4" />
+                      <span>Acompanhe os pagamentos no <strong>Financeiro</strong></span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Resumo Visual */}
-          <div className="mt-6 p-4 bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 rounded-xl">
-            <h4 className="font-bold text-gray-900 dark:text-white mb-3">✨ Resumo Rápido</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+          <div className="p-4 bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 rounded-xl">
+            <h4 className="font-bold text-gray-900 dark:text-white mb-3">✨ Módulos Utilizados no Fluxo</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
               <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
-                <p className="text-2xl mb-1">👨‍💼</p>
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">Admin</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Gera link e gerencia</p>
+                <Send className="w-6 h-6 mx-auto mb-1 text-blue-500" />
+                <p className="text-xs font-semibold text-gray-900 dark:text-white">Solicitações</p>
               </div>
               <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
-                <p className="text-2xl mb-1">🔗</p>
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">Vínculo</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Automático e permanente</p>
+                <Briefcase className="w-6 h-6 mx-auto mb-1 text-pink-500" />
+                <p className="text-xs font-semibold text-gray-900 dark:text-white">Projetos</p>
               </div>
               <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
-                <p className="text-2xl mb-1">👤</p>
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">Cliente</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Acessa portal exclusivo</p>
+                <DollarSign className="w-6 h-6 mx-auto mb-1 text-green-500" />
+                <p className="text-xs font-semibold text-gray-900 dark:text-white">Financeiro</p>
+              </div>
+              <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
+                <MessageSquare className="w-6 h-6 mx-auto mb-1 text-purple-500" />
+                <p className="text-xs font-semibold text-gray-900 dark:text-white">Chat</p>
               </div>
             </div>
           </div>
 
           <Tip>
-            Cada admin só vê e gerencia os clientes vinculados a ele. Isso garante privacidade e organização!
+            Use o Chat a qualquer momento para tirar dúvidas com o cliente ou vice-versa!
           </Tip>
         </Section>
 
