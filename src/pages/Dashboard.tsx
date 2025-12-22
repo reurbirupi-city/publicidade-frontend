@@ -60,7 +60,7 @@ const Dashboard: React.FC = () => {
   }>>([]);
   const settingsRef = useRef<HTMLDivElement>(null);
   
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { setUserType } = useTutorial();
   const userIsWebmaster = user?.email ? isWebmaster(user.email) : false;
   
@@ -529,24 +529,30 @@ const Dashboard: React.FC = () => {
 
                     <div className="border-t border-gray-200 dark:border-gray-700 mt-2 pt-2">
                       <button
-                        onClick={() => navigate('/')}
-                        className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left text-gray-600 dark:text-gray-300"
+                        onClick={async () => {
+                          await signOut();
+                          navigate('/login');
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-left text-red-600 dark:text-red-400"
                       >
-                        <Home className="w-4 h-4" />
-                        <span className="text-sm">Voltar ao Início</span>
+                        <LogOut className="w-4 h-4" />
+                        <span className="text-sm">Sair</span>
                       </button>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Home */}
+              {/* Logout */}
               <button
-                onClick={() => navigate('/')}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                onClick={async () => {
+                  await signOut();
+                  navigate('/login');
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 rounded-lg transition-colors"
               >
-                <Home className="w-4 h-4" />
-                <span className="text-sm font-medium">Início</span>
+                <LogOut className="w-4 h-4" />
+                <span className="text-sm font-medium">Sair</span>
               </button>
             </div>
           </div>
