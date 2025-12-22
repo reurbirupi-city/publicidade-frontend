@@ -565,32 +565,43 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats.map((stat, index) => (
-            <div
-              key={index}
-              className="relative group cursor-pointer"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity blur-xl" 
-                   style={{ background: `linear-gradient(135deg, ${stat.gradient})` }}></div>
-              <div className="relative backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 border-l-4 border-l-purple-500 dark:border-l-amber-500 rounded-xl p-6 transition-all hover:scale-105 hover:shadow-2xl hover:border-l-purple-600 dark:hover:border-l-amber-400 hover:shadow-purple-500/20 dark:hover:shadow-amber-500/20">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-lg`}>
-                    <stat.icon className="w-6 h-6 text-white" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {stats.map((stat, index) => {
+            // Cores variadas para cada card de stats
+            const cardColors = [
+              { border: 'border-l-blue-500 hover:border-l-blue-600', bg: 'from-blue-50 to-cyan-50 dark:from-blue-950/40 dark:to-cyan-950/40' },
+              { border: 'border-l-purple-500 hover:border-l-purple-600', bg: 'from-purple-50 to-pink-50 dark:from-purple-950/40 dark:to-pink-950/40' },
+              { border: 'border-l-emerald-500 hover:border-l-emerald-600', bg: 'from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/40' },
+              { border: 'border-l-orange-500 hover:border-l-orange-600', bg: 'from-orange-50 to-amber-50 dark:from-orange-950/40 dark:to-amber-950/40' }
+            ];
+            const colors = cardColors[index % cardColors.length];
+            
+            return (
+              <div
+                key={index}
+                className="relative group cursor-pointer"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity blur-xl" 
+                     style={{ background: `linear-gradient(135deg, ${stat.gradient})` }}></div>
+                <div className={`relative backdrop-blur-xl bg-gradient-to-br ${colors.bg} border border-gray-200 dark:border-gray-800 border-l-4 ${colors.border} rounded-xl p-4 transition-all hover:scale-[1.02] hover:shadow-xl`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-md`}>
+                      <stat.icon className="w-5 h-5 text-white" />
+                    </div>
+                    <span className={`text-xs font-semibold ${
+                      stat.changeType === 'positive' ? 'text-green-500' : 
+                      stat.changeType === 'negative' ? 'text-red-500' : 
+                      'text-gray-500'
+                    }`}>
+                      {stat.change}
+                    </span>
                   </div>
-                  <span className={`text-sm font-semibold ${
-                    stat.changeType === 'positive' ? 'text-green-500' : 
-                    stat.changeType === 'negative' ? 'text-red-500' : 
-                    'text-gray-500'
-                  }`}>
-                    {stat.change}
-                  </span>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">{stat.value}</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{stat.label}</p>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{stat.value}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{stat.label}</p>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -604,59 +615,76 @@ const Dashboard: React.FC = () => {
               </button>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              {modules.map((module, index) => (
-                <div
-                  key={index}
-                  onClick={() => navigate(module.path)}
-                  className="relative group cursor-pointer"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity blur-xl" 
-                       style={{ background: `linear-gradient(135deg, ${module.gradient})` }}></div>
-                  <div className="relative backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 border-l-4 border-l-blue-500 dark:border-l-amber-500 rounded-lg p-6 transition-all hover:scale-105 hover:shadow-2xl hover:border-l-blue-600 dark:hover:border-l-amber-400 hover:shadow-blue-500/20 dark:hover:shadow-amber-500/20">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${module.gradient} flex items-center justify-center shadow-lg`}>
-                        <module.icon className="w-6 h-6 text-white" />
+            <div className="grid md:grid-cols-2 gap-3">
+              {modules.map((module, index) => {
+                // Cores variadas para cada módulo
+                const moduleColors = [
+                  { border: 'border-l-blue-500 hover:border-l-blue-600', bg: 'from-blue-50/80 to-cyan-50/80 dark:from-blue-950/30 dark:to-cyan-950/30', text: 'text-blue-600 dark:text-blue-400' },
+                  { border: 'border-l-purple-500 hover:border-l-purple-600', bg: 'from-purple-50/80 to-pink-50/80 dark:from-purple-950/30 dark:to-pink-950/30', text: 'text-purple-600 dark:text-purple-400' },
+                  { border: 'border-l-emerald-500 hover:border-l-emerald-600', bg: 'from-emerald-50/80 to-teal-50/80 dark:from-emerald-950/30 dark:to-teal-950/30', text: 'text-emerald-600 dark:text-emerald-400' },
+                  { border: 'border-l-orange-500 hover:border-l-orange-600', bg: 'from-orange-50/80 to-amber-50/80 dark:from-orange-950/30 dark:to-amber-950/30', text: 'text-orange-600 dark:text-orange-400' },
+                  { border: 'border-l-pink-500 hover:border-l-pink-600', bg: 'from-pink-50/80 to-rose-50/80 dark:from-pink-950/30 dark:to-rose-950/30', text: 'text-pink-600 dark:text-pink-400' },
+                  { border: 'border-l-indigo-500 hover:border-l-indigo-600', bg: 'from-indigo-50/80 to-violet-50/80 dark:from-indigo-950/30 dark:to-violet-950/30', text: 'text-indigo-600 dark:text-indigo-400' },
+                  { border: 'border-l-teal-500 hover:border-l-teal-600', bg: 'from-teal-50/80 to-cyan-50/80 dark:from-teal-950/30 dark:to-cyan-950/30', text: 'text-teal-600 dark:text-teal-400' },
+                  { border: 'border-l-red-500 hover:border-l-red-600', bg: 'from-red-50/80 to-orange-50/80 dark:from-red-950/30 dark:to-orange-950/30', text: 'text-red-600 dark:text-red-400' }
+                ];
+                const colors = moduleColors[index % moduleColors.length];
+                
+                return (
+                  <div
+                    key={index}
+                    onClick={() => navigate(module.path)}
+                    className="relative group cursor-pointer"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity blur-xl" 
+                         style={{ background: `linear-gradient(135deg, ${module.gradient})` }}></div>
+                    <div className={`relative backdrop-blur-xl bg-gradient-to-br ${colors.bg} border border-gray-200 dark:border-gray-800 border-l-4 ${colors.border} rounded-lg p-4 transition-all hover:scale-[1.02] hover:shadow-xl`}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${module.gradient} flex items-center justify-center shadow-md`}>
+                          <module.icon className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-base font-bold text-gray-900 dark:text-white">{module.title}</h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{module.description}</p>
+                        </div>
+                        <div className={`w-2 h-2 rounded-full ${
+                          module.status === 'active' ? 'bg-green-500 animate-pulse' :
+                          module.status === 'warning' ? 'bg-yellow-500 animate-pulse' :
+                          'bg-gray-400'
+                        }`}></div>
                       </div>
-                      <div className={`w-2 h-2 rounded-full ${
-                        module.status === 'active' ? 'bg-green-500 animate-pulse' :
-                        module.status === 'warning' ? 'bg-yellow-500 animate-pulse' :
-                        'bg-gray-400'
-                      }`}></div>
-                    </div>
-                    <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-1">{module.title}</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{module.description}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-purple-600 dark:text-amber-400">{module.count}</span>
-                      <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-purple-500 dark:group-hover:text-amber-400 transition-colors" />
+                      <div className="flex items-center justify-between pl-13">
+                        <span className={`text-sm font-semibold ${colors.text}`}>{module.count}</span>
+                        <ChevronRight className={`w-4 h-4 text-gray-400 group-hover:${colors.text} transition-colors`} />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Activity Feed */}
-            <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 border-t-4 border-t-pink-500 dark:border-t-amber-500 rounded-xl p-6 transition-all hover:border-t-pink-600 dark:hover:border-t-amber-400">
-              <div className="flex items-center gap-2 mb-4">
-                <Activity className="w-5 h-5 text-pink-500 dark:text-amber-400" />
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Atividades Recentes</h3>
+            <div className="backdrop-blur-xl bg-gradient-to-br from-pink-50/80 to-rose-50/80 dark:from-pink-950/30 dark:to-rose-950/30 border border-gray-200 dark:border-gray-800 border-t-4 border-t-pink-500 hover:border-t-pink-600 rounded-xl p-4 transition-all">
+              <div className="flex items-center gap-2 mb-3">
+                <Activity className="w-4 h-4 text-pink-500" />
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Atividades Recentes</h3>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {activities.map((activity) => (
-                  <div key={activity.id} className="flex gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                  <div key={activity.id} className="flex gap-2 p-2 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
                       activity.type === 'success' ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
                       activity.type === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' :
                       'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                     }`}>
-                      <activity.icon className="w-4 h-4" />
+                      <activity.icon className="w-3.5 h-3.5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">{activity.message}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{activity.time}</p>
+                      <p className="text-xs text-gray-700 dark:text-gray-300 font-medium leading-tight">{activity.message}</p>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-500">{activity.time}</p>
                     </div>
                   </div>
                 ))}
@@ -664,16 +692,16 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Quick Tips */}
-            <div className="backdrop-blur-xl bg-gradient-to-br from-purple-500/10 to-blue-500/10 dark:from-amber-500/10 dark:to-orange-500/10 border border-purple-200 dark:border-gray-800 border-t-4 border-t-purple-500 dark:border-t-amber-500 rounded-xl p-6 transition-all hover:border-t-purple-600 dark:hover:border-t-amber-400">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="w-5 h-5 text-purple-500 dark:text-amber-400" />
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Dicas Rápidas</h3>
+            <div className="backdrop-blur-xl bg-gradient-to-br from-violet-50/80 to-indigo-50/80 dark:from-violet-950/30 dark:to-indigo-950/30 border border-gray-200 dark:border-gray-800 border-t-4 border-t-violet-500 hover:border-t-violet-600 rounded-xl p-4 transition-all">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="w-4 h-4 text-violet-500" />
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Dicas Rápidas</h3>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {tips.map((tip, index) => (
                   <div key={index} className="flex items-start gap-2">
-                    <Target className="w-4 h-4 text-purple-500 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-600 dark:text-gray-300">{tip}</p>
+                    <Target className="w-3.5 h-3.5 text-violet-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-gray-600 dark:text-gray-300">{tip}</p>
                   </div>
                 ))}
               </div>
