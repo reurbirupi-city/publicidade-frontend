@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTutorial } from '../contexts/TutorialContext';
@@ -321,6 +321,9 @@ const ClientPortal: React.FC = () => {
   // ✅ FLAG PARA CONTROLAR CARREGAMENTO DO LOCALSTORAGE
   const [localStorageLoaded, setLocalStorageLoaded] = useState(false);
   const [mensagensCliente, setMensagensCliente] = useState<Record<string, string>>({});
+  const [adminDigitando, setAdminDigitando] = useState<Record<string, boolean>>({});
+  const [ultimaDigitacaoCliente, setUltimaDigitacaoCliente] = useState<number>(0);
+  const digitandoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // ✅ CARREGAR DADOS DO LOCALSTORAGE (Após todos os useState)
   useEffect(() => {
@@ -587,6 +590,86 @@ const ClientPortal: React.FC = () => {
     };
   }, [user?.uid, localStorageLoaded]);
 
+  // Monitorar quando o admin está digitando em cada solicitação
+  useEffect(() => {
+    if (!user?.uid || solicitacoesServico.length === 0) return;
+
+    const unsubscribes: (() => void)[] = [];
+
+    solicitacoesServico.forEach(solicitacao => {
+      const docRef = doc(db, 'solicitacoes_clientes', solicitacao.id);
+      const unsub = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const adminDigitandoTimestamp = data.adminDigitando;
+          
+          if (adminDigitandoTimestamp) {
+            const agora = Date.now();
+            const diff = agora - adminDigitandoTimestamp;
+            const estaDigitando = diff < 3000;
+            
+            setAdminDigitando(prev => ({
+              ...prev,
+              [solicitacao.id]: estaDigitando
+            }));
+            
+            if (estaDigitando) {
+              setTimeout(() => {
+                setAdminDigitando(prev => ({
+                  ...prev,
+                  [solicitacao.id]: false
+                }));
+              }, 3000 - diff);
+            }
+          } else {
+            setAdminDigitando(prev => ({
+              ...prev,
+              [solicitacao.id]: false
+            }));
+          }
+        }
+      });
+      unsubscribes.push(unsub);
+    });
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, [user?.uid, solicitacoesServico.length]);
+
+  // Função para atualizar status de digitação do cliente
+  const atualizarClienteDigitando = async (solicitacaoId: string, digitando: boolean) => {
+    try {
+      const docRef = doc(db, 'solicitacoes_clientes', solicitacaoId);
+      if (digitando) {
+        await updateDoc(docRef, { clienteDigitando: Date.now() });
+      } else {
+        await updateDoc(docRef, { clienteDigitando: null });
+      }
+    } catch (error) {
+      // Silenciar erro
+    }
+  };
+
+  // Handler para mudança no input de mensagem do cliente
+  const handleMensagemClienteChange = (solicitacaoId: string, valor: string) => {
+    setMensagensCliente(prev => ({ ...prev, [solicitacaoId]: valor }));
+    
+    const agora = Date.now();
+    if (agora - ultimaDigitacaoCliente > 2000) {
+      setUltimaDigitacaoCliente(agora);
+      atualizarClienteDigitando(solicitacaoId, true);
+    }
+    
+    if (digitandoTimeoutRef.current) {
+      clearTimeout(digitandoTimeoutRef.current);
+    }
+    
+    digitandoTimeoutRef.current = setTimeout(() => {
+      atualizarClienteDigitando(solicitacaoId, false);
+    }, 2000);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'planejamento':
@@ -815,6 +898,12 @@ const ClientPortal: React.FC = () => {
     if (!texto) {
       alert('Digite uma mensagem antes de enviar.');
       return;
+    }
+
+    // Limpar status de digitação
+    atualizarClienteDigitando(solicitacao.id, false);
+    if (digitandoTimeoutRef.current) {
+      clearTimeout(digitandoTimeoutRef.current);
     }
 
     const novaResposta = {

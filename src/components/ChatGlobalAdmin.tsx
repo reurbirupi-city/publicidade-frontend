@@ -59,9 +59,12 @@ const ChatGlobalAdmin: React.FC = () => {
     conversaId?: string;
   }>({ tipo: null });
   const [mostrarEncerradas, setMostrarEncerradas] = useState(false);
+  const [clienteDigitando, setClienteDigitando] = useState(false);
+  const [ultimaDigitacao, setUltimaDigitacao] = useState<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const digitandoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Verificar se é admin e carregar IDs dos clientes do admin
   useEffect(() => {
@@ -234,8 +237,102 @@ const ChatGlobalAdmin: React.FC = () => {
     marcarComoLidas();
   }, [conversaSelecionada]);
 
+  // Monitorar quando o cliente está digitando
+  useEffect(() => {
+    if (!conversaSelecionada) {
+      setClienteDigitando(false);
+      return;
+    }
+
+    const docRef = doc(db, 'solicitacoes_clientes', conversaSelecionada.id);
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const clienteDigitandoTimestamp = data.clienteDigitando;
+        
+        // Considerar "digitando" se foi atualizado nos últimos 3 segundos
+        if (clienteDigitandoTimestamp) {
+          const agora = Date.now();
+          const diff = agora - clienteDigitandoTimestamp;
+          setClienteDigitando(diff < 3000);
+          
+          // Auto-limpar após 3 segundos
+          if (diff < 3000) {
+            setTimeout(() => {
+              setClienteDigitando(false);
+            }, 3000 - diff);
+          }
+        } else {
+          setClienteDigitando(false);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [conversaSelecionada?.id]);
+
+  // Atualizar status de digitação do admin
+  const atualizarStatusDigitando = async (digitando: boolean) => {
+    if (!conversaSelecionada) return;
+    
+    try {
+      const docRef = doc(db, 'solicitacoes_clientes', conversaSelecionada.id);
+      if (digitando) {
+        await updateDoc(docRef, { 
+          adminDigitando: Date.now() 
+        });
+      } else {
+        await updateDoc(docRef, { 
+          adminDigitando: null 
+        });
+      }
+    } catch (error) {
+      // Silenciar erro para não poluir console
+    }
+  };
+
+  // Handler para mudança no input com debounce para "digitando"
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNovaMensagem(e.target.value);
+    
+    // Atualizar status de digitação
+    const agora = Date.now();
+    if (agora - ultimaDigitacao > 2000) {
+      setUltimaDigitacao(agora);
+      atualizarStatusDigitando(true);
+    }
+    
+    // Limpar timeout anterior
+    if (digitandoTimeoutRef.current) {
+      clearTimeout(digitandoTimeoutRef.current);
+    }
+    
+    // Definir timeout para parar de "digitar" após 2 segundos de inatividade
+    digitandoTimeoutRef.current = setTimeout(() => {
+      atualizarStatusDigitando(false);
+    }, 2000);
+  };
+
+  // Limpar status de digitação ao enviar ou sair
+  useEffect(() => {
+    return () => {
+      if (digitandoTimeoutRef.current) {
+        clearTimeout(digitandoTimeoutRef.current);
+      }
+      if (conversaSelecionada) {
+        atualizarStatusDigitando(false);
+      }
+    };
+  }, [conversaSelecionada]);
+
   const handleEnviar = async () => {
     if (!novaMensagem.trim() || enviando || !conversaSelecionada) return;
+    
+    // Limpar status de digitação ao enviar
+    atualizarStatusDigitando(false);
+    if (digitandoTimeoutRef.current) {
+      clearTimeout(digitandoTimeoutRef.current);
+    }
     
     setEnviando(true);
     try {
@@ -743,6 +840,20 @@ const ChatGlobalAdmin: React.FC = () => {
                 <div ref={messagesEndRef} />
               </div>
 
+              {/* Indicador de digitando */}
+              {clienteDigitando && (
+                <div className="px-4 py-1 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                    </div>
+                    <span className="text-xs italic">{conversaSelecionada.nomeCliente} está digitando...</span>
+                  </div>
+                </div>
+              )}
+
               {/* Input */}
               <div className="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
                 {conversaSelecionada.status === 'encerrada' ? (
@@ -762,7 +873,7 @@ const ChatGlobalAdmin: React.FC = () => {
                       ref={inputRef}
                       type="text"
                       value={novaMensagem}
-                      onChange={(e) => setNovaMensagem(e.target.value)}
+                      onChange={handleInputChange}
                       onKeyPress={handleKeyPress}
                       placeholder="Digite sua mensagem..."
                       className="flex-1 px-4 py-2.5 bg-white dark:bg-gray-700 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-[#25D366] border border-gray-200 dark:border-gray-600"

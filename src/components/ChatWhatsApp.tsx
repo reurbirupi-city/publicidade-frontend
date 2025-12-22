@@ -26,6 +26,8 @@ interface ChatWhatsAppProps {
   statusDestinatario?: string;
   isAdmin?: boolean;
   solicitacaoId?: string;
+  outroDigitando?: boolean;
+  onDigitando?: (digitando: boolean) => void;
 }
 
 const ChatWhatsApp: React.FC<ChatWhatsAppProps> = ({
@@ -34,13 +36,17 @@ const ChatWhatsApp: React.FC<ChatWhatsAppProps> = ({
   nomeDestinatario,
   fotoDestinatario,
   statusDestinatario = 'online',
-  isAdmin = false
+  isAdmin = false,
+  outroDigitando = false,
+  onDigitando
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [novaMensagem, setNovaMensagem] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [ultimaDigitacao, setUltimaDigitacao] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const digitandoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto scroll para última mensagem
   const scrollToBottom = () => {
@@ -54,8 +60,46 @@ const ChatWhatsApp: React.FC<ChatWhatsAppProps> = ({
     }
   }, [isOpen, mensagens]);
 
+  // Limpar timeout ao desmontar
+  useEffect(() => {
+    return () => {
+      if (digitandoTimeoutRef.current) {
+        clearTimeout(digitandoTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Handler para mudança no input com notificação de digitação
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNovaMensagem(e.target.value);
+    
+    if (onDigitando) {
+      const agora = Date.now();
+      if (agora - ultimaDigitacao > 2000) {
+        setUltimaDigitacao(agora);
+        onDigitando(true);
+      }
+      
+      if (digitandoTimeoutRef.current) {
+        clearTimeout(digitandoTimeoutRef.current);
+      }
+      
+      digitandoTimeoutRef.current = setTimeout(() => {
+        onDigitando(false);
+      }, 2000);
+    }
+  };
+
   const handleEnviar = async () => {
     if (!novaMensagem.trim() || enviando) return;
+    
+    // Limpar status de digitação ao enviar
+    if (onDigitando) {
+      onDigitando(false);
+    }
+    if (digitandoTimeoutRef.current) {
+      clearTimeout(digitandoTimeoutRef.current);
+    }
     
     setEnviando(true);
     try {
@@ -270,6 +314,20 @@ const ChatWhatsApp: React.FC<ChatWhatsAppProps> = ({
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Indicador de digitando */}
+          {outroDigitando && (
+            <div className="px-4 py-1 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                </div>
+                <span className="text-xs italic">{nomeDestinatario} está digitando...</span>
+              </div>
+            </div>
+          )}
+
           {/* Input de Mensagem - Estilo WhatsApp */}
           <div className="bg-gray-100 dark:bg-gray-800 px-3 py-2 flex items-center gap-2 border-t border-gray-200 dark:border-gray-700">
             <button className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
@@ -284,7 +342,7 @@ const ChatWhatsApp: React.FC<ChatWhatsAppProps> = ({
               ref={inputRef}
               type="text"
               value={novaMensagem}
-              onChange={(e) => setNovaMensagem(e.target.value)}
+              onChange={handleInputChange}
               onKeyPress={handleKeyPress}
               placeholder="Digite uma mensagem..."
               disabled={enviando}
