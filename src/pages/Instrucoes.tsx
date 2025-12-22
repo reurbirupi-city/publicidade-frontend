@@ -131,6 +131,174 @@ const Instrucoes: React.FC = () => {
           </p>
         </div>
 
+        {/* Fluxo Admin-Cliente */}
+        <Section title="🔄 Fluxo Completo: Admin ↔ Cliente" icon={<Users className="w-5 h-5" />} defaultOpen>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            Entenda como funciona a relação entre administrador e cliente no sistema.
+          </p>
+          
+          {/* Diagrama Visual do Fluxo */}
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 mb-6">
+            <h4 className="font-bold text-gray-900 dark:text-white mb-4 text-center">📊 Visão Geral do Fluxo</h4>
+            
+            <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
+              {/* Admin */}
+              <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-4 text-white text-center min-w-[140px]">
+                <Crown className="w-8 h-8 mx-auto mb-2" />
+                <p className="font-bold">ADMIN</p>
+                <p className="text-xs text-purple-200">Você</p>
+              </div>
+              
+              {/* Seta */}
+              <div className="flex flex-col items-center text-gray-400">
+                <div className="hidden md:block text-2xl">→</div>
+                <div className="md:hidden text-2xl">↓</div>
+                <p className="text-xs">Envia Link</p>
+              </div>
+              
+              {/* Link */}
+              <div className="bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl p-4 text-white text-center min-w-[140px]">
+                <Link2 className="w-8 h-8 mx-auto mb-2" />
+                <p className="font-bold">LINK</p>
+                <p className="text-xs text-green-200">Código Único</p>
+              </div>
+              
+              {/* Seta */}
+              <div className="flex flex-col items-center text-gray-400">
+                <div className="hidden md:block text-2xl">→</div>
+                <div className="md:hidden text-2xl">↓</div>
+                <p className="text-xs">Cadastra</p>
+              </div>
+              
+              {/* Cliente */}
+              <div className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl p-4 text-white text-center min-w-[140px]">
+                <UserPlus className="w-8 h-8 mx-auto mb-2" />
+                <p className="font-bold">CLIENTE</p>
+                <p className="text-xs text-blue-200">Vinculado a você</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Etapas Detalhadas */}
+          <div className="space-y-4">
+            <h4 className="font-bold text-gray-900 dark:text-white">📋 Etapas do Processo:</h4>
+            
+            {/* Etapa 1 */}
+            <div className="flex gap-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border-l-4 border-purple-500">
+              <div className="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold">1</div>
+              <div>
+                <p className="font-bold text-gray-900 dark:text-white">Admin gera o link de convite</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Acesse ⚙️ Configurações no Dashboard → Copie o "Link para Clientes"
+                </p>
+                <div className="mt-2 p-2 bg-white dark:bg-gray-800 rounded-lg text-xs font-mono text-purple-600 dark:text-purple-400 break-all">
+                  seusite.com/register?ref=XSYALU3B
+                </div>
+              </div>
+            </div>
+            
+            {/* Etapa 2 */}
+            <div className="flex gap-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border-l-4 border-green-500">
+              <div className="flex-shrink-0 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-bold">2</div>
+              <div>
+                <p className="font-bold text-gray-900 dark:text-white">Envie o link ao cliente</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Envie por WhatsApp, email ou qualquer meio de comunicação.
+                </p>
+                <div className="mt-2 flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                  <MessageSquare className="w-4 h-4" />
+                  <span>"Olá! Use este link para se cadastrar no sistema..."</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Etapa 3 */}
+            <div className="flex gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border-l-4 border-blue-500">
+              <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">3</div>
+              <div>
+                <p className="font-bold text-gray-900 dark:text-white">Cliente se cadastra</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  O cliente acessa o link, preenche os dados e cria a conta.
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                  <span className="text-sm text-blue-600 dark:text-blue-400">Automaticamente vinculado a você!</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Etapa 4 */}
+            <div className="flex gap-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border-l-4 border-amber-500">
+              <div className="flex-shrink-0 w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center text-white font-bold">4</div>
+              <div>
+                <p className="font-bold text-gray-900 dark:text-white">Código regenera automaticamente</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Por segurança, cada código é de uso único. Após o cadastro, um novo código é gerado.
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-amber-500" />
+                  <span className="text-sm text-amber-600 dark:text-amber-400">Link antigo não funciona mais!</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Etapa 5 */}
+            <div className="flex gap-4 p-4 bg-cyan-50 dark:bg-cyan-900/20 rounded-xl border-l-4 border-cyan-500">
+              <div className="flex-shrink-0 w-10 h-10 bg-cyan-500 rounded-full flex items-center justify-center text-white font-bold">5</div>
+              <div>
+                <p className="font-bold text-gray-900 dark:text-white">Interação Admin ↔ Cliente</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Agora vocês podem interagir pelo sistema:
+                </p>
+                <ul className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                  <li className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-cyan-500" />
+                    Chat em tempo real
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-cyan-500" />
+                    Criar projetos para o cliente
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-cyan-500" />
+                    Enviar propostas e contratos
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Send className="w-4 h-4 text-cyan-500" />
+                    Cliente pode solicitar serviços
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Resumo Visual */}
+          <div className="mt-6 p-4 bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 rounded-xl">
+            <h4 className="font-bold text-gray-900 dark:text-white mb-3">✨ Resumo Rápido</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+              <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
+                <p className="text-2xl mb-1">👨‍💼</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">Admin</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Gera link e gerencia</p>
+              </div>
+              <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
+                <p className="text-2xl mb-1">🔗</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">Vínculo</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Automático e permanente</p>
+              </div>
+              <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
+                <p className="text-2xl mb-1">👤</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">Cliente</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Acessa portal exclusivo</p>
+              </div>
+            </div>
+          </div>
+
+          <Tip>
+            Cada admin só vê e gerencia os clientes vinculados a ele. Isso garante privacidade e organização!
+          </Tip>
+        </Section>
+
         {/* Para Administradores */}
         <div className="mb-4">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
