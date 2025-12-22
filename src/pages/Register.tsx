@@ -6,7 +6,7 @@ import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from 'fire
 import { doc, setDoc } from 'firebase/firestore';
 import { getClientes, saveClientes } from '../services/dataIntegration';
 import { notificarNovoCliente } from '../services/notificacoes';
-import { getAdminByCodigoConvite, Admin, criarAdmin, gerarCodigoConvite } from '../services/adminService';
+import { getAdminByCodigoConvite, Admin, criarAdmin, gerarCodigoConvite, regenerarCodigoConvite } from '../services/adminService';
 
 const Register: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -271,6 +271,16 @@ const Register: React.FC = () => {
         if (resultado.success) {
           console.log('✅ Admin criado com sucesso:', resultado.admin?.id);
           
+          // 🔐 SEGURANÇA: Regenerar código de convite após uso (código de uso único)
+          if (adminConvite) {
+            try {
+              const novoCodigo = await regenerarCodigoConvite(adminConvite.id);
+              console.log('🔄 Código de convite regenerado após uso. Novo código:', novoCodigo);
+            } catch (regenError) {
+              console.error('⚠️ Erro ao regenerar código (não bloqueante):', regenError);
+            }
+          }
+          
           // Fazer logout após criar conta
           await auth.signOut();
 
@@ -437,6 +447,17 @@ const Register: React.FC = () => {
         console.log('🔔 Notificação enviada ao', adminConvite ? `admin ${adminConvite.id}` : 'webmaster', ': novo cliente cadastrado');
       } catch (notifError) {
         console.error('⚠️ Erro ao enviar notificação (não bloqueante):', notifError);
+      }
+
+      // 5.2. 🔐 SEGURANÇA: Regenerar código de convite após uso (código de uso único)
+      // Isso invalida o link antigo, impedindo cadastros não autorizados
+      if (adminConvite) {
+        try {
+          const novoCodigo = await regenerarCodigoConvite(adminConvite.id);
+          console.log('🔄 Código de convite regenerado após uso. Novo código:', novoCodigo);
+        } catch (regenError) {
+          console.error('⚠️ Erro ao regenerar código (não bloqueante):', regenError);
+        }
       }
 
       // 6. Fazer logout após criar conta
