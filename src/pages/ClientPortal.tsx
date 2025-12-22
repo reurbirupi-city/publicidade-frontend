@@ -27,7 +27,8 @@ import {
   Sparkles,
   Send,
   FileSignature,
-  ClipboardCheck
+  ClipboardCheck,
+  LogOut
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
@@ -45,7 +46,7 @@ import {
 
 const ClientPortal: React.FC = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const { setUserType } = useTutorial();
   const [clientData, setClientData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -1407,6 +1408,16 @@ const ClientPortal: React.FC = () => {
               <ThemeToggle />
               <NotificacoesBell />
               <TutorialSettingsButton />
+              <button
+                onClick={async () => {
+                  await signOut();
+                  navigate('/login');
+                }}
+                className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors group"
+                title="Sair"
+              >
+                <LogOut className="w-5 h-5 text-gray-600 dark:text-gray-400 group-hover:text-red-600 dark:group-hover:text-red-400" />
+              </button>
               <div className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg">
                 <img 
                   src={clientData.avatar} 
