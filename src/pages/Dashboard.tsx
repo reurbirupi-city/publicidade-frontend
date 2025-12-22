@@ -609,10 +609,6 @@ const Dashboard: React.FC = () => {
           <div className="lg:col-span-2 space-y-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Módulos</h3>
-              <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg transition-all hover:scale-105">
-                <Plus className="w-4 h-4" />
-                <span className="text-sm font-medium">Novo</span>
-              </button>
             </div>
 
             <div className="grid md:grid-cols-2 gap-3">
