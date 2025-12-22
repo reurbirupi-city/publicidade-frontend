@@ -286,6 +286,94 @@ export const regenerarCodigoConvite = async (adminId: string): Promise<string | 
 // ============================================================================
 
 /**
+ * Promove um cliente existente para administrador
+ * O cliente mantém seu UID do Firebase Auth mas ganha acesso como admin
+ */
+export const promoverClienteParaAdmin = async (
+  clienteId: string,
+  dadosCliente: {
+    nome: string;
+    email: string;
+    telefone?: string;
+    empresa?: string;
+  },
+  role: AdminRole = 'admin'
+): Promise<{ success: boolean; error?: string; admin?: Admin }> => {
+  try {
+    // Verificar se já existe um admin com este ID
+    const adminExistente = await getDoc(doc(db, 'admins', clienteId));
+    if (adminExistente.exists()) {
+      return { success: false, error: 'Este usuário já é um administrador.' };
+    }
+
+    // Criar o registro de admin com o mesmo UID do cliente
+    const novoAdmin: Omit<Admin, 'id'> = {
+      nome: dadosCliente.nome,
+      email: dadosCliente.email.toLowerCase(),
+      role: role,
+      ativo: true,
+      dataCriacao: new Date().toISOString(),
+      telefone: dadosCliente.telefone,
+      nomeAgencia: dadosCliente.empresa || dadosCliente.nome,
+      codigoConvite: gerarCodigoConvite()
+    };
+
+    await setDoc(doc(db, 'admins', clienteId), novoAdmin);
+
+    // Atualizar o registro do cliente para marcar que foi promovido
+    try {
+      await updateDoc(doc(db, 'clientes', clienteId), { 
+        promovidoParaAdmin: true,
+        dataPromocao: new Date().toISOString()
+      });
+    } catch (e) {
+      // Cliente pode não existir na coleção clientes
+      console.log('Cliente não encontrado na coleção clientes');
+    }
+
+    // Atualizar users também
+    try {
+      await updateDoc(doc(db, 'users', clienteId), { 
+        isAdmin: true,
+        adminRole: role
+      });
+    } catch (e) {
+      console.log('Usuário não encontrado na coleção users');
+    }
+
+    console.log('✅ Cliente promovido para admin:', clienteId);
+    return { success: true, admin: { id: clienteId, ...novoAdmin } };
+  } catch (error: any) {
+    console.error('❌ Erro ao promover cliente:', error);
+    return { success: false, error: error.message || 'Erro ao promover cliente para administrador.' };
+  }
+};
+
+/**
+ * Lista todos os clientes disponíveis para promoção
+ */
+export const listarClientesParaPromocao = async (): Promise<any[]> => {
+  try {
+    const snapshot = await getDocs(collection(db, 'clientes'));
+    const clientes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Filtrar clientes que ainda não são admins
+    const clientesFiltrados = [];
+    for (const cliente of clientes) {
+      const adminDoc = await getDoc(doc(db, 'admins', cliente.id));
+      if (!adminDoc.exists()) {
+        clientesFiltrados.push(cliente);
+      }
+    }
+    
+    return clientesFiltrados;
+  } catch (error) {
+    console.error('Erro ao listar clientes para promoção:', error);
+    return [];
+  }
+};
+
+/**
  * Vincula um cliente a um admin
  */
 export const vincularClienteAoAdmin = async (clienteId: string, adminId: string): Promise<boolean> => {
@@ -408,5 +496,7 @@ export default {
   getClientesDoAdmin,
   getSolicitacoesDoAdmin,
   inicializarAdmin,
-  gerarCodigoConvite
+  gerarCodigoConvite,
+  promoverClienteParaAdmin,
+  listarClientesParaPromocao
 };

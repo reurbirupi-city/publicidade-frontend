@@ -18,7 +18,9 @@ import {
   EyeOff,
   Link2,
   UserCheck,
-  UserX
+  UserX,
+  ArrowUpCircle,
+  Search
 } from 'lucide-react';
 import {
   Admin,
@@ -30,7 +32,9 @@ import {
   desativarAdmin,
   reativarAdmin,
   regenerarCodigoConvite,
-  getClientesDoAdmin
+  getClientesDoAdmin,
+  promoverClienteParaAdmin,
+  listarClientesParaPromocao
 } from '../services/adminService';
 
 interface ModalGestaoAdminsProps {
@@ -45,6 +49,14 @@ const ModalGestaoAdmins: React.FC<ModalGestaoAdminsProps> = ({ isOpen, onClose }
   const [editando, setEditando] = useState<Admin | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
   const [clientesPorAdmin, setClientesPorAdmin] = useState<Record<string, number>>({});
+  
+  // Estados para promoção de cliente
+  const [showPromocao, setShowPromocao] = useState(false);
+  const [clientesDisponiveis, setClientesDisponiveis] = useState<any[]>([]);
+  const [clienteSelecionado, setClienteSelecionado] = useState<any | null>(null);
+  const [buscaCliente, setBuscaCliente] = useState('');
+  const [carregandoClientes, setCarregandoClientes] = useState(false);
+  const [rolePromocao, setRolePromocao] = useState<AdminRole>('admin');
   
   // Form states
   const [formData, setFormData] = useState({
@@ -134,6 +146,59 @@ const ModalGestaoAdmins: React.FC<ModalGestaoAdminsProps> = ({ isOpen, onClose }
     });
     setErro('');
   };
+
+  // Funções para promoção de cliente
+  const handleAbrirPromocao = async () => {
+    setShowPromocao(true);
+    setCarregandoClientes(true);
+    try {
+      const clientes = await listarClientesParaPromocao();
+      setClientesDisponiveis(clientes);
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error);
+    } finally {
+      setCarregandoClientes(false);
+    }
+  };
+
+  const handlePromoverCliente = async () => {
+    if (!clienteSelecionado) return;
+    
+    setSalvando(true);
+    setErro('');
+    
+    try {
+      const resultado = await promoverClienteParaAdmin(
+        clienteSelecionado.id,
+        {
+          nome: clienteSelecionado.nome,
+          email: clienteSelecionado.email,
+          telefone: clienteSelecionado.telefone || clienteSelecionado.whatsapp,
+          empresa: clienteSelecionado.empresa
+        },
+        rolePromocao
+      );
+
+      if (resultado.success) {
+        setShowPromocao(false);
+        setClienteSelecionado(null);
+        setBuscaCliente('');
+        setRolePromocao('admin');
+      } else {
+        setErro(resultado.error || 'Erro ao promover cliente.');
+      }
+    } catch (error) {
+      setErro('Erro inesperado. Tente novamente.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const clientesFiltrados = clientesDisponiveis.filter(c => 
+    c.nome?.toLowerCase().includes(buscaCliente.toLowerCase()) ||
+    c.email?.toLowerCase().includes(buscaCliente.toLowerCase()) ||
+    c.empresa?.toLowerCase().includes(buscaCliente.toLowerCase())
+  );
 
   const handleEditar = (admin: Admin) => {
     setEditando(admin);
@@ -383,6 +448,146 @@ const ModalGestaoAdmins: React.FC<ModalGestaoAdminsProps> = ({ isOpen, onClose }
                 </button>
               </div>
             </form>
+          ) : showPromocao ? (
+            // Tela de Promoção de Cliente
+            <div className="max-w-2xl mx-auto space-y-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                  Promover Cliente para Admin
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPromocao(false);
+                    setClienteSelecionado(null);
+                    setBuscaCliente('');
+                    setErro('');
+                  }}
+                  className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                >
+                  Cancelar
+                </button>
+              </div>
+
+              {erro && (
+                <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl p-4 text-red-700 dark:text-red-300 text-sm">
+                  {erro}
+                </div>
+              )}
+
+              {/* Busca de Cliente */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Buscar Cliente
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={buscaCliente}
+                    onChange={(e) => setBuscaCliente(e.target.value)}
+                    placeholder="Digite nome, email ou empresa..."
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+
+              {/* Lista de Clientes */}
+              <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                <div className="max-h-64 overflow-y-auto">
+                  {carregandoClientes ? (
+                    <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                      Carregando clientes...
+                    </div>
+                  ) : clientesFiltrados.length === 0 ? (
+                    <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                      {buscaCliente ? 'Nenhum cliente encontrado' : 'Nenhum cliente disponível para promoção'}
+                    </div>
+                  ) : (
+                    clientesFiltrados.map(cliente => (
+                      <button
+                        key={cliente.id}
+                        onClick={() => setClienteSelecionado(cliente)}
+                        className={`w-full p-4 flex items-center gap-4 border-b border-gray-100 dark:border-gray-800 last:border-0 transition-colors ${
+                          clienteSelecionado?.id === cliente.id 
+                            ? 'bg-green-50 dark:bg-green-900/20' 
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          clienteSelecionado?.id === cliente.id 
+                            ? 'bg-green-500 text-white' 
+                            : 'bg-gray-200 dark:bg-gray-700'
+                        }`}>
+                          {clienteSelecionado?.id === cliente.id ? (
+                            <Check className="w-5 h-5" />
+                          ) : (
+                            <span className="text-gray-600 dark:text-gray-300 font-bold">
+                              {cliente.nome?.charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="font-medium text-gray-900 dark:text-white">{cliente.nome}</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">{cliente.email}</p>
+                          {cliente.empresa && (
+                            <p className="text-xs text-gray-400 dark:text-gray-500">{cliente.empresa}</p>
+                          )}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Cliente Selecionado - Configurações */}
+              {clienteSelecionado && (
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-green-500 rounded-xl">
+                      <ArrowUpCircle className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-green-800 dark:text-green-200">{clienteSelecionado.nome}</p>
+                      <p className="text-sm text-green-600 dark:text-green-400">será promovido para administrador</p>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-green-800 dark:text-green-200 mb-2">
+                      Nível de Acesso
+                    </label>
+                    <select
+                      value={rolePromocao}
+                      onChange={(e) => setRolePromocao(e.target.value as AdminRole)}
+                      className="w-full px-4 py-3 rounded-xl border border-green-300 dark:border-green-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="colaborador">Colaborador - Acesso limitado</option>
+                      <option value="admin">Administrador - Acesso completo</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Botão Promover */}
+              <button
+                onClick={handlePromoverCliente}
+                disabled={!clienteSelecionado || salvando}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-3.5 px-6 rounded-xl transition-all"
+              >
+                {salvando ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    Promovendo...
+                  </>
+                ) : (
+                  <>
+                    <ArrowUpCircle className="w-5 h-5" />
+                    Promover para Admin
+                  </>
+                )}
+              </button>
+            </div>
           ) : (
             // Lista de Admins
             <>
@@ -395,13 +600,22 @@ const ModalGestaoAdmins: React.FC<ModalGestaoAdminsProps> = ({ isOpen, onClose }
                     {admins.length} administrador{admins.length !== 1 ? 'es' : ''} no sistema
                   </p>
                 </div>
-                <button
-                  onClick={() => setShowForm(true)}
-                  className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-2.5 px-5 rounded-xl transition-all"
-                >
-                  <UserPlus className="w-5 h-5" />
-                  Novo Admin
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleAbrirPromocao}
+                    className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-2.5 px-5 rounded-xl transition-all"
+                  >
+                    <ArrowUpCircle className="w-5 h-5" />
+                    Promover Cliente
+                  </button>
+                  <button
+                    onClick={() => setShowForm(true)}
+                    className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-2.5 px-5 rounded-xl transition-all"
+                  >
+                    <UserPlus className="w-5 h-5" />
+                    Novo Admin
+                  </button>
+                </div>
               </div>
 
               {loading ? (
