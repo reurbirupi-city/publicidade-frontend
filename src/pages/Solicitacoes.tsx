@@ -585,7 +585,7 @@ const Solicitacoes: React.FC = () => {
           <>
             {/* Filtros */}
             <div className="mb-6 flex gap-2 flex-wrap">
-              {['todas', 'nova', 'analisando', 'proposta-criada', 'aceita', 'em-projeto'].map(status => (
+              {['todas', 'nova', 'analisando', 'proposta-criada', 'aceita', 'em-projeto', 'concluida'].map(status => (
                 <button
                   key={status}
                   onClick={() => setFiltroStatus(status)}

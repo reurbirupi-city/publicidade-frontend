@@ -8,7 +8,7 @@
  */
 
 import { db } from './firebase';
-import { collection, doc, setDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, query, where, updateDoc } from 'firebase/firestore';
 
 // ============================================================================
 // TIPOS E INTERFACES COMPARTILHADAS
@@ -469,10 +469,12 @@ export const atualizarStatusCliente = async (
     // Salvar no localStorage
     saveClientes(clientes);
     
-    // Salvar no Firestore
+    // Salvar no Firestore - usar updateDoc para preservar campos como adminId
     try {
-      await setDoc(doc(db, 'clientes', clienteId), {
-        ...clientes[clienteIndex],
+      await updateDoc(doc(db, 'clientes', clienteId), {
+        status: novoStatus,
+        etapaFunil: novaEtapaFunil || cliente.etapaFunil,
+        dataMudancaEtapa: new Date().toISOString().split('T')[0],
         syncedAt: new Date().toISOString(),
       });
       console.log(`✅ Status do cliente ${clienteId} atualizado: ${statusAnterior} → ${novoStatus} | Etapa: ${etapaAnterior} → ${novaEtapaFunil || etapaAnterior}`);

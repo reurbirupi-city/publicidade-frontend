@@ -14,6 +14,7 @@ import { collection, query, where, getDocs, doc, updateDoc, onSnapshot, orderBy 
 import { db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { notificarNovaMensagem } from '../services/notificacoes';
+import { isWebmaster, getAdminByEmail, getClientesDoAdmin } from '../services/adminService';
 
 interface Mensagem {
   id: string;
@@ -44,16 +45,22 @@ const ChatGlobalAdmin: React.FC = () => {
   const [busca, setBusca] = useState('');
   const [carregando, setCarregando] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [clienteIdsDoAdmin, setClienteIdsDoAdmin] = useState<string[]>([]);
+  const [isWebmasterUser, setIsWebmasterUser] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Verificar se é admin - usando useEffect para evitar problemas com hooks
+  // Verificar se é admin e carregar IDs dos clientes do admin
   useEffect(() => {
     const verificarSeAdmin = async () => {
       if (!user?.email) {
         setIsAdmin(false);
         return;
       }
+
+      // Verificar se é webmaster
+      const webmasterCheck = isWebmaster(user.email);
+      setIsWebmasterUser(webmasterCheck);
 
       // Lista de emails conhecidos como admin/webmaster
       const emailsAdmin = [
@@ -67,10 +74,12 @@ const ChatGlobalAdmin: React.FC = () => {
       let adminCheck = emailsAdmin.some(email => user.email?.toLowerCase() === email.toLowerCase()) ||
         user.email.toLowerCase().includes('admin') ||
         localStorage.getItem('userRole') === 'admin' ||
-        localStorage.getItem('userRole') === 'webmaster';
+        localStorage.getItem('userRole') === 'webmaster' ||
+        webmasterCheck;
       
       // Verificar também na coleção admins do Firestore
-      if (!adminCheck && user.uid) {
+      let adminData = null;
+      if (user.uid) {
         try {
           const adminDoc = await getDocs(query(
             collection(db, 'admins'),
@@ -79,14 +88,26 @@ const ChatGlobalAdmin: React.FC = () => {
           
           if (!adminDoc.empty) {
             adminCheck = true;
-            console.log('✅ Usuário encontrado na coleção admins');
+            adminData = { id: adminDoc.docs[0].id, ...adminDoc.docs[0].data() };
           }
         } catch (error) {
           console.log('⚠️ Erro ao verificar coleção admins:', error);
         }
       }
       
-      console.log('🔐 ChatGlobalAdmin - User:', user?.email, '| isAdmin:', adminCheck);
+      // Carregar IDs dos clientes deste admin
+      if (adminCheck && !webmasterCheck && adminData) {
+        try {
+          const clientes = await getClientesDoAdmin(adminData.id);
+          const ids = clientes.map(c => c.id);
+          setClienteIdsDoAdmin(ids);
+          console.log(`📋 Chat: Admin tem ${ids.length} clientes vinculados`);
+        } catch (error) {
+          console.error('❌ Erro ao carregar clientes do admin:', error);
+        }
+      }
+      
+      console.log('🔐 ChatGlobalAdmin - User:', user?.email, '| isAdmin:', adminCheck, '| isWebmaster:', webmasterCheck);
       setIsAdmin(adminCheck);
     };
 
@@ -97,11 +118,18 @@ const ChatGlobalAdmin: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Carregar conversas do Firestore em tempo real
+  // Carregar conversas do Firestore em tempo real - filtradas por clientes do admin
   useEffect(() => {
     if (!isAdmin) return;
+    
+    // Se não é webmaster e não tem clientes, não carregar
+    if (!isWebmasterUser && clienteIdsDoAdmin.length === 0) {
+      console.log('⚠️ Admin sem clientes vinculados, aguardando...');
+      setConversas([]);
+      return;
+    }
 
-    console.log('🔍 Carregando conversas para o admin...');
+    console.log('🔍 Carregando conversas para o admin...', isWebmasterUser ? '(webmaster - todas)' : `(${clienteIdsDoAdmin.length} clientes)`);
     setCarregando(true);
 
     const q = query(
@@ -111,14 +139,20 @@ const ChatGlobalAdmin: React.FC = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const conversasData: Conversa[] = [];
       
-      snapshot.forEach((doc) => {
-        const data = doc.data();
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        
+        // Filtrar: webmaster vê tudo, admin comum vê só seus clientes
+        if (!isWebmasterUser && !clienteIdsDoAdmin.includes(data.clienteId)) {
+          return; // Pular solicitações de clientes de outros admins
+        }
+        
         const respostas = data.respostas || [];
         const ultimaResposta = respostas.length > 0 ? respostas[respostas.length - 1] : null;
         const naoLidas = respostas.filter((r: any) => r.autor === 'Cliente' && !r.lidaPeloAdmin).length;
         
         conversasData.push({
-          id: doc.id,
+          id: docSnap.id,
           nomeCliente: data.nomeCliente || 'Cliente',
           titulo: data.titulo || data.servicoTitulo || 'Solicitação',
           ultimaMensagem: ultimaResposta?.texto?.substring(0, 50) + (ultimaResposta?.texto?.length > 50 ? '...' : ''),
@@ -153,7 +187,7 @@ const ChatGlobalAdmin: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [isAdmin]);
+  }, [isAdmin, isWebmasterUser, clienteIdsDoAdmin]);
 
   // Marcar mensagens como lidas quando abrir a conversa
   useEffect(() => {
