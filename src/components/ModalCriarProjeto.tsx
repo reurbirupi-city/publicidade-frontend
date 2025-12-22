@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Save, X } from 'lucide-react';
 import Modal from './Modal';
 import { ClienteSelector } from './DataSelectors';
-import { getClienteByIdAsync, createProjetoWithSync, atualizarStatusCliente } from '../services/dataIntegration';
+import { getClienteByIdAsync, getClienteById, createProjetoWithSync, atualizarStatusCliente } from '../services/dataIntegration';
 
 interface Projeto {
   id: string;

@@ -1165,7 +1165,7 @@ const Projetos: React.FC = () => {
               </div>
             </div>
 
-            {/* Coluna: Em Andamento */
+            {/* Coluna: Em Andamento */}
             <div
               className="min-w-[280px] backdrop-blur-xl bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border-blue-200 dark:border-blue-700 rounded-xl p-4"
               onDragOver={handleDragOver}
@@ -1189,7 +1189,7 @@ const Projetos: React.FC = () => {
               </div>
             </div>
 
-            {/* Coluna: Pausado */
+            {/* Coluna: Pausado */}
             <div
               className="min-w-[280px] backdrop-blur-xl bg-gradient-to-b from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 border border-yellow-200 dark:border-yellow-700 rounded-xl p-4"
               onDragOver={handleDragOver}
@@ -1213,7 +1213,7 @@ const Projetos: React.FC = () => {
               </div>
             </div>
 
-            {/* Coluna: Em Revisão */
+            {/* Coluna: Em Revisão */}
             <div
               className="min-w-[280px] backdrop-blur-xl bg-gradient-to-b from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border border-purple-200 dark:border-purple-700 rounded-xl p-4"
               onDragOver={handleDragOver}
@@ -1237,7 +1237,7 @@ const Projetos: React.FC = () => {
               </div>
             </div>
 
-            {/* Coluna: Aguardando Aprovação */
+            {/* Coluna: Aguardando Aprovação */}
             <div
               className="min-w-[280px] backdrop-blur-xl bg-gradient-to-b from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border border-orange-200 dark:border-orange-700 rounded-xl p-4"
               onDragOver={handleDragOver}
@@ -1261,7 +1261,7 @@ const Projetos: React.FC = () => {
               </div>
             </div>
 
-            {/* Coluna: Concluído */
+            {/* Coluna: Concluído */}
             <div
               className="min-w-[280px] backdrop-blur-xl bg-gradient-to-b from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border border-green-200 dark:border-green-700 rounded-xl p-4"
               onDragOver={handleDragOver}
@@ -1285,7 +1285,7 @@ const Projetos: React.FC = () => {
               </div>
             </div>
 
-            {/* Coluna: Cancelado */
+            {/* Coluna: Cancelado */}
             <div
               className="min-w-[280px] backdrop-blur-xl bg-gradient-to-b from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border-red-200 dark:border-red-700 rounded-xl p-4"
               onDragOver={handleDragOver}
