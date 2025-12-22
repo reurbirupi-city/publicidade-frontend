@@ -379,7 +379,7 @@ const Dashboard: React.FC = () => {
 
       {/* Header */}
       <header className="relative z-50 backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border-b border-gray-200 dark:border-purple-500/30 sticky top-0 transition-all duration-300">
-        <div className="max-w-[1600px] mx-auto px-6 py-4">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-3">
@@ -553,7 +553,7 @@ const Dashboard: React.FC = () => {
         </div>
       </header>
 
-      <div className="relative z-10 max-w-[1600px] mx-auto px-6 py-8">
+      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-black mb-2">
