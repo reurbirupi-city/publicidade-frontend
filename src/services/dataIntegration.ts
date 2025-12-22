@@ -8,7 +8,7 @@
  */
 
 import { db } from './firebase';
-import { collection, doc, setDoc, getDocs, query, where, updateDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, query, where, updateDoc, getDoc } from 'firebase/firestore';
 
 // ============================================================================
 // TIPOS E INTERFACES COMPARTILHADAS
@@ -147,6 +147,43 @@ export const saveEventos = (eventos: any[]): void => {
 export const getClienteById = (clienteId: string): ClienteBase | null => {
   const clientes = getClientes();
   return clientes.find(c => c.id === clienteId) || null;
+};
+
+/**
+ * Busca cliente por ID - versão assíncrona que também busca no Firestore
+ * Primeiro tenta localStorage, depois Firestore se não encontrar
+ */
+export const getClienteByIdAsync = async (clienteId: string): Promise<ClienteBase | null> => {
+  // Primeiro tenta no localStorage
+  const clientes = getClientes();
+  const clienteLocal = clientes.find(c => c.id === clienteId);
+  if (clienteLocal) {
+    return clienteLocal;
+  }
+  
+  // Se não encontrou no localStorage, busca no Firestore
+  try {
+    const docRef = doc(db, 'clientes', clienteId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        nome: data.nome || data.displayName || '',
+        empresa: data.empresa || '',
+        email: data.email || '',
+        telefone: data.telefone || data.phone || '',
+        status: data.status || 'ativo',
+        valorTotal: data.valorTotal || 0,
+        projetos: data.projetos || 0,
+        ...data
+      } as ClienteBase;
+    }
+  } catch (error) {
+    console.error('Erro ao buscar cliente no Firestore:', error);
+  }
+  
+  return null;
 };
 
 /**
@@ -311,32 +348,38 @@ export const deleteProjetoAndRelations = (projetoId: string): void => {
  * Cria um novo projeto e atualiza totais do cliente
  */
 export const createProjetoWithSync = async (projeto: any): Promise<void> => {
+  // Garantir que o projeto tenha o campo entregas inicializado
+  const projetoComEntregas = {
+    ...projeto,
+    entregas: projeto.entregas || [],
+  };
+  
   const projetos = getProjetos();
-  projetos.push(projeto);
+  projetos.push(projetoComEntregas);
   saveProjetos(projetos);
   
   // Buscar dados adicionais do cliente para garantir que o projeto possa ser encontrado
-  const cliente = getClienteById(projeto.clienteId);
+  const cliente = getClienteById(projetoComEntregas.clienteId);
   
   // Salvar no Firestore
   try {
     const projetoParaFirestore = {
-      ...projeto,
+      ...projetoComEntregas,
       // Incluir email do cliente para facilitar busca no portal do cliente
-      clienteEmail: cliente?.email || projeto.clienteEmail || '',
+      clienteEmail: cliente?.email || projetoComEntregas.clienteEmail || '',
       syncedAt: new Date().toISOString(),
     };
     
-    await setDoc(doc(db, 'projetos', projeto.id), projetoParaFirestore);
-    console.log(`✅ Projeto ${projeto.id} salvo no Firestore`);
+    await setDoc(doc(db, 'projetos', projetoComEntregas.id), projetoParaFirestore);
+    console.log(`✅ Projeto ${projetoComEntregas.id} salvo no Firestore`);
   } catch (error) {
     console.error('❌ Erro ao salvar projeto no Firestore:', error);
   }
   
   // Recalcula totais do cliente
-  recalcularTotaisCliente(projeto.clienteId);
+  recalcularTotaisCliente(projetoComEntregas.clienteId);
   
-  console.log(`✅ Projeto ${projeto.id} criado e sincronizado`);
+  console.log(`✅ Projeto ${projetoComEntregas.id} criado e sincronizado`);
 };
 
 /**

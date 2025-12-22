@@ -13,10 +13,12 @@ import {
   AlertCircle,
   TrendingUp,
   Briefcase,
-  Target
+  Target,
+  Upload
 } from 'lucide-react';
 import Modal from './Modal';
 import { getEventosByProjeto } from '../services/dataIntegration';
+import EntregasProjeto from './EntregasProjeto';
 
 interface Projeto {
   id: string;
@@ -68,7 +70,7 @@ const ModalVisualizarProjeto: React.FC<ModalVisualizarProjetoProps> = ({
   onEdit,
   onDelete,
 }) => {
-  const [activeTab, setActiveTab] = useState<'detalhes' | 'arquivos' | 'comentarios' | 'revisoes' | 'aprovacoes' | 'timeline'>('detalhes');
+  const [activeTab, setActiveTab] = useState<'detalhes' | 'entregas' | 'arquivos' | 'comentarios' | 'revisoes' | 'aprovacoes' | 'timeline'>('detalhes');
 
   if (!projeto) return null;
 
@@ -102,6 +104,7 @@ const ModalVisualizarProjeto: React.FC<ModalVisualizarProjetoProps> = ({
 
   const tabs = [
     { id: 'detalhes', label: 'Detalhes', icon: FileText },
+    { id: 'entregas', label: 'Entregas', icon: Upload, count: projeto.entregas?.length || 0 },
     { id: 'arquivos', label: 'Arquivos', icon: Briefcase, count: projeto.arquivos?.length || 0 },
     { id: 'comentarios', label: 'Comentários', icon: MessageSquare, count: (projeto.comentariosInternos?.length || 0) + (projeto.comentariosCliente?.length || 0) },
     { id: 'revisoes', label: 'Revisões', icon: AlertCircle, count: projeto.revisoes?.length || 0 },
@@ -435,6 +438,16 @@ const ModalVisualizarProjeto: React.FC<ModalVisualizarProjetoProps> = ({
                 <p>Atualizado em: {formatDateTime(projeto.atualizadoEm)}</p>
               </div>
             </div>
+          )}
+
+          {activeTab === 'entregas' && (
+            <EntregasProjeto
+              projetoId={projeto.id}
+              clienteId={projeto.clienteId}
+              clienteNome={projeto.clienteNome}
+              isAdmin={true}
+              onEntregaAtualizada={() => console.log('Entrega atualizada')}
+            />
           )}
 
           {activeTab === 'arquivos' && (

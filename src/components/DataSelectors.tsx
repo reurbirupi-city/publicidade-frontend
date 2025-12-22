@@ -1,5 +1,15 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { getClientesDropdown, getProjetosDropdown } from '../services/dataIntegration';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../services/firebase';
+import { useAuth } from '../contexts/AuthContext';
+import { isWebmaster, getAdminByEmail } from '../services/adminService';
+
+interface ClienteOption {
+  value: string;
+  label: string;
+  cliente?: any;
+}
 
 interface ClienteSelectorProps {
   value: string;
@@ -16,13 +26,80 @@ export const ClienteSelector: React.FC<ClienteSelectorProps> = ({
   required = false,
   className = ''
 }) => {
-  const clientes = getClientesDropdown();
-  
-  // Debug: log para verificar clientes
-  React.useEffect(() => {
-    console.log('🔍 ClienteSelector - Total de clientes:', clientes.length);
-    console.log('📋 Clientes disponíveis:', clientes);
-  }, [clientes]);
+  const { user } = useAuth();
+  const [clientes, setClientes] = useState<ClienteOption[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Carregar clientes do Firestore filtrados pelo admin
+  useEffect(() => {
+    const carregarClientes = async () => {
+      if (!user?.email) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        let clientesData: ClienteOption[] = [];
+
+        // Verificar se é webmaster (vê todos) ou admin comum (vê só seus clientes)
+        const isWebmasterUser = isWebmaster(user.email);
+
+        if (isWebmasterUser) {
+          // Webmaster vê todos os clientes
+          const snapshot = await getDocs(collection(db, 'clientes'));
+          clientesData = snapshot.docs.map(doc => ({
+            value: doc.id,
+            label: `${doc.data().nome} - ${doc.data().empresa || 'Sem empresa'}`,
+            cliente: { id: doc.id, ...doc.data() }
+          }));
+          console.log('👑 Webmaster: carregando todos os clientes:', clientesData.length);
+        } else {
+          // Admin comum: buscar apenas seus clientes vinculados
+          const admin = await getAdminByEmail(user.email);
+          
+          if (admin) {
+            const q = query(
+              collection(db, 'clientes'),
+              where('adminId', '==', admin.id)
+            );
+            const snapshot = await getDocs(q);
+            clientesData = snapshot.docs.map(doc => ({
+              value: doc.id,
+              label: `${doc.data().nome} - ${doc.data().empresa || 'Sem empresa'}`,
+              cliente: { id: doc.id, ...doc.data() }
+            }));
+            console.log(`📋 Admin ${admin.nome}: carregando ${clientesData.length} clientes vinculados`);
+          } else {
+            console.log('⚠️ Admin não encontrado no sistema');
+          }
+        }
+
+        // Também carregar do localStorage (clientes legados)
+        const clientesLocalStorage = getClientesDropdown();
+        
+        // Mesclar evitando duplicatas (priorizar Firestore)
+        const idsFirestore = new Set(clientesData.map(c => c.value));
+        const clientesLocal = clientesLocalStorage.filter(c => !idsFirestore.has(c.value));
+        
+        const todosClientes = [...clientesData, ...clientesLocal];
+        
+        // Ordenar por nome
+        todosClientes.sort((a, b) => a.label.localeCompare(b.label));
+        
+        setClientes(todosClientes);
+        console.log('🔍 ClienteSelector - Total combinado:', todosClientes.length);
+      } catch (error) {
+        console.error('❌ Erro ao carregar clientes:', error);
+        // Fallback para localStorage em caso de erro
+        setClientes(getClientesDropdown());
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    carregarClientes();
+  }, [user]);
 
   return (
     <div className={className}>
@@ -34,18 +111,19 @@ export const ClienteSelector: React.FC<ClienteSelectorProps> = ({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required={required}
-        className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 outline-none text-gray-900 dark:text-white"
+        disabled={loading}
+        className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 outline-none text-gray-900 dark:text-white disabled:opacity-50"
       >
-        <option value="">Selecione um cliente...</option>
+        <option value="">{loading ? 'Carregando...' : 'Selecione um cliente...'}</option>
         {clientes.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>
         ))}
       </select>
-      {clientes.length === 0 && (
+      {!loading && clientes.length === 0 && (
         <p className="text-xs text-red-500 dark:text-red-400 mt-1">
-          ⚠️ Nenhum cliente cadastrado. Cadastre clientes no módulo CRM primeiro.
+          ⚠️ Nenhum cliente vinculado. Envie um link de convite para cadastrar clientes.
         </p>
       )}
     </div>

@@ -28,7 +28,8 @@ import {
   Send,
   FileSignature,
   ClipboardCheck,
-  LogOut
+  LogOut,
+  Upload
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
@@ -36,6 +37,7 @@ import { TutorialOverlay, TutorialSettingsButton } from '../components/TutorialO
 import ModalGerarProposta from '../components/ModalGerarProposta';
 import ModalContratoAssinatura from '../components/ModalContratoAssinatura';
 import ChatWhatsApp from '../components/ChatWhatsApp';
+import EntregasProjeto from '../components/EntregasProjeto';
 import {
   notificarNovaSolicitacao,
   notificarPropostaAceita,
@@ -2073,6 +2075,23 @@ const ClientPortal: React.FC = () => {
                   </ul>
                 </div>
               )}
+
+              {/* Entregas do Projeto - Upload e Feedback */}
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <Upload className="w-5 h-5 text-orange-600" />
+                  Entregas do Projeto
+                </h3>
+                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4">
+                  <EntregasProjeto
+                    projetoId={selectedProject.id}
+                    clienteId={user?.uid || ''}
+                    clienteNome={user?.displayName || clientData?.nome || 'Cliente'}
+                    isAdmin={false}
+                    onEntregaAtualizada={() => console.log('Entrega atualizada pelo cliente')}
+                  />
+                </div>
+              </div>
 
               {/* Botões de Ação */}
               <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">

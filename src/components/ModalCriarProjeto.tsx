@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Save, X } from 'lucide-react';
 import Modal from './Modal';
 import { ClienteSelector } from './DataSelectors';
-import { getClienteById, createProjetoWithSync, atualizarStatusCliente } from '../services/dataIntegration';
+import { getClienteByIdAsync, createProjetoWithSync, atualizarStatusCliente } from '../services/dataIntegration';
 
 interface Projeto {
   id: string;
@@ -69,8 +69,8 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
     'Outro',
   ];
 
-  const handleClienteChange = (clienteId: string) => {
-    const cliente = getClienteById(clienteId);
+  const handleClienteChange = async (clienteId: string) => {
+    const cliente = await getClienteByIdAsync(clienteId);
     
     if (cliente) {
       console.log('📋 Pré-carregando dados do cliente:', cliente);
