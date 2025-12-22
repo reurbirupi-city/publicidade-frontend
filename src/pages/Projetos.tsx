@@ -183,13 +183,13 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ projeto, onDragStart, onDragEnd
       draggable={!isConcluido}
       onDragStart={(e) => !isConcluido && onDragStart(e, projeto.id)}
       onDragEnd={onDragEnd}
-      onClick={() => onView(projeto)}
+      onDoubleClick={() => onView(projeto)}
       className={`relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 transition-all group cursor-pointer ${
         isConcluido 
           ? 'opacity-90 ring-2 ring-green-500/50' 
           : 'hover:shadow-xl hover:scale-105'
       }`}
-      title={isConcluido ? '🔒 Projeto concluído - clique para ver detalhes' : 'Clique para ver detalhes'}
+      title={isConcluido ? '🔒 Projeto concluído - duplo clique para ver detalhes' : 'Duplo clique para ver detalhes | Arraste para mover'}
     >
       {/* Indicador de bloqueio para concluídos */}
       {isConcluido && (
@@ -259,6 +259,18 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ projeto, onDragStart, onDragEnd
           </span>
         </div>
       </div>
+
+      {/* Botão de ação rápida */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onView(projeto);
+        }}
+        className="mt-3 w-full py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1"
+      >
+        <Eye className="w-3 h-3" />
+        Ver Detalhes / Entregas
+      </button>
     </div>
   );
 };
