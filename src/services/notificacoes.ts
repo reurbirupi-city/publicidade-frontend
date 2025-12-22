@@ -171,6 +171,11 @@ export const buscarNotificacoes = async (
 
 /**
  * Listener em tempo real para notificações
+ * 
+ * Lógica de roteamento:
+ * - Webmaster (destinatarioId='webmaster'): Recebe notificações de admins e clientes sem admin
+ * - Admin (destinatarioId=userId): Recebe notificações dos SEUS clientes
+ * - Cliente (destinatarioId=clienteId): Recebe suas notificações específicas
  */
 export const escutarNotificacoes = (
   destinatarioTipo: DestinatarioTipo,
@@ -181,26 +186,14 @@ export const escutarNotificacoes = (
   
   const notificacoesRef = collection(db, 'notificacoes');
   
-  // Para admin, buscar TODAS as notificações com destinatarioTipo='admin'
-  // Para cliente, buscar apenas as suas notificações específicas
-  let q;
-  
-  if (destinatarioTipo === 'admin') {
-    // Admin recebe todas as notificações destinadas a admin
-    q = query(
-      notificacoesRef,
-      where('destinatarioTipo', '==', 'admin'),
-      limit(100)
-    );
-  } else {
-    // Cliente recebe apenas suas notificações específicas
-    q = query(
-      notificacoesRef,
-      where('destinatarioTipo', '==', 'cliente'),
-      where('destinatarioId', '==', destinatarioId),
-      limit(100)
-    );
-  }
+  // Agora todos os tipos usam filtro por destinatarioId específico
+  // Admin usa seu userId, cliente usa seu clienteId
+  let q = query(
+    notificacoesRef,
+    where('destinatarioTipo', '==', destinatarioTipo),
+    where('destinatarioId', '==', destinatarioId),
+    limit(100)
+  );
 
   const unsubscribe = onSnapshot(q, (snapshot) => {
     console.log('📥 Snapshot recebido para', destinatarioTipo, '- docs:', snapshot.docs.length);
@@ -250,20 +243,28 @@ export const escutarNotificacoes = (
 
 /**
  * Notifica admin sobre novo cliente cadastrado
+ * @param adminId - ID específico do admin (se cliente veio por link de convite)
+ *                  Se não fornecido, notifica o webmaster (sistema)
  */
 export const notificarNovoCliente = async (
   clienteNome: string,
   clienteEmpresa: string,
   clienteEmail: string,
-  clienteId: string
+  clienteId: string,
+  adminId?: string  // ID do admin que convidou o cliente
 ): Promise<void> => {
-  console.log('📤 notificarNovoCliente chamada:', { clienteNome, clienteEmpresa, clienteEmail });
+  console.log('📤 notificarNovoCliente chamada:', { clienteNome, clienteEmpresa, clienteEmail, adminId });
+  
+  // Se tem adminId, notifica o admin específico
+  // Senão, notifica o webmaster (cliente veio sem link de convite)
+  const destinatario = adminId || 'webmaster';
+  
   await criarNotificacao({
     tipo: 'novo_cliente',
     titulo: '👤 Novo Cliente Cadastrado!',
     mensagem: `${clienteNome} (${clienteEmpresa}) acabou de se cadastrar. Email: ${clienteEmail}`,
     destinatarioTipo: 'admin',
-    destinatarioId: 'admin',
+    destinatarioId: destinatario,
     remetenteNome: clienteNome,
     referenciaId: clienteId,
     referenciaTipo: 'solicitacao',
@@ -275,19 +276,26 @@ export const notificarNovoCliente = async (
 
 /**
  * Notifica admin sobre nova solicitação de serviço
+ * @param adminId - ID específico do admin (se cliente tem adminId)
  */
 export const notificarNovaSolicitacao = async (
   clienteNome: string,
   servicoTitulo: string,
-  solicitacaoId: string
+  solicitacaoId: string,
+  adminId?: string  // ID do admin do cliente
 ): Promise<void> => {
-  console.log('📤 notificarNovaSolicitacao chamada:', { clienteNome, servicoTitulo, solicitacaoId });
+  console.log('📤 notificarNovaSolicitacao chamada:', { clienteNome, servicoTitulo, solicitacaoId, adminId });
+  
+  // Se tem adminId, notifica o admin específico
+  // Senão, notifica o webmaster
+  const destinatario = adminId || 'webmaster';
+  
   await criarNotificacao({
     tipo: 'nova_solicitacao',
     titulo: '📋 Nova Solicitação de Serviço',
     mensagem: `${clienteNome} solicitou: ${servicoTitulo}`,
     destinatarioTipo: 'admin',
-    destinatarioId: 'admin',
+    destinatarioId: destinatario,
     remetenteNome: clienteNome,
     referenciaId: solicitacaoId,
     referenciaTipo: 'solicitacao',

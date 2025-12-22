@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTutorial } from '../contexts/TutorialContext';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, onSnapshot, addDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import {
   FileText,
@@ -424,6 +424,35 @@ const ClientPortal: React.FC = () => {
         if (projetos.length > 0) {
           console.log('✅ Encontrados', projetos.length, 'projetos do Firestore');
           setProjetosAdmin(projetos);
+          
+          // ✅ REMOVER PROJETOS LOCAIS que já existem no Firestore (evitar duplicação)
+          // Se um projeto foi criado pelo admin no Firestore com o mesmo solicitacaoId,
+          // remover o projeto local criado automaticamente na assinatura do contrato
+          setProjetosDoContrato(prev => {
+            const idsFirestore = projetos.map(p => p.solicitacaoId).filter(Boolean);
+            const contratoIdsFirestore = projetos.map(p => p.contratoId).filter(Boolean);
+            
+            const projetosLocaisFiltrados = prev.filter(local => {
+              // Manter apenas projetos locais que NÃO existem no Firestore
+              const existeNoFirestore = 
+                (local.solicitacaoId && idsFirestore.includes(local.solicitacaoId)) ||
+                (local.contratoId && contratoIdsFirestore.includes(local.contratoId));
+              
+              if (existeNoFirestore) {
+                console.log('🔄 Removendo projeto local duplicado:', local.id, '(já existe no Firestore)');
+              }
+              
+              return !existeNoFirestore;
+            });
+            
+            // Atualizar localStorage também
+            if (user?.uid && projetosLocaisFiltrados.length !== prev.length) {
+              localStorage.setItem(`projetos_${user.uid}`, JSON.stringify(projetosLocaisFiltrados));
+              console.log('✅ localStorage atualizado - projetos duplicados removidos');
+            }
+            
+            return projetosLocaisFiltrados;
+          });
         } else {
           console.log('⚠️ Nenhum projeto encontrado no Firestore para este cliente');
         }
@@ -609,6 +638,36 @@ const ClientPortal: React.FC = () => {
       case 'marketing': return '📊';
       case 'web': return '🌐';
       default: return '📁';
+    }
+  };
+
+  // Calcular progresso baseado no status do projeto (sincronizado com Kanban do admin)
+  const getProgressoByStatus = (projeto: any): number => {
+    // Se o projeto já tem um progresso definido no Firestore, usar esse valor
+    if (typeof projeto.progresso === 'number' && projeto.progresso > 0) {
+      return projeto.progresso;
+    }
+    
+    // Caso contrário, calcular baseado no status
+    switch (projeto.status) {
+      case 'planejamento':
+        return 10;
+      case 'em_andamento':
+      case 'em-andamento':
+        return 40;
+      case 'pausado':
+        return projeto.progresso || 30; // Mantém o progresso anterior
+      case 'revisao':
+        return 70;
+      case 'aprovacao':
+      case 'aguardando-aprovacao':
+        return 90;
+      case 'concluido':
+        return 100;
+      case 'cancelado':
+        return 0;
+      default:
+        return 0;
     }
   };
 
@@ -919,12 +978,14 @@ const ClientPortal: React.FC = () => {
       console.log('✅ Solicitação salva no Firestore:', novaSolicitacao.id);
       
       // Notificar admin sobre nova solicitação
+      // Se cliente tem adminId, notifica o admin específico
       await notificarNovaSolicitacao(
         clientData?.nome || user?.email || 'Cliente',
         service.titulo,
-        novaSolicitacao.id
+        novaSolicitacao.id,
+        clientData?.adminId  // ID do admin do cliente (se existir)
       );
-      console.log('🔔 Notificação enviada para admin');
+      console.log('🔔 Notificação enviada para', clientData?.adminId ? `admin ${clientData.adminId}` : 'webmaster');
     } catch (error) {
       console.error('❌ Erro ao salvar solicitação no Firestore:', error);
     }
@@ -983,12 +1044,14 @@ const ClientPortal: React.FC = () => {
       console.log('✅ Solicitação personalizada salva no Firestore:', novaSolicitacao.id);
       
       // Notificar admin sobre nova solicitação personalizada
+      // Se cliente tem adminId, notifica o admin específico
       await notificarNovaSolicitacao(
         clientData?.nome || user?.email || 'Cliente',
         customServiceData.titulo,
-        novaSolicitacao.id
+        novaSolicitacao.id,
+        clientData?.adminId  // ID do admin do cliente (se existir)
       );
-      console.log('🔔 Notificação enviada para admin');
+      console.log('🔔 Notificação enviada para', clientData?.adminId ? `admin ${clientData.adminId}` : 'webmaster');
     } catch (error) {
       console.error('❌ Erro ao salvar solicitação personalizada no Firestore:', error);
     }
@@ -1151,7 +1214,7 @@ const ClientPortal: React.FC = () => {
     setShowContratoModal(true);
   };
 
-  const handleContratoAssinado = async (contratoId: string, assinaturaBase64: string, nomeArquivo: string) => {
+  const handleContratoAssinado = async (contratoId: string, assinaturaBase64: string, nomeArquivo: string, pdfBase64: string) => {
     console.log('🎉 Contrato assinado:', contratoId);
     const contrato = contratosPendentes.find(c => c.id === contratoId);
     
@@ -1164,11 +1227,37 @@ const ClientPortal: React.FC = () => {
     console.log('🔗 Solicitação vinculada:', contrato.solicitacaoId);
     
     try {
+      // Salvar contrato assinado na coleção contratos_assinados
+      // Usamos o pdfBase64 diretamente pois Firebase Storage requer billing
+      const contratoAssinado = {
+        contratoId,
+        solicitacaoId: contrato.solicitacaoId,
+        propostaId: contrato.propostaId,
+        clienteId: user?.uid,
+        clienteNome: clientData?.nome || 'Cliente',
+        clienteEmpresa: clientData?.empresa || '',
+        clienteEmail: clientData?.email || user?.email || '',
+        titulo: contrato.titulo,
+        valor: contrato.valor,
+        servicos: contrato.servicos || [],
+        dataAssinatura: new Date().toISOString(),
+        nomeArquivo,
+        pdfBase64, // Salvar o PDF como base64 diretamente no Firestore
+        assinaturaBase64,
+        status: 'assinado',
+        adminId: clientData?.adminId || ''
+      };
+      
+      await addDoc(collection(db, 'contratos_assinados'), contratoAssinado);
+      console.log('✅ Contrato salvo na coleção contratos_assinados (com PDF base64)');
+
       // 1. Atualiza proposta/solicitação no Firestore para "contrato-assinado"
       const docRef = doc(db, 'solicitacoes_clientes', contrato.solicitacaoId);
       await updateDoc(docRef, {
         status: 'contrato-assinado',
-        dataAssinatura: new Date().toISOString()
+        dataAssinatura: new Date().toISOString(),
+        contratoArquivo: nomeArquivo,
+        contratoAssinadoBase64: true // Flag indicando que o PDF está salvo como base64
       });
       console.log('✅ Status da proposta atualizado no Firestore para: contrato-assinado');
 
@@ -1222,36 +1311,14 @@ const ClientPortal: React.FC = () => {
         }
       });
       
-      // 5. Cria projeto automaticamente
-      const servicosArray = contrato.servicos || [];
-      const novoProjeto = {
-        id: `PROJ-${String(projetosDoContrato.length + projetosAdmin.length + 1).padStart(3, '0')}`,
-        contratoId: contratoId,
-        solicitacaoId: contrato.solicitacaoId,
-        propostaId: contrato.propostaId,
-        titulo: contrato.titulo.replace('Contrato - ', ''),
-        status: 'em-andamento',
-        categoria: servicosArray[0]?.categoria?.toLowerCase().replace(' ', '-') || 'outros',
-        dataInicio: new Date().toISOString().split('T')[0],
-        valor: contrato.valor,
-        progresso: 0,
-        imagemCapa: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400',
-        descricao: contrato.descricao,
-        servicos: servicosArray,
-        recorrente: servicosArray.some((s: any) => s.recorrente),
-        proximasEntregas: ['Kickoff do projeto em até 48h'],
-        assinaturaData: new Date().toISOString().split('T')[0],
-        assinaturaArquivo: nomeArquivo
-      };
-      
-      setProjetosDoContrato(prev => [...prev, novoProjeto]);
-      
-      // 6. Fechar o modal após assinatura
+      // 5. Fechar o modal após assinatura
+      // NOTA: Projeto NÃO é criado automaticamente.
+      // O admin irá criar o projeto manualmente após analisar o contrato.
       setTimeout(() => {
         setShowContratoModal(false);
         setContratoSelecionado(null);
         // Mostrar mensagem de sucesso
-        alert('✅ Contrato assinado com sucesso! Seu projeto foi criado automaticamente.');
+        alert('✅ Contrato assinado com sucesso! Em breve o administrador criará seu projeto e você poderá acompanhar o progresso.');
       }, 2000);
     } catch (error) {
       console.error('❌ Erro ao processar assinatura do contrato:', error);
@@ -1719,7 +1786,7 @@ const ClientPortal: React.FC = () => {
                         <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                           <span>📅 Início: {new Date(projeto.dataInicio).toLocaleDateString('pt-BR')}</span>
                           <span>⏰ Prazo: {new Date(projeto.prazoEstimado).toLocaleDateString('pt-BR')}</span>
-                          <span>📊 Progresso: {projeto.progresso || 0}%</span>
+                          <span>📊 Progresso: {getProgressoByStatus(projeto)}%</span>
                         </div>
 
                         {/* Área de Aprovação - quando status é "aprovacao" */}
@@ -1773,101 +1840,17 @@ const ClientPortal: React.FC = () => {
                   </div>
                 ))}
 
-                {/* Projetos criados por contratos assinados (DINÂMICOS) */}
-                {projetosDoContrato.length > 0 ? (
-                  projetosDoContrato.map((projeto) => (
-                    <div 
-                      key={projeto.id}
-                      className={`border-2 rounded-lg p-4 hover:shadow-lg transition-all cursor-pointer ${getStatusBorderColor(projeto.status)}`}
-                      onClick={() => setSelectedProject(projeto)}
-                    >
-                      <div className="mb-2">
-                        <span className="px-3 py-1 bg-green-500 text-white text-xs rounded-full font-bold">
-                          🆕 NOVO - Criado por Contrato
-                        </span>
-                      </div>
-                      <div className="flex items-start gap-4">
-                        <img 
-                          src={projeto.imagemCapa}
-                          alt={projeto.titulo}
-                          className="w-24 h-24 rounded-lg object-cover"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between mb-2">
-                            <div>
-                              <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                                {getCategoriaIcon(projeto.categoria)} {projeto.titulo}
-                              </h3>
-                              <span className={`inline-block px-3 py-1 text-xs rounded-full ${getStatusColor(projeto.status)}`}>
-                                {getStatusLabel(projeto.status)}
-                              </span>
-                            </div>
-                            <p className="text-lg font-bold text-green-600 dark:text-green-400">
-                              R$ {projeto.valor.toLocaleString('pt-BR')}
-                            </p>
-                          </div>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{projeto.descricao}</p>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            📋 Solicitação: {projeto.solicitacaoId} → 📄 Proposta: {projeto.propostaId} → ✍️ Contrato: {projeto.contratoId}
-                          </div>
-
-                          {/* Área de Aprovação - quando status é "aprovacao" */}
-                          {(projeto.status === 'aprovacao' || projeto.status === 'aguardando-aprovacao') && (
-                            <div className="mt-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
-                              <div className="flex items-start gap-3 mb-3">
-                                <div className="p-2 bg-amber-100 dark:bg-amber-800 rounded-lg">
-                                  <CheckCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                                </div>
-                                <div className="flex-1">
-                                  <h4 className="font-semibold text-amber-800 dark:text-amber-200">
-                                    ✅ Aguardando sua Aprovação
-                                  </h4>
-                                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                                    A equipe finalizou esta etapa e aguarda sua aprovação.
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* Descrição do que foi feito */}
-                              {projeto.descricaoFaseAtual && (
-                                <div className="mb-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-700">
-                                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">
-                                    📝 O que foi realizado:
-                                  </p>
-                                  <p className="text-sm text-gray-700 dark:text-gray-300">
-                                    {projeto.descricaoFaseAtual}
-                                  </p>
-                                </div>
-                              )}
-
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleAprovarProjeto(projeto.id);
-                                }}
-                                className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 py-3 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-600 transition-all flex items-center justify-center gap-2 shadow-lg"
-                              >
-                                <CheckCircle className="w-5 h-5" />
-                                Aprovar e Concluir
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  projetosAdmin.length === 0 && (
-                    <div className="text-center py-12">
-                      <BarChart3 className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                      <p className="text-gray-500 dark:text-gray-400">
-                        Nenhum projeto iniciado ainda.
-                      </p>
-                      <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-                        Projetos aparecerão aqui após você assinar um contrato ou quando o admin criar um projeto.
-                      </p>
-                    </div>
-                  )
+                {/* Mensagem quando não há projetos */}
+                {projetosAdmin.length === 0 && (
+                  <div className="text-center py-12">
+                    <BarChart3 className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-500 dark:text-gray-400">
+                      Nenhum projeto iniciado ainda.
+                    </p>
+                    <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+                      Projetos aparecerão aqui após você assinar um contrato e o administrador criar seu projeto.
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
@@ -1925,24 +1908,30 @@ const ClientPortal: React.FC = () => {
 
             {/* Conteúdo do Modal */}
             <div className="p-6 space-y-6">
-              {/* Imagem de Capa */}
+              {/* Imagem de Capa e Progresso */}
               <div className="relative rounded-xl overflow-hidden h-64">
-                <img 
-                  src={selectedProject.imagemCapa} 
-                  alt={selectedProject.titulo}
-                  className="w-full h-full object-cover"
-                />
+                {selectedProject.imagemCapa ? (
+                  <img 
+                    src={selectedProject.imagemCapa} 
+                    alt={selectedProject.titulo}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+                    <span className="text-6xl">{getCategoriaIcon(selectedProject.categoria)}</span>
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-6">
-                  <div className="text-white">
-                    <p className="text-sm mb-1">Progresso Geral</p>
+                  <div className="text-white w-full">
+                    <p className="text-sm mb-1">Progresso Geral (baseado no status do projeto)</p>
                     <div className="flex items-center gap-3">
                       <div className="flex-1 bg-white/30 rounded-full h-3 overflow-hidden">
                         <div 
                           className="bg-gradient-to-r from-blue-400 to-cyan-400 h-full transition-all"
-                          style={{ width: `${selectedProject.progresso}%` }}
+                          style={{ width: `${getProgressoByStatus(selectedProject)}%` }}
                         ></div>
                       </div>
-                      <span className="font-bold text-lg">{selectedProject.progresso}%</span>
+                      <span className="font-bold text-lg">{getProgressoByStatus(selectedProject)}%</span>
                     </div>
                   </div>
                 </div>
@@ -1970,7 +1959,7 @@ const ClientPortal: React.FC = () => {
                     <span className="font-semibold">Investimento</span>
                   </div>
                   <p className="text-gray-900 dark:text-white font-medium">
-                    R$ {selectedProject.valor.toLocaleString('pt-BR')}
+                    R$ {(selectedProject.valorContratado || selectedProject.valor || 0).toLocaleString('pt-BR')}
                     {selectedProject.recorrente && <span className="text-sm text-gray-500"> /mês</span>}
                   </p>
                 </div>

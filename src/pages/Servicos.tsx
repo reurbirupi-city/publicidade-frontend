@@ -469,6 +469,19 @@ const Servicos: React.FC = () => {
     return cores[categoria] || 'bg-gray-100 text-gray-800';
   };
 
+  // Obter cor da borda esquerda baseada na categoria
+  const getCategoriaBorderColor = (categoria: string) => {
+    const cores: Record<string, string> = {
+      'branding': 'border-l-purple-500',
+      'social-media': 'border-l-pink-500',
+      'web': 'border-l-blue-500',
+      'marketing': 'border-l-green-500',
+      'design': 'border-l-orange-500',
+      'video': 'border-l-red-500'
+    };
+    return cores[categoria] || 'border-l-gray-500';
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -593,7 +606,7 @@ const Servicos: React.FC = () => {
         {filteredServicos.map(servico => (
           <div
             key={servico.id}
-            className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden transition-all hover:shadow-md ${!servico.ativo ? 'opacity-60' : ''}`}
+            className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 border-l-4 ${getCategoriaBorderColor(servico.categoria)} overflow-hidden transition-all hover:shadow-lg hover:scale-[1.02] ${!servico.ativo ? 'opacity-60' : ''}`}
           >
             {/* Header do Card */}
             <div className="p-4 border-b border-gray-100 dark:border-gray-700">

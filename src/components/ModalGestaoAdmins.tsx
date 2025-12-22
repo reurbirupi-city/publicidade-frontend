@@ -156,6 +156,15 @@ const ModalGestaoAdmins: React.FC<ModalGestaoAdminsProps> = ({ isOpen, onClose }
     setTimeout(() => setCopiado(null), 2000);
   };
 
+  // Link para cadastro de novos ADMINS (apenas para webmasters)
+  const handleCopiarLinkAdmin = (admin: Admin) => {
+    const baseUrl = window.location.origin;
+    const link = `${baseUrl}/register?ref=${admin.codigoConvite}&type=admin`;
+    navigator.clipboard.writeText(link);
+    setCopiado(`admin-${admin.id}`);
+    setTimeout(() => setCopiado(null), 2000);
+  };
+
   const handleCopiarCodigo = (admin: Admin) => {
     navigator.clipboard.writeText(admin.codigoConvite);
     setCopiado(`codigo-${admin.id}`);
@@ -519,6 +528,34 @@ const ModalGestaoAdmins: React.FC<ModalGestaoAdminsProps> = ({ isOpen, onClose }
                                     </>
                                   )}
                                 </button>
+
+                                {/* Botão para convidar novos ADMINS - apenas para webmasters */}
+                                {admin.role === 'webmaster' && (
+                                  <>
+                                    <div className="bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded-lg border border-amber-200 dark:border-amber-800 mt-2">
+                                      <p className="text-xs text-amber-600 dark:text-amber-400 mb-1 font-semibold">Link para novos Administradores:</p>
+                                      <p className="text-xs text-amber-700 dark:text-amber-300 font-mono break-all">
+                                        {window.location.origin}/register?ref={admin.codigoConvite}&type=admin
+                                      </p>
+                                    </div>
+                                    <button
+                                      onClick={() => handleCopiarLinkAdmin(admin)}
+                                      className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-semibold py-2.5 px-4 rounded-lg transition-all shadow-lg shadow-amber-500/25"
+                                    >
+                                      {copiado === `admin-${admin.id}` ? (
+                                        <>
+                                          <Check className="w-4 h-4" />
+                                          Link de Admin Copiado!
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Crown className="w-4 h-4" />
+                                          Copiar Link para Novo Admin
+                                        </>
+                                      )}
+                                    </button>
+                                  </>
+                                )}
                               </>
                             ) : (
                               <div className="text-center py-2">

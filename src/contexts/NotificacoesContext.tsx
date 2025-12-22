@@ -7,6 +7,8 @@ import {
   marcarTodasComoLidas,
   DestinatarioTipo
 } from '../services/notificacoes';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../services/firebase';
 
 // ============================================================================
 // TIPOS
@@ -35,38 +37,82 @@ export const NotificacoesProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const { user } = useAuth();
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isWebmaster, setIsWebmaster] = useState(false);
+  const [adminChecked, setAdminChecked] = useState(false);
   
-  // Determinar se é admin (baseado no email ou role)
-  // Lista de emails de admin - adicione os emails dos administradores aqui
-  const emailsAdmin = [
+  // Lista de emails de webmaster (super admin)
+  const emailsWebmaster = [
     'admin@agencia.com',
     'admin@admin.com',
-    'reurbirupi@gmail.com',
-    'tributacao.irupi@gmail.com', // Email do admin
+    'reurbirupi@gmail.com', // Webmaster principal
   ];
-  
-  const isAdmin = user?.email ? (
-    emailsAdmin.some(email => user.email?.toLowerCase() === email.toLowerCase()) ||
-    user.email.toLowerCase().includes('admin') ||
-    localStorage.getItem('userRole') === 'admin'
-  ) : false;
 
-  // Tipo e ID do destinatário
-  const destinatarioTipo: DestinatarioTipo = isAdmin ? 'admin' : 'cliente';
-  const destinatarioId = isAdmin ? 'admin' : (user?.uid || '');
+  // Verificar se é admin consultando a coleção admins no Firestore
+  useEffect(() => {
+    const verificarAdmin = async () => {
+      if (!user?.uid) {
+        setIsAdmin(false);
+        setIsWebmaster(false);
+        setAdminChecked(true);
+        return;
+      }
+
+      // Verificar webmaster por email
+      const isWeb = emailsWebmaster.some(email => 
+        user.email?.toLowerCase() === email.toLowerCase()
+      );
+      setIsWebmaster(isWeb);
+
+      if (isWeb) {
+        setIsAdmin(true);
+        setAdminChecked(true);
+        console.log('✅ NotificacoesContext - Webmaster identificado:', user.email);
+        return;
+      }
+
+      // Verificar se está na coleção admins do Firestore
+      try {
+        const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+        if (adminDoc.exists()) {
+          setIsAdmin(true);
+          console.log('✅ NotificacoesContext - Admin identificado via Firestore:', user.email);
+        } else {
+          setIsAdmin(false);
+          console.log('👤 NotificacoesContext - Cliente identificado:', user.email);
+        }
+      } catch (error) {
+        console.error('❌ Erro ao verificar admin:', error);
+        setIsAdmin(false);
+      }
+      
+      setAdminChecked(true);
+    };
+
+    verificarAdmin();
+  }, [user?.uid, user?.email]);
+
+  // Tipo e ID do destinatário (calculado após verificação de admin)
+  const destinatarioTipo: DestinatarioTipo = (isWebmaster || isAdmin) ? 'admin' : 'cliente';
+  const destinatarioId = isWebmaster ? 'webmaster' : (user?.uid || '');
 
   // Debug: log para verificar identificação
-  console.log('🔐 NotificacoesContext - User:', user?.email, '| isAdmin:', isAdmin, '| destinatarioTipo:', destinatarioTipo, '| destinatarioId:', destinatarioId);
+  useEffect(() => {
+    if (adminChecked) {
+      console.log('🔐 NotificacoesContext - User:', user?.email, '| isWebmaster:', isWebmaster, '| isAdmin:', isAdmin, '| destinatarioTipo:', destinatarioTipo, '| destinatarioId:', destinatarioId);
+    }
+  }, [adminChecked, user?.email, isWebmaster, isAdmin, destinatarioTipo, destinatarioId]);
 
   // Escutar notificações em tempo real
   useEffect(() => {
-    if (!user) {
+    if (!user || !adminChecked) {
       setNotificacoes([]);
       setLoading(false);
       return;
     }
 
     setLoading(true);
+    console.log('🔔 NotificacoesContext - Iniciando listener para:', destinatarioTipo, destinatarioId);
     
     const unsubscribe = escutarNotificacoes(
       destinatarioTipo,
@@ -75,19 +121,13 @@ export const NotificacoesProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setNotificacoes(novasNotificacoes);
         setLoading(false);
         
-        // Tocar som para novas notificações não lidas (opcional)
-        const naoLidasAntes = notificacoes.filter(n => !n.lida).length;
-        const naoLidasAgora = novasNotificacoes.filter(n => !n.lida).length;
-        
-        if (naoLidasAgora > naoLidasAntes && naoLidasAntes > 0) {
-          // Nova notificação recebida - poderia tocar som aqui
-          console.log('🔔 Nova notificação recebida!');
-        }
+        // Log de debug
+        console.log('📥 NotificacoesContext - Recebidas:', novasNotificacoes.length, 'notificações');
       }
     );
 
     return () => unsubscribe();
-  }, [user, destinatarioTipo, destinatarioId]);
+  }, [user, adminChecked, destinatarioTipo, destinatarioId]);
 
   // Contar não lidas
   const naoLidas = notificacoes.filter(n => !n.lida).length;
@@ -116,7 +156,7 @@ export const NotificacoesProvider: React.FC<{ children: React.ReactNode }> = ({ 
         loading, 
         marcarLida, 
         marcarTodasLidas,
-        isAdmin
+        isAdmin: isAdmin || isWebmaster  // Webmaster também é considerado admin para UI
       }}
     >
       {children}

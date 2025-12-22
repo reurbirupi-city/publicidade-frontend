@@ -5,6 +5,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { NotificacoesProvider } from './contexts/NotificacoesContext';
 import { TutorialProvider } from './contexts/TutorialContext';
+import ChatGlobalAdmin from './components/ChatGlobalAdmin';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -44,6 +45,8 @@ function App() {
               <Route path="/client-portal" element={<ClientPortal />} />
               <Route path="/solicitacoes" element={<Solicitacoes />} />
             </Routes>
+            {/* Chat Global - Aparece em todas as páginas para admins */}
+            <ChatGlobalAdmin />
           </BrowserRouter>
           </TutorialProvider>
         </NotificacoesProvider>

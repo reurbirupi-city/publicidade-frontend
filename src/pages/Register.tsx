@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Sparkles, Mail, Lock, User, Phone, Building, ArrowLeft, MapPin, Shield } from 'lucide-react';
+import { Sparkles, Mail, Lock, User, Phone, Building, ArrowLeft, MapPin, Shield, Crown } from 'lucide-react';
 import { auth, db } from '../services/firebase';
 import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { getClientes, saveClientes } from '../services/dataIntegration';
 import { notificarNovoCliente } from '../services/notificacoes';
-import { getAdminByCodigoConvite, Admin } from '../services/adminService';
+import { getAdminByCodigoConvite, Admin, criarAdmin, gerarCodigoConvite } from '../services/adminService';
 
 const Register: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [adminConvite, setAdminConvite] = useState<Admin | null>(null);
   const [loadingAdmin, setLoadingAdmin] = useState(true);
+  // Verifica se é cadastro de admin (type=admin na URL)
+  const isAdminRegister = searchParams.get('type') === 'admin';
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -35,12 +37,23 @@ const Register: React.FC = () => {
   useEffect(() => {
     const buscarAdminConvite = async () => {
       const ref = searchParams.get('ref');
+      const type = searchParams.get('type');
+      
       if (ref) {
         console.log('🔍 Código de convite encontrado na URL:', ref);
+        console.log('🔍 Tipo de cadastro:', type === 'admin' ? 'ADMIN' : 'CLIENTE');
+        
         const admin = await getAdminByCodigoConvite(ref);
         if (admin) {
-          console.log('✅ Admin encontrado:', admin.nome, '-', admin.nomeAgencia);
-          setAdminConvite(admin);
+          console.log('✅ Admin encontrado:', admin.nome, '-', admin.nomeAgencia, '| Role:', admin.role);
+          
+          // Se é cadastro de admin, verificar se o convite é de um webmaster
+          if (type === 'admin' && admin.role !== 'webmaster') {
+            console.log('⚠️ Apenas webmasters podem convidar novos admins');
+            // Não seta o adminConvite para bloquear
+          } else {
+            setAdminConvite(admin);
+          }
         } else {
           console.log('⚠️ Código de convite inválido');
         }
@@ -166,26 +179,28 @@ const Register: React.FC = () => {
       return;
     }
 
-    // Validação de CPF/CNPJ
-    if (formData.tipoPessoa === 'juridica') {
-      if (!formData.cnpj.trim()) {
-        setError('CNPJ é obrigatório para pessoa jurídica');
-        return;
+    // Validação de CPF/CNPJ (apenas para cadastro de cliente)
+    if (!isAdminRegister) {
+      if (formData.tipoPessoa === 'juridica') {
+        if (!formData.cnpj.trim()) {
+          setError('CNPJ é obrigatório para pessoa jurídica');
+          return;
+        }
+        if (!validarCNPJ(formData.cnpj)) {
+          setError('CNPJ inválido');
+          return;
+        }
       }
-      if (!validarCNPJ(formData.cnpj)) {
-        setError('CNPJ inválido');
-        return;
-      }
-    }
 
-    if (formData.tipoPessoa === 'fisica') {
-      if (!formData.cpf.trim()) {
-        setError('CPF é obrigatório para pessoa física');
-        return;
-      }
-      if (!validarCPF(formData.cpf)) {
-        setError('CPF inválido');
-        return;
+      if (formData.tipoPessoa === 'fisica') {
+        if (!formData.cpf.trim()) {
+          setError('CPF é obrigatório para pessoa física');
+          return;
+        }
+        if (!validarCPF(formData.cpf)) {
+          setError('CPF inválido');
+          return;
+        }
       }
     }
 
@@ -238,6 +253,44 @@ const Register: React.FC = () => {
         }
       }
       
+      // ============================================================
+      // CADASTRO DE ADMIN (quando type=admin na URL)
+      // ============================================================
+      if (isAdminRegister) {
+        console.log('👑 Criando conta de ADMINISTRADOR...');
+        
+        const resultado = await criarAdmin({
+          nome: formData.nome,
+          email: formData.email,
+          senha: formData.password,
+          role: 'admin',
+          telefone: formData.telefone,
+          nomeAgencia: formData.empresa
+        });
+
+        if (resultado.success) {
+          console.log('✅ Admin criado com sucesso:', resultado.admin?.id);
+          
+          // Fazer logout após criar conta
+          await auth.signOut();
+
+          // Redirecionar para login com mensagem de sucesso
+          navigate('/login', { 
+            state: { 
+              message: '✅ Conta de administrador criada com sucesso! Faça login para acessar o painel.' 
+            } 
+          });
+        } else {
+          setError(resultado.error || 'Erro ao criar conta de administrador');
+        }
+        
+        setLoading(false);
+        return;
+      }
+
+      // ============================================================
+      // CADASTRO DE CLIENTE (fluxo padrão)
+      // ============================================================
       console.log('📝 Criando conta de cliente...');
       
       // 1. Criar usuário no Firebase Auth
@@ -371,14 +424,17 @@ const Register: React.FC = () => {
       console.log('✅ Cliente cadastrado no localStorage (CRM local):', novoCliente.id);
 
       // 5.1. Notificar admin sobre novo cliente cadastrado
+      // Se veio por link de convite, notifica o admin específico
+      // Se não, notifica o webmaster
       try {
         await notificarNovoCliente(
           formData.nome,
           formData.empresa,
           formData.email,
-          uid
+          uid,
+          adminConvite?.id  // ID do admin que convidou (se existir)
         );
-        console.log('🔔 Notificação enviada ao admin: novo cliente cadastrado');
+        console.log('🔔 Notificação enviada ao', adminConvite ? `admin ${adminConvite.id}` : 'webmaster', ': novo cliente cadastrado');
       } catch (notifError) {
         console.error('⚠️ Erro ao enviar notificação (não bloqueante):', notifError);
       }
@@ -409,6 +465,107 @@ const Register: React.FC = () => {
     }
   };
 
+  // Tela de carregamento enquanto verifica o código de convite
+  if (loadingAdmin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-purple-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Verificando código de convite...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Tela de bloqueio quando não há código de convite válido
+  if (!adminConvite) {
+    const codigoInformado = searchParams.get('ref');
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-purple-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          {/* Back Button */}
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Voltar
+          </button>
+
+          {/* Blocked Card */}
+          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 text-center">
+            {/* Logo */}
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <Sparkles className="w-8 h-8 text-primary-600" />
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-purple-600 bg-clip-text text-transparent">
+                Gestão Criativa
+              </h1>
+            </div>
+
+            {/* Ícone de Bloqueio */}
+            <div className="mb-6">
+              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-orange-100 to-red-100 rounded-full flex items-center justify-center">
+                <Shield className="w-10 h-10 text-orange-600" />
+              </div>
+            </div>
+
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">
+              {codigoInformado ? 'Código Inválido' : 'Acesso Restrito'}
+            </h2>
+
+            <p className="text-gray-600 mb-6">
+              {codigoInformado 
+                ? isAdminRegister
+                  ? `O código de convite "${codigoInformado}" não é válido ou não pertence a um webmaster autorizado.`
+                  : `O código de convite "${codigoInformado}" não é válido ou expirou.`
+                : isAdminRegister
+                  ? 'O cadastro de novos administradores requer um link de convite de um webmaster.'
+                  : 'O cadastro de novos clientes requer um link de convite de uma agência parceira.'
+              }
+            </p>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+              <p className="text-sm text-amber-800">
+                <strong>💡 Como obter acesso?</strong><br />
+                {isAdminRegister 
+                  ? 'Solicite um link de convite ao webmaster do sistema.'
+                  : 'Solicite um link de convite à agência ou profissional que irá atendê-lo.'
+                }
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => navigate('/login')}
+                className="w-full py-3 bg-gradient-to-r from-primary-600 to-purple-600 text-white rounded-xl font-semibold hover:opacity-90 transition-opacity"
+              >
+                Já tenho conta - Fazer Login
+              </button>
+              
+              <button
+                onClick={() => navigate('/')}
+                className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+              >
+                Voltar para Início
+              </button>
+            </div>
+
+            <p className="mt-6 text-xs text-gray-500">
+              Se você é uma agência e deseja se cadastrar,{' '}
+              <button 
+                onClick={() => navigate('/admin-register')}
+                className="text-primary-600 hover:underline font-medium"
+              >
+                clique aqui
+              </button>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-purple-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -433,29 +590,49 @@ const Register: React.FC = () => {
 
           {/* Badge de convite do admin */}
           {adminConvite && (
-            <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl">
+            <div className={`mb-6 p-4 border rounded-xl ${
+              isAdminRegister 
+                ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200' 
+                : 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200'
+            }`}>
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg">
-                  <Shield className="w-5 h-5 text-white" />
+                <div className={`p-2 rounded-lg ${
+                  isAdminRegister 
+                    ? 'bg-gradient-to-br from-amber-500 to-orange-500' 
+                    : 'bg-gradient-to-br from-purple-500 to-pink-500'
+                }`}>
+                  {isAdminRegister ? (
+                    <Crown className="w-5 h-5 text-white" />
+                  ) : (
+                    <Shield className="w-5 h-5 text-white" />
+                  )}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-purple-900">Convite de</p>
-                  <p className="text-lg font-bold text-purple-700">
+                  <p className={`text-sm font-semibold ${isAdminRegister ? 'text-amber-900' : 'text-purple-900'}`}>
+                    {isAdminRegister ? 'Convite de Webmaster' : 'Convite de'}
+                  </p>
+                  <p className={`text-lg font-bold ${isAdminRegister ? 'text-amber-700' : 'text-purple-700'}`}>
                     {adminConvite.nomeAgencia || adminConvite.nome}
                   </p>
                 </div>
               </div>
-              <p className="mt-2 text-xs text-purple-600">
-                Você foi convidado(a) para se cadastrar como cliente desta agência.
+              <p className={`mt-2 text-xs ${isAdminRegister ? 'text-amber-600' : 'text-purple-600'}`}>
+                {isAdminRegister 
+                  ? 'Você foi convidado(a) para se cadastrar como ADMINISTRADOR do sistema.'
+                  : 'Você foi convidado(a) para se cadastrar como cliente desta agência.'
+                }
               </p>
             </div>
           )}
 
           <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
-            Crie sua conta
+            {isAdminRegister ? 'Cadastro de Administrador' : 'Crie sua conta'}
           </h2>
           <p className="text-gray-600 text-center mb-6">
-            Registre-se para acessar o portal do cliente
+            {isAdminRegister 
+              ? 'Registre-se para gerenciar sua agência e clientes'
+              : 'Registre-se para acessar o portal do cliente'
+            }
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -526,7 +703,7 @@ const Register: React.FC = () => {
             {/* Empresa */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Empresa *
+                {isAdminRegister ? 'Nome da Agência *' : 'Empresa *'}
               </label>
               <div className="relative">
                 <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -536,60 +713,64 @@ const Register: React.FC = () => {
                   value={formData.empresa}
                   onChange={handleChange}
                   className="input-field pl-10"
-                  placeholder="Nome da empresa"
+                  placeholder={isAdminRegister ? 'Nome da sua agência' : 'Nome da empresa'}
                   required
                 />
               </div>
             </div>
 
-            {/* Tipo de Pessoa */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tipo de Pessoa *
-              </label>
-              <select
-                name="tipoPessoa"
-                value={formData.tipoPessoa}
-                onChange={handleChange}
-                className="input-field"
-                required
-              >
-                <option value="juridica">Pessoa Jurídica</option>
-                <option value="fisica">Pessoa Física</option>
-              </select>
-            </div>
+            {/* Tipo de Pessoa e CPF/CNPJ - Apenas para clientes */}
+            {!isAdminRegister && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tipo de Pessoa *
+                  </label>
+                  <select
+                    name="tipoPessoa"
+                    value={formData.tipoPessoa}
+                    onChange={handleChange}
+                    className="input-field"
+                    required
+                  >
+                    <option value="juridica">Pessoa Jurídica</option>
+                    <option value="fisica">Pessoa Física</option>
+                  </select>
+                </div>
 
-            {/* CPF ou CNPJ */}
-            {formData.tipoPessoa === 'juridica' ? (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  CNPJ *
-                </label>
-                <input
-                  type="text"
-                  name="cnpj"
-                  value={formData.cnpj}
-                  onChange={handleChange}
-                  className="input-field"
-                  placeholder="00.000.000/0000-00"
-                  required
-                />
-              </div>
-            ) : (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  CPF *
-                </label>
-                <input
-                  type="text"
-                  name="cpf"
-                  value={formData.cpf}
-                  onChange={handleChange}
-                  className="input-field"
-                  placeholder="000.000.000-00"
-                  required
-                />
-              </div>
+                {/* CPF ou CNPJ */}
+                {formData.tipoPessoa === 'juridica' ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      CNPJ *
+                    </label>
+                    <input
+                      type="text"
+                      name="cnpj"
+                      value={formData.cnpj}
+                      onChange={handleChange}
+                      className="input-field"
+                      placeholder="00.000.000/0000-00"
+                      required
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      CPF *
+                    </label>
+                    <input
+                      type="text"
+                      name="cpf"
+                      value={formData.cpf}
+                      onChange={handleChange}
+                      className="input-field"
+                      placeholder="000.000.000-00"
+                      required
+                    />
+                  </div>
+                )}
+              </>
             )}
 
             {/* WhatsApp */}

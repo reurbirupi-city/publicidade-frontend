@@ -6,6 +6,7 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
@@ -15,6 +16,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<UserCredential>;
   signUp: (email: string, password: string) => Promise<UserCredential>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -63,8 +65,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await firebaseSignOut(auth);
   };
 
+  const resetPassword = async (email: string) => {
+    if (!auth) {
+      throw new Error('Firebase não configurado. Configure o arquivo .env primeiro.');
+    }
+    await sendPasswordResetEmail(auth, email);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );

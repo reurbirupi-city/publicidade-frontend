@@ -50,6 +50,7 @@ const Dashboard: React.FC = () => {
   const [showGestaoAdmins, setShowGestaoAdmins] = useState(false);
   const [adminData, setAdminData] = useState<Admin | null>(null);
   const [linkCopiado, setLinkCopiado] = useState(false);
+  const [linkAdminCopiado, setLinkAdminCopiado] = useState(false);
   const [activities, setActivities] = useState<Array<{
     id: string;
     type: 'success' | 'info' | 'warning';
@@ -485,14 +486,44 @@ const Dashboard: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Badge de Webmaster */}
+                    {/* Badge de Webmaster com Link para Novos Admins */}
                     {userIsWebmaster && (
-                      <div className="mx-4 my-2 px-3 py-2 bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 rounded-lg border border-amber-200 dark:border-amber-800">
-                        <div className="flex items-center gap-2">
+                      <div className="mx-4 my-2 p-3 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+                        <div className="flex items-center gap-2 mb-2">
                           <Crown className="w-4 h-4 text-amber-600" />
                           <span className="text-xs font-bold text-amber-700 dark:text-amber-400">WEBMASTER</span>
                         </div>
-                        <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">Acesso total ao sistema</p>
+                        <p className="text-xs text-amber-600 dark:text-amber-500 mb-2">Acesso total ao sistema</p>
+                        
+                        {/* Link para cadastrar novos admins */}
+                        {adminData?.codigoConvite && (
+                          <>
+                            <p className="text-xs text-amber-700 dark:text-amber-300 font-mono break-all mb-2">
+                              {window.location.origin}/register?ref={adminData.codigoConvite}&type=admin
+                            </p>
+                            <button
+                              onClick={() => {
+                                const link = `${window.location.origin}/register?ref=${adminData.codigoConvite}&type=admin`;
+                                navigator.clipboard.writeText(link);
+                                setLinkAdminCopiado(true);
+                                setTimeout(() => setLinkAdminCopiado(false), 2000);
+                              }}
+                              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-semibold py-2 px-3 rounded-lg transition-all"
+                            >
+                              {linkAdminCopiado ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5" />
+                                  Link de Admin Copiado!
+                                </>
+                              ) : (
+                                <>
+                                  <Crown className="w-3.5 h-3.5" />
+                                  Copiar Link para Novo Admin
+                                </>
+                              )}
+                            </button>
+                          </>
+                        )}
                       </div>
                     )}
 

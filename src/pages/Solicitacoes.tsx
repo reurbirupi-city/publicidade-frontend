@@ -33,6 +33,44 @@ import { TutorialOverlay } from '../components/TutorialOverlay';
 import ChatWhatsAppAdmin from '../components/ChatWhatsAppAdmin';
 import { getClientes, getProjetos, saveProjetos, atualizarStatusCliente } from '../services/dataIntegration';
 
+// Função para baixar contrato assinado do Firestore
+const baixarContratoAssinado = async (solicitacaoId: string) => {
+  try {
+    // Buscar contrato na coleção contratos_assinados
+    const q = query(
+      collection(db, 'contratos_assinados'),
+      where('solicitacaoId', '==', solicitacaoId)
+    );
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+      alert('Contrato não encontrado');
+      return;
+    }
+    
+    const contratoData = snapshot.docs[0].data();
+    
+    if (contratoData.pdfBase64) {
+      // Criar link de download do base64
+      const link = document.createElement('a');
+      link.href = contratoData.pdfBase64;
+      link.download = contratoData.nomeArquivo || `Contrato_${solicitacaoId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      console.log('✅ Download do contrato iniciado');
+    } else if (contratoData.pdfUrl) {
+      // Fallback para URL (caso tenha conseguido fazer upload)
+      window.open(contratoData.pdfUrl, '_blank');
+    } else {
+      alert('PDF do contrato não disponível');
+    }
+  } catch (error) {
+    console.error('❌ Erro ao baixar contrato:', error);
+    alert('Erro ao baixar contrato. Tente novamente.');
+  }
+};
+
 const Solicitacoes: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -434,8 +472,14 @@ const Solicitacoes: React.FC = () => {
         return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400';
       case 'aceita':
         return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-      case 'em-projeto':
+      case 'contrato-pendente':
         return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
+      case 'contrato-assinado':
+        return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
+      case 'concluida':
+        return 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400';
+      case 'em-projeto':
+        return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400';
       case 'rejeitada':
         return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
       default:
@@ -453,6 +497,12 @@ const Solicitacoes: React.FC = () => {
         return 'Proposta Enviada';
       case 'aceita':
         return 'Aceita';
+      case 'contrato-pendente':
+        return 'Contrato Pendente';
+      case 'contrato-assinado':
+        return 'Contrato Assinado ✅';
+      case 'concluida':
+        return 'Concluída';
       case 'em-projeto':
         return 'Em Projeto';
       case 'rejeitada':
@@ -471,6 +521,12 @@ const Solicitacoes: React.FC = () => {
       case 'proposta-criada':
         return FileText;
       case 'aceita':
+        return CheckCircle;
+      case 'contrato-pendente':
+        return FileText;
+      case 'contrato-assinado':
+        return CheckCircle;
+      case 'concluida':
         return CheckCircle;
       case 'rejeitada':
         return X;
@@ -680,6 +736,20 @@ const Solicitacoes: React.FC = () => {
                             <Plus className="w-4 h-4" />
                             Iniciar Projeto
                           </button>
+                        ) : solicitacao.status === 'contrato-assinado' || solicitacao.status === 'concluida' ? (
+                          <div className="flex-1 flex gap-2">
+                            <div className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-500 to-green-500 text-white px-3 py-2.5 rounded-xl font-semibold text-xs">
+                              <CheckCircle className="w-4 h-4" />
+                              Contrato Assinado
+                            </div>
+                            <button
+                              onClick={() => baixarContratoAssinado(solicitacao.id)}
+                              className="flex items-center justify-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2.5 rounded-xl font-semibold text-xs transition-all"
+                              title="Baixar Contrato Assinado"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          </div>
                         ) : null}
                         <button
                           onClick={() => {

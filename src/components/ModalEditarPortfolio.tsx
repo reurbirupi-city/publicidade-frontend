@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Upload,
@@ -15,8 +15,10 @@ import {
   User,
   FileText,
   Sparkles,
-  Edit
+  Edit,
+  Loader
 } from 'lucide-react';
+import { uploadImage, uploadMultipleImages } from '../services/imageUpload';
 
 // ============================================================================
 // INTERFACES
@@ -68,6 +70,11 @@ const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
   const [novaTag, setNovaTag] = useState('');
   const [novaImagemUrl, setNovaImagemUrl] = useState('');
   const [erros, setErros] = useState<string[]>([]);
+  const [uploadingCapa, setUploadingCapa] = useState(false);
+  const [uploadingGaleria, setUploadingGaleria] = useState(false);
+  
+  const inputCapaRef = useRef<HTMLInputElement>(null);
+  const inputGaleriaRef = useRef<HTMLInputElement>(null);
 
   // Inicializa o formulário quando o item mudar
   useEffect(() => {
@@ -141,6 +148,72 @@ const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
       ...formData,
       imagensGaleria: formData.imagensGaleria.filter(img => img !== url)
     });
+  };
+
+  // Upload de imagem de capa
+  const handleUploadCapa = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !formData) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione apenas arquivos de imagem.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 5MB.');
+      return;
+    }
+
+    setUploadingCapa(true);
+    try {
+      const downloadUrl = await uploadImage(file);
+      setFormData({ ...formData, imagemCapa: downloadUrl });
+      console.log('✅ Imagem de capa enviada:', downloadUrl);
+    } catch (error) {
+      console.error('❌ Erro ao enviar imagem de capa:', error);
+      alert('Erro ao enviar imagem. Tente novamente.');
+    } finally {
+      setUploadingCapa(false);
+      if (inputCapaRef.current) inputCapaRef.current.value = '';
+    }
+  };
+
+  // Upload de imagens da galeria
+  const handleUploadGaleria = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !formData) return;
+
+    setUploadingGaleria(true);
+
+    try {
+      // Filtrar arquivos válidos
+      const validFiles: File[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024) {
+          validFiles.push(file);
+        }
+      }
+
+      if (validFiles.length > 0) {
+        // Criar FileList simulado
+        const dataTransfer = new DataTransfer();
+        validFiles.forEach(file => dataTransfer.items.add(file));
+        
+        const novasUrls = await uploadMultipleImages(dataTransfer.files);
+        setFormData({
+          ...formData,
+          imagensGaleria: [...formData.imagensGaleria, ...novasUrls]
+        });
+      }
+    } catch (error) {
+      console.error('❌ Erro ao enviar imagens da galeria:', error);
+      alert('Erro ao enviar algumas imagens. Tente novamente.');
+    } finally {
+      setUploadingGaleria(false);
+      if (inputGaleriaRef.current) inputGaleriaRef.current.value = '';
+    }
   };
 
   const getCategoriaInfo = (categoria: CategoriaPortfolio) => {
@@ -339,63 +412,113 @@ const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
               </h3>
 
               {/* Imagem de Capa */}
-              <div className="mb-4">
+              <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  URL da Imagem de Capa *
+                  Imagem de Capa * (clique para fazer upload)
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="url"
-                    value={formData.imagemCapa}
-                    onChange={(e) => setFormData({ ...formData, imagemCapa: e.target.value })}
-                    className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
-                    placeholder="https://..."
-                  />
-                </div>
-                {formData.imagemCapa && (
-                  <div className="mt-3 relative rounded-lg overflow-hidden">
-                    <img
-                      src={formData.imagemCapa}
-                      alt="Preview Capa"
-                      className="w-full h-48 object-cover"
+                
+                <input
+                  ref={inputCapaRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleUploadCapa}
+                  className="hidden"
+                />
+                
+                {formData.imagemCapa ? (
+                  <div className="relative h-48 rounded-xl overflow-hidden group border-2 border-blue-500">
+                    <img 
+                      src={formData.imagemCapa} 
+                      alt="Preview capa" 
+                      className="w-full h-full object-cover" 
                     />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                      <button
+                        onClick={() => inputCapaRef.current?.click()}
+                        disabled={uploadingCapa}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold flex items-center gap-2"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Trocar
+                      </button>
+                      <button
+                        onClick={() => setFormData({ ...formData, imagemCapa: '' })}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold flex items-center gap-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Remover
+                      </button>
+                    </div>
                     <div className="absolute top-2 right-2">
                       <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded-full">
                         Capa
                       </span>
                     </div>
                   </div>
+                ) : (
+                  <button
+                    onClick={() => inputCapaRef.current?.click()}
+                    disabled={uploadingCapa}
+                    className="w-full h-48 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl flex flex-col items-center justify-center gap-3 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all cursor-pointer"
+                  >
+                    {uploadingCapa ? (
+                      <>
+                        <Loader className="w-10 h-10 text-blue-600 animate-spin" />
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Enviando imagem...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-10 h-10 text-gray-400" />
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
+                          Clique para enviar a imagem de capa
+                        </span>
+                        <span className="text-xs text-gray-500">PNG, JPG, WEBP (máx. 5MB)</span>
+                      </>
+                    )}
+                  </button>
                 )}
               </div>
 
               {/* Galeria de Imagens */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Galeria de Imagens * (mínimo 1)
+                  Galeria de Imagens * (mínimo 1 - pode selecionar várias)
                 </label>
-                <div className="flex gap-2 mb-3">
-                  <input
-                    type="url"
-                    value={novaImagemUrl}
-                    onChange={(e) => setNovaImagemUrl(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAdicionarImagem()}
-                    className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
-                    placeholder="https://... (Enter para adicionar)"
-                  />
-                  <button
-                    onClick={handleAdicionarImagem}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Adicionar
-                  </button>
-                </div>
+                
+                <input
+                  ref={inputGaleriaRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleUploadGaleria}
+                  className="hidden"
+                />
+                
+                <button
+                  onClick={() => inputGaleriaRef.current?.click()}
+                  disabled={uploadingGaleria}
+                  className="w-full mb-4 py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl flex items-center justify-center gap-3 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all cursor-pointer"
+                >
+                  {uploadingGaleria ? (
+                    <>
+                      <Loader className="w-5 h-5 text-blue-600 animate-spin" />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Enviando imagens...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-5 h-5 text-blue-600" />
+                      <span className="text-sm font-semibold text-blue-600">
+                        Adicionar imagens à galeria
+                      </span>
+                    </>
+                  )}
+                </button>
 
                 {/* Grid de Imagens */}
                 {formData.imagensGaleria.length > 0 && (
                   <div className="grid grid-cols-3 gap-3">
                     {formData.imagensGaleria.map((url, index) => (
-                      <div key={index} className="relative group rounded-lg overflow-hidden">
+                      <div key={index} className="relative group rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700">
                         <img
                           src={url}
                           alt={`Galeria ${index + 1}`}
@@ -403,13 +526,22 @@ const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
                         />
                         <button
                           onClick={() => handleRemoverImagem(url)}
-                          className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
+                        <span className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/60 text-white text-xs rounded">
+                          {index + 1}
+                        </span>
                       </div>
                     ))}
                   </div>
+                )}
+                
+                {formData.imagensGaleria.length === 0 && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                    Nenhuma imagem adicionada à galeria ainda
+                  </p>
                 )}
               </div>
             </div>

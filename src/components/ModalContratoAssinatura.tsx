@@ -29,7 +29,7 @@ interface ModalContratoAssinaturaProps {
   };
   servicos: ServicoContratado[];
   valorTotal: number;
-  onContratoAssinado: (contratoId: string, assinaturaBase64: string, nomeArquivo: string) => void;
+  onContratoAssinado: (contratoId: string, assinaturaBase64: string, nomeArquivo: string, pdfBase64: string) => void;
 }
 
 const ModalContratoAssinatura: React.FC<ModalContratoAssinaturaProps> = ({
@@ -437,6 +437,11 @@ const ModalContratoAssinatura: React.FC<ModalContratoAssinaturaProps> = ({
 
       // ========== SALVAR PDF ==========
       const nomeArquivo = `Contrato_${cliente.empresa.replace(/\s+/g, '_')}_${contratoIdFinal}.pdf`;
+      
+      // Obter PDF como base64 para upload
+      const pdfBase64 = doc.output('datauristring');
+      
+      // Baixar localmente também
       doc.save(nomeArquivo);
 
       // Aguardar um pouco e então confirmar
@@ -445,7 +450,7 @@ const ModalContratoAssinatura: React.FC<ModalContratoAssinaturaProps> = ({
         setProcessando(false);
         
         setTimeout(() => {
-          onContratoAssinado(contratoIdFinal, assinaturaBase64, nomeArquivo);
+          onContratoAssinado(contratoIdFinal, assinaturaBase64, nomeArquivo, pdfBase64);
         }, 1500);
       }, 1000);
 
