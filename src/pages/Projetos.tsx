@@ -158,9 +158,10 @@ interface KanbanCardProps {
   projeto: Projeto;
   onDragStart: (e: React.DragEvent, projectId: string) => void;
   onDragEnd: (e: React.DragEvent) => void;
+  onView: (projeto: Projeto) => void;
 }
 
-const KanbanCard: React.FC<KanbanCardProps> = ({ projeto, onDragStart, onDragEnd }) => {
+const KanbanCard: React.FC<KanbanCardProps> = ({ projeto, onDragStart, onDragEnd, onView }) => {
   const getPrioridadeColor = (prioridade: PrioridadeProjeto) => {
     const colors = {
       baixa: 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800',
@@ -182,12 +183,13 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ projeto, onDragStart, onDragEnd
       draggable={!isConcluido}
       onDragStart={(e) => !isConcluido && onDragStart(e, projeto.id)}
       onDragEnd={onDragEnd}
-      className={`relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 transition-all group ${
+      onClick={() => onView(projeto)}
+      className={`relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 transition-all group cursor-pointer ${
         isConcluido 
-          ? 'cursor-not-allowed opacity-90 ring-2 ring-green-500/50' 
-          : 'cursor-move hover:shadow-xl hover:scale-105'
+          ? 'opacity-90 ring-2 ring-green-500/50' 
+          : 'hover:shadow-xl hover:scale-105'
       }`}
-      title={isConcluido ? '🔒 Projeto concluído - não pode ser movido' : 'Arraste para mover'}
+      title={isConcluido ? '🔒 Projeto concluído - clique para ver detalhes' : 'Clique para ver detalhes'}
     >
       {/* Indicador de bloqueio para concluídos */}
       {isConcluido && (
@@ -1158,12 +1160,12 @@ const Projetos: React.FC = () => {
                 {projetosFiltrados
                   .filter(p => p.status === 'planejamento')
                   .map(projeto => (
-                    <KanbanCard key={projeto.id} projeto={projeto} onDragStart={handleDragStart} onDragEnd={handleDragEnd} />
+                    <KanbanCard key={projeto.id} projeto={projeto} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onView={handleView} />
                   ))}
               </div>
             </div>
 
-            {/* Coluna: Em Andamento */}
+            {/* Coluna: Em Andamento */
             <div
               className="min-w-[280px] backdrop-blur-xl bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border-blue-200 dark:border-blue-700 rounded-xl p-4"
               onDragOver={handleDragOver}
@@ -1182,12 +1184,12 @@ const Projetos: React.FC = () => {
                 {projetosFiltrados
                   .filter(p => p.status === 'em_andamento')
                   .map(projeto => (
-                    <KanbanCard key={projeto.id} projeto={projeto} onDragStart={handleDragStart} onDragEnd={handleDragEnd} />
+                    <KanbanCard key={projeto.id} projeto={projeto} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onView={handleView} />
                   ))}
               </div>
             </div>
 
-            {/* Coluna: Pausado */}
+            {/* Coluna: Pausado */
             <div
               className="min-w-[280px] backdrop-blur-xl bg-gradient-to-b from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 border border-yellow-200 dark:border-yellow-700 rounded-xl p-4"
               onDragOver={handleDragOver}
@@ -1206,12 +1208,12 @@ const Projetos: React.FC = () => {
                 {projetosFiltrados
                   .filter(p => p.status === 'pausado')
                   .map(projeto => (
-                    <KanbanCard key={projeto.id} projeto={projeto} onDragStart={handleDragStart} onDragEnd={handleDragEnd} />
+                    <KanbanCard key={projeto.id} projeto={projeto} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onView={handleView} />
                   ))}
               </div>
             </div>
 
-            {/* Coluna: Em Revisão */}
+            {/* Coluna: Em Revisão */
             <div
               className="min-w-[280px] backdrop-blur-xl bg-gradient-to-b from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border border-purple-200 dark:border-purple-700 rounded-xl p-4"
               onDragOver={handleDragOver}
@@ -1230,12 +1232,12 @@ const Projetos: React.FC = () => {
                 {projetosFiltrados
                   .filter(p => p.status === 'revisao')
                   .map(projeto => (
-                    <KanbanCard key={projeto.id} projeto={projeto} onDragStart={handleDragStart} onDragEnd={handleDragEnd} />
+                    <KanbanCard key={projeto.id} projeto={projeto} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onView={handleView} />
                   ))}
               </div>
             </div>
 
-            {/* Coluna: Aguardando Aprovação */}
+            {/* Coluna: Aguardando Aprovação */
             <div
               className="min-w-[280px] backdrop-blur-xl bg-gradient-to-b from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border border-orange-200 dark:border-orange-700 rounded-xl p-4"
               onDragOver={handleDragOver}
@@ -1254,12 +1256,12 @@ const Projetos: React.FC = () => {
                 {projetosFiltrados
                   .filter(p => p.status === 'aprovacao')
                   .map(projeto => (
-                    <KanbanCard key={projeto.id} projeto={projeto} onDragStart={handleDragStart} onDragEnd={handleDragEnd} />
+                    <KanbanCard key={projeto.id} projeto={projeto} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onView={handleView} />
                   ))}
               </div>
             </div>
 
-            {/* Coluna: Concluído */}
+            {/* Coluna: Concluído */
             <div
               className="min-w-[280px] backdrop-blur-xl bg-gradient-to-b from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border border-green-200 dark:border-green-700 rounded-xl p-4"
               onDragOver={handleDragOver}
@@ -1278,12 +1280,12 @@ const Projetos: React.FC = () => {
                 {projetosFiltrados
                   .filter(p => p.status === 'concluido')
                   .map(projeto => (
-                    <KanbanCard key={projeto.id} projeto={projeto} onDragStart={handleDragStart} onDragEnd={handleDragEnd} />
+                    <KanbanCard key={projeto.id} projeto={projeto} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onView={handleView} />
                   ))}
               </div>
             </div>
 
-            {/* Coluna: Cancelado */}
+            {/* Coluna: Cancelado */
             <div
               className="min-w-[280px] backdrop-blur-xl bg-gradient-to-b from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border-red-200 dark:border-red-700 rounded-xl p-4"
               onDragOver={handleDragOver}
@@ -1302,7 +1304,7 @@ const Projetos: React.FC = () => {
                 {projetosFiltrados
                   .filter(p => p.status === 'cancelado')
                   .map(projeto => (
-                    <KanbanCard key={projeto.id} projeto={projeto} onDragStart={handleDragStart} onDragEnd={handleDragEnd} />
+                    <KanbanCard key={projeto.id} projeto={projeto} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onView={handleView} />
                   ))}
               </div>
             </div>
