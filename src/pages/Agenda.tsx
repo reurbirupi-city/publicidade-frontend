@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Calendar,
@@ -17,21 +17,23 @@ import {
   Users,
   Briefcase,
   Zap,
-  CheckCircle2
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
 import { TutorialOverlay } from '../components/TutorialOverlay';
-
-interface RecorrenciaEvento {
-  ativa: boolean;
-  tipo: 'diaria' | 'semanal' | 'mensal';
-  intervalo: number; // a cada X dias/semanas/meses
-  diasSemana?: number[]; // 0=Domingo, 1=Segunda, ..., 6=Sábado
-  diaDoMes?: number; // dia específico do mês (1-31)
-  dataFim?: string; // data limite da recorrência
-  ocorrencias?: number; // ou número de ocorrências
-}
+import { useAuth } from '../contexts/AuthContext';
+import { 
+  Evento, 
+  RecorrenciaEvento,
+  escutarEventos, 
+  criarEvento, 
+  criarEventosEmLote,
+  atualizarEvento, 
+  deletarEvento,
+  toggleEventoConcluido
+} from '../services/agendaService';
 
 interface EventoTemplate {
   id: string;
@@ -44,37 +46,17 @@ interface EventoTemplate {
   materiaisNecessarios?: string[];
 }
 
-interface Evento {
-  id: string;
-  titulo: string;
-  descricao: string;
-  data: string;
-  horaInicio: string;
-  horaFim: string;
-  tipo: 'reuniao' | 'deadline' | 'foco' | 'ligacao' | 'outro';
-  prioridade: 'alta' | 'media' | 'baixa';
-  cliente?: string;
-  projeto?: string;
-  projetoId?: string;
-  etapaProjeto?: 'briefing' | 'criacao' | 'revisao' | 'ajustes' | 'aprovacao' | 'entrega';
-  local?: string;
-  participantes?: string[];
-  cor: string;
-  concluido: boolean;
-  alertaMinutos?: number;
-  recorrencia?: RecorrenciaEvento;
-  eventoRecorrentePaiId?: string; // ID do evento original que gera recorrências
-  templateId?: string; // ID do template usado para criar este evento
-}
-
 const Agenda: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [viewMode, setViewMode] = useState<'dia' | 'semana' | 'mes'>('semana');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'view' | 'create' | 'edit'>('view');
   const [selectedEvento, setSelectedEvento] = useState<Evento | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [eventos, setEventos] = useState<Evento[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Função auxiliar para converter Date para string sem problema de fuso horário
   const dateToLocalString = (date: Date): string => {
@@ -84,125 +66,22 @@ const Agenda: React.FC = () => {
     return `${ano}-${mes}-${dia}`;
   };
 
-  const [eventos, setEventos] = useState<Evento[]>([
-    {
-      id: '1',
-      titulo: 'Reunião com Cliente - Silva & Associados',
-      descricao: 'Apresentação da campanha digital Q1 2025',
-      data: '2025-12-15',
-      horaInicio: '09:00',
-      horaFim: '10:30',
-      tipo: 'reuniao',
-      prioridade: 'alta',
-      cliente: 'Maria Silva',
-      projeto: 'Campanha Digital Q1',
-      projetoId: 'PROJ-2025-001',
-      etapaProjeto: 'briefing',
-      local: 'Zoom',
-      participantes: ['Maria Silva', 'João Designer'],
-      cor: 'blue',
-      concluido: false,
-      alertaMinutos: 15
-    },
-    {
-      id: '2',
-      titulo: 'Bloco de Foco - Design',
-      descricao: 'Desenvolvimento de artes para Instagram\n\nChecklist:\n- [ ] Apresentar portfólio\n- [ ] Entender objetivo do projeto\n- [ ] Definir público-alvo',
-      data: '2025-12-15',
-      horaInicio: '14:00',
-      horaFim: '17:00',
-      tipo: 'foco',
-      prioridade: 'alta',
-      projeto: 'Social Media - Tech Solutions',
-      projetoId: 'PROJ-2025-002',
-      etapaProjeto: 'criacao',
-      cor: 'purple',
-      concluido: false,
-      alertaMinutos: 5,
-      templateId: 'temp-3'
-    },
-    {
-      id: '3',
-      titulo: 'Deadline - Entrega Proposta',
-      descricao: 'Proposta comercial Costa Marketing',
-      data: '2025-12-15',
-      horaInicio: '18:00',
-      horaFim: '18:30',
-      tipo: 'deadline',
-      prioridade: 'alta',
-      cliente: 'Ana Costa',
-      projeto: 'Proposta Q1',
-      projetoId: 'PROJ-2025-003',
-      etapaProjeto: 'aprovacao',
-      cor: 'red',
-      concluido: false,
-      alertaMinutos: 30
-    },
-    {
-      id: '4',
-      titulo: 'Stand-up Diário - Equipe',
-      descricao: 'Reunião rápida de alinhamento diário com a equipe',
-      data: '2025-12-16',
-      horaInicio: '09:00',
-      horaFim: '09:15',
-      tipo: 'reuniao',
-      prioridade: 'alta',
-      participantes: ['Equipe completa'],
-      local: 'Sala de Reuniões',
-      cor: 'blue',
-      concluido: false,
-      alertaMinutos: 5,
-      recorrencia: {
-        ativa: true,
-        tipo: 'semanal',
-        intervalo: 1,
-        diasSemana: [1, 2, 3, 4, 5], // Seg-Sex
-        ocorrencias: 20
-      }
-    },
-    {
-      id: '5',
-      titulo: 'Review Semanal de Projetos',
-      descricao: 'Revisão de status de todos os projetos em andamento',
-      data: '2025-12-16',
-      horaInicio: '16:00',
-      horaFim: '17:00',
-      tipo: 'reuniao',
-      prioridade: 'media',
-      participantes: ['Equipe Gestão'],
-      local: 'Zoom',
-      cor: 'purple',
-      concluido: false,
-      alertaMinutos: 15,
-      recorrencia: {
-        ativa: true,
-        tipo: 'semanal',
-        intervalo: 1,
-        diasSemana: [5], // Sexta-feira
-        dataFim: '2025-12-31'
-      }
-    },
-    {
-      id: '6',
-      titulo: 'Relatório Mensal de Performance',
-      descricao: 'Compilar e apresentar métricas do mês',
-      data: '2025-12-17',
-      horaInicio: '14:00',
-      horaFim: '15:30',
-      tipo: 'foco',
-      prioridade: 'alta',
-      cor: 'orange',
-      concluido: false,
-      alertaMinutos: 60,
-      recorrencia: {
-        ativa: true,
-        tipo: 'mensal',
-        intervalo: 1,
-        diaDoMes: 1,
-        ocorrencias: 12
-      }
+  // Carregar eventos do Firestore em tempo real
+  useEffect(() => {
+    if (!user?.uid) {
+      setLoading(false);
+      return;
     }
-  ]);
+
+    console.log('📅 Carregando eventos da agenda...');
+    const unsubscribe = escutarEventos(user.uid, (eventosFirestore) => {
+      console.log(`📅 ${eventosFirestore.length} eventos carregados`);
+      setEventos(eventosFirestore);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid]);
 
   // Templates de eventos pré-configurados
   const [templates] = useState<EventoTemplate[]>([
@@ -509,41 +388,68 @@ const Agenda: React.FC = () => {
     setShowDeleteConfirm(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedEvento) {
-      setEventos(eventos.filter(e => e.id !== selectedEvento.id));
-      setShowDeleteConfirm(false);
-      setSelectedEvento(null);
-    }
-  };
-
-  const handleSave = () => {
-    if (modalMode === 'create') {
-      const novoEvento: Evento = {
-        ...formData as Evento,
-        id: Date.now().toString()
-      };
-      
-      // Se tem recorrência ativa, gerar eventos recorrentes
-      if (novoEvento.recorrencia?.ativa) {
-        const eventosRecorrentes = gerarEventosRecorrentes(novoEvento);
-        setEventos([...eventos, ...eventosRecorrentes]);
-      } else {
-        setEventos([...eventos, novoEvento]);
+      try {
+        await deletarEvento(selectedEvento.id);
+        setShowDeleteConfirm(false);
+        setSelectedEvento(null);
+      } catch (error) {
+        console.error('Erro ao deletar evento:', error);
+        alert('Erro ao deletar evento. Tente novamente.');
       }
-    } else if (modalMode === 'edit' && selectedEvento) {
-      setEventos(eventos.map(e => 
-        e.id === selectedEvento.id ? { ...formData as Evento, id: e.id } : e
-      ));
     }
-    setShowModal(false);
-    setSelectedEvento(null);
   };
 
-  const toggleConcluido = (id: string) => {
-    setEventos(eventos.map(e => 
-      e.id === id ? { ...e, concluido: !e.concluido } : e
-    ));
+  const handleSave = async () => {
+    try {
+      if (modalMode === 'create') {
+        const novoEvento = {
+          ...formData,
+          adminId: user?.uid
+        };
+        
+        console.log('📅 Criando evento:', novoEvento);
+        
+        // Se tem recorrência ativa, gerar eventos recorrentes
+        if (formData.recorrencia?.ativa) {
+          const eventoBase: Evento = {
+            ...novoEvento as Evento,
+            id: 'temp'
+          };
+          const eventosRecorrentes = gerarEventosRecorrentes(eventoBase);
+          const eventosParaCriar = eventosRecorrentes.map(({ id, ...resto }) => resto);
+          await criarEventosEmLote(eventosParaCriar as any[], user?.uid);
+        } else {
+          const resultado = await criarEvento(novoEvento as any, user?.uid);
+          if (resultado) {
+            console.log('✅ Evento salvo com sucesso!');
+          } else {
+            throw new Error('Falha ao criar evento');
+          }
+        }
+      } else if (modalMode === 'edit' && selectedEvento) {
+        const dadosAtualizados = { ...formData };
+        delete (dadosAtualizados as any).id;
+        await atualizarEvento(selectedEvento.id, dadosAtualizados);
+      }
+      setShowModal(false);
+      setSelectedEvento(null);
+    } catch (error) {
+      console.error('Erro ao salvar evento:', error);
+      alert('Erro ao salvar evento. Tente novamente.');
+    }
+  };
+
+  const toggleConcluido = async (id: string) => {
+    try {
+      const evento = eventos.find(e => e.id === id);
+      if (evento) {
+        await toggleEventoConcluido(id, !evento.concluido);
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+    }
   };
 
   const stats = [
@@ -614,6 +520,18 @@ const Agenda: React.FC = () => {
       </header>
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 py-8">
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-12 mb-8">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+              <p className="text-gray-500 dark:text-gray-400">Carregando agenda...</p>
+            </div>
+          </div>
+        )}
+
+        {!loading && (
+          <>
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {stats.map((stat, index) => (
@@ -880,6 +798,8 @@ const Agenda: React.FC = () => {
               </p>
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
 
