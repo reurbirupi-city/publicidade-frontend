@@ -24,10 +24,6 @@ const Home: React.FC = () => {
     navigate('/login');
   };
 
-  const handleRegister = () => {
-    navigate('/register');
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-gray-950 dark:from-gray-950 dark:via-gray-950 dark:to-black text-white overflow-hidden">
       {/* Background Animado */}

@@ -302,16 +302,10 @@ const Login: React.FC = () => {
                   <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent"></div>
                 </div>
 
-                {/* Register Link */}
+                {/* Informação sobre registro via convite */}
                 <div className="text-center">
-                  <p className="text-gray-400">
-                    Não tem uma conta?{' '}
-                    <button
-                      onClick={() => navigate('/register')}
-                      className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
-                    >
-                      Criar conta cliente
-                    </button>
+                  <p className="text-gray-400 text-sm">
+                    Para criar uma conta, solicite um link de convite ao seu administrador.
                   </p>
                 </div>
               </div>
