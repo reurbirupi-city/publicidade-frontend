@@ -34,7 +34,7 @@ import ModalGerarProposta from '../components/ModalGerarProposta';
 import ModalContratoAssinatura from '../components/ModalContratoAssinatura';
 import ModalFinalizarServico from '../components/ModalFinalizarServico';
 import { db } from '../services/firebase';
-import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { isWebmaster, getAdminByEmail } from '../services/adminService';
 
@@ -331,6 +331,17 @@ const CRM: React.FC = () => {
         dataVinculo: new Date().toISOString()
       });
       
+      // Salvar também na subcoleção admins/{adminId}/clientes/{clienteId}
+      const clienteVinculado = clientesOrfaos.find(c => c.id === clienteId);
+      if (clienteVinculado) {
+        await setDoc(doc(db, 'admins', adminAtual.id, 'clientes', clienteId), {
+          ...clienteVinculado,
+          adminId: adminAtual.id,
+          adminNome: adminAtual.nomeAgencia || adminAtual.nome,
+          dataVinculo: new Date().toISOString()
+        });
+      }
+      
       // Atualizar também na coleção users
       try {
         await updateDoc(doc(db, 'users', clienteId), {
@@ -342,7 +353,6 @@ const CRM: React.FC = () => {
       }
       
       // Mover da lista de órfãos para a lista de clientes
-      const clienteVinculado = clientesOrfaos.find(c => c.id === clienteId);
       if (clienteVinculado) {
         setClientesOrfaos(prev => prev.filter(c => c.id !== clienteId));
         setClientes(prev => [...prev, { 

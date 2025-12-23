@@ -368,6 +368,16 @@ const Register: React.FC = () => {
         // Não interrompe o fluxo
       }
 
+      // 3.1 Se vinculado a um admin, TAMBÉM salvar na subcoleção admins/{adminId}/clientes/{clienteId}
+      if (adminConvite) {
+        try {
+          await setDoc(doc(db, 'admins', adminConvite.id, 'clientes', uid), clienteParaFirestore);
+          console.log('✅ Cliente também salvo na subcoleção do admin:', adminConvite.id);
+        } catch (subcolError: any) {
+          console.error('⚠️ Erro ao salvar cliente na subcoleção do admin (não bloqueante):', subcolError);
+        }
+      }
+
       // 4. Criar documento do usuário no Firestore (coleção users)
       const userDataFirestore: any = {
         nome: formData.nome,
