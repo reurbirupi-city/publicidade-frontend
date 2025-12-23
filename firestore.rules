@@ -135,13 +135,31 @@ service cloud.firestore {
       // Apenas admin pode atualizar/deletar
       allow update, delete: if isAdmin();
     }
+
+    // ============================================================================
+    // COLEÇÃO: feedbacks_projetos (avaliações dos clientes sobre projetos)
+    // ============================================================================
+    match /feedbacks_projetos/{feedbackId} {
+      // Cliente pode criar feedback para seus projetos
+      allow create: if isAuthenticated();
+      // Admin pode ler todos, cliente pode ler os próprios
+      allow read: if isAdmin() || 
+                     (isAuthenticated() && resource.data.clienteId == request.auth.uid);
+      // Cliente pode atualizar seu próprio feedback, admin pode deletar
+      allow update: if isAuthenticated() && resource.data.clienteId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
     
     // Coleção de projetos
     match /projetos/{projetoId} {
       allow read: if isAuthenticated() && 
                      (isAdmin() || 
                       resource.data.clienteId == request.auth.uid);
-      allow create, update, delete: if isAdmin();
+      allow create, delete: if isAdmin();
+      // Admin pode atualizar tudo, cliente pode atualizar apenas feedbackCliente e status de aprovação
+      allow update: if isAdmin() || 
+                       (isAuthenticated() && 
+                        resource.data.clienteId == request.auth.uid);
       
       // Permitir acesso a subcoleções do projeto (tasks, arquivos, etc)
       match /{subCollection=**} {
