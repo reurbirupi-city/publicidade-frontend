@@ -210,7 +210,8 @@ const Register: React.FC = () => {
       console.log('📝 Verificando dados...');
 
       // ============================================================
-      // VALIDAÇÃO: Cliente precisa de link de convite obrigatoriamente
+      // VALIDAÇÃO: Cliente precisa de link de convite APENAS se registrando sozinho
+      // Webmaster pode cadastrar cliente sem convite
       // ============================================================
       if (!isAdminRegister && !adminConvite) {
         setError('❌ É necessário um link de convite para se registrar como cliente. Solicite ao seu administrador.');
@@ -347,7 +348,7 @@ const Register: React.FC = () => {
         syncedAt: new Date().toISOString(),
       };
 
-      // Se veio de link de convite, vincular ao admin (OBRIGATÓRIO para cliente)
+      // Se veio de link de convite, vincular ao admin
       if (adminConvite) {
         clienteParaFirestore.adminId = adminConvite.id;
         clienteParaFirestore.adminNome = adminConvite.nomeAgencia || adminConvite.nome;
@@ -355,8 +356,7 @@ const Register: React.FC = () => {
         clienteParaFirestore.observacoes = `Cliente cadastrado via link de convite de ${adminConvite.nomeAgencia || adminConvite.nome}`;
         console.log('🔗 Cliente vinculado ao admin:', adminConvite.id, '-', adminConvite.nomeAgencia);
       } else {
-        // Esta situação não deve mais acontecer (validação anterior)
-        throw new Error('Cliente deve ser vinculado a um admin');
+        console.log('⚠️ Cliente cadastrado sem vínculo com admin (será necessário vincular depois)');
       }
 
       // Adicionar CPF ou CNPJ apenas se existir
@@ -369,7 +369,7 @@ const Register: React.FC = () => {
 
       console.log('📝 Salvando cliente no Firestore (coleção clientes)...', clienteParaFirestore);
 
-      // 3. Salvar sempre na coleção clientes/{uid} (OBRIGATÓRIO com adminId)
+      // 3. Salvar sempre na coleção clientes/{uid} (com ou sem adminId)
       try {
         await setDoc(doc(db, 'clientes', uid), clienteParaFirestore);
         console.log('✅ Cliente salvo na coleção clientes:', uid);
@@ -388,10 +388,14 @@ const Register: React.FC = () => {
         clienteId: uid,
         status: 'ativo',
         dataCadastro: new Date().toISOString(),
-        uid: uid,
-        adminId: adminConvite!.id,
-        adminNome: adminConvite!.nomeAgencia || adminConvite!.nome
+        uid: uid
       };
+
+      // Vincular ao admin se tiver convite
+      if (adminConvite) {
+        userDataFirestore.adminId = adminConvite.id;
+        userDataFirestore.adminNome = adminConvite.nomeAgencia || adminConvite.nome;
+      }
 
       await setDoc(doc(db, 'users', uid), userDataFirestore);
       console.log('✅ Documento de usuário criado no Firestore (coleção users)');

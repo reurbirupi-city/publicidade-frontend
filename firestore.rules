@@ -55,16 +55,17 @@ service cloud.firestore {
     }
     
     // ============================================================================
-    // COLEÇÃO: clientes (todos os clientes com adminId obrigatório)
+    // COLEÇÃO: clientes (todos os clientes, com ou sem adminId)
     // ============================================================================
     match /clientes/{clienteId} {
-      // Cliente pode criar seu próprio documento (quando se registra via invite)
-      allow create: if isAuthenticated() && request.auth.uid == clienteId && 
-                       request.resource.data.adminId != null;
-      // Admin pode ler/escrever clientes vinculados a ele
+      // Cliente pode criar seu próprio documento (quando se registra)
+      allow create: if isAuthenticated() && request.auth.uid == clienteId;
+      // Admin pode ler e escrever todos os clientes
       allow read, write: if isAdmin();
       // Cliente pode ler seu próprio documento
       allow read: if isAuthenticated() && request.auth.uid == clienteId;
+      // Cliente pode atualizar seu próprio documento (em breve)
+      allow update: if isAuthenticated() && request.auth.uid == clienteId;
     }    // Coleção de solicitações
     match /solicitacoes/{solicitacaoId} {
       allow create: if isAuthenticated();

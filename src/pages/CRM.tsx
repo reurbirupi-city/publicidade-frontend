@@ -190,16 +190,25 @@ const CRM: React.FC = () => {
         
         setAdminAtual(admin);
         
-        // Buscar clientes vinculados a este admin na coleção clientes
-        const q = query(collection(db, 'clientes'), where('adminId', '==', admin.id));
+        // Buscar clientes na coleção clientes
+        const q = query(collection(db, 'clientes'));
         const snapshot = await getDocs(q);
-        const clientesFirestore = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+        let clientesFirestore = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
         
-        console.log(`📋 CRM: Carregou ${clientesFirestore.length} clientes para admin ${admin.nome}`);
+        console.log(`📋 CRM: Carregou ${clientesFirestore.length} clientes total`);
+        
+        // Se for webmaster, mostrar TODOS
+        if (isWebmaster(user.email)) {
+          console.log(`👑 Webmaster: mostrando todos os ${clientesFirestore.length} clientes`);
+        } else {
+          // Se for admin comum, filtrar apenas seus clientes
+          clientesFirestore = clientesFirestore.filter(c => c.adminId === admin.id);
+          console.log(`📋 Admin ${admin.nome}: ${clientesFirestore.length} clientes vinculados`);
+        }
         
         setClientes(clientesFirestore);
         setClientesOrfaos([]);
-        console.log('✅ CRM: Carregou', clientesFirestore.length, 'clientes vinculados ao admin');
+        console.log('✅ CRM: Carregou', clientesFirestore.length, 'clientes');
       } catch (error) {
         console.error('❌ CRM: Erro ao carregar clientes do Firestore:', error);
       }
