@@ -16,7 +16,6 @@ import {
   Database,
   Lock,
   ChevronDown,
-  Play,
   Star
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
@@ -235,7 +234,7 @@ const Home: React.FC = () => {
             {/* Main Title */}
             <div className={`transition-all duration-1000 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
               <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black leading-tight mb-6">
-                <span className="block text-white mb-2">O Futuro da</span>
+                <span className="block text-white mb-2">O Futuro</span>
                 <span className="relative inline-block">
                   <span className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 blur-2xl opacity-50" />
                   <span className="relative bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent animate-gradient-x">
@@ -269,10 +268,6 @@ const Home: React.FC = () => {
                 <ArrowRight className="w-6 h-6 relative group-hover:translate-x-1 transition-transform" />
               </button>
 
-              <button className="flex items-center gap-3 bg-white/5 backdrop-blur-xl border border-white/10 hover:bg-white/10 hover:border-white/20 px-8 py-4 rounded-2xl font-semibold text-lg transition-all duration-300">
-                <Play className="w-6 h-6 text-purple-400" />
-                <span>Ver Demo</span>
-              </button>
             </div>
 
             {/* Stats Preview */}
