@@ -458,39 +458,15 @@ const ClientPortal: React.FC = () => {
       try {
         console.log('🔍 Buscando projetos do Firestore para cliente:', user.uid, user.email);
         
-        // Buscar TODOS os projetos e filtrar localmente
-        // Isso permite encontrar projetos por clienteId (uid Firebase), email ou nome
+        // ✅ Query segura: buscar apenas projetos do cliente autenticado
+        // Firestore rules só permitem ler projetos onde clienteId == user.uid
         const projetosRef = collection(db, 'projetos');
-        const querySnapshot = await getDocs(projetosRef);
-        const todosProjetos: any[] = [];
+        const q = query(projetosRef, where('clienteId', '==', user.uid));
+        const querySnapshot = await getDocs(q);
         
+        const projetosDoCliente: any[] = [];
         querySnapshot.forEach((doc) => {
-          todosProjetos.push({ ...doc.data(), id: doc.id });
-        });
-        
-        // Filtrar projetos que pertencem a este cliente
-        // Busca por: clienteId (uid), clienteEmail, ou nome do cliente
-        const clienteEmail = user.email?.toLowerCase() || '';
-        const clienteNome = clientData?.nome?.toLowerCase() || '';
-        const clienteEmpresa = clientData?.empresa?.toLowerCase() || '';
-        
-        const projetosDoCliente = todosProjetos.filter(projeto => {
-          // Match por clienteId (uid do Firebase)
-          if (projeto.clienteId === user.uid) return true;
-          
-          // Match por email do cliente (campo pode ser clienteEmail ou dentro de cliente)
-          const projetoEmail = (projeto.clienteEmail || projeto.email || '').toLowerCase();
-          if (projetoEmail && projetoEmail === clienteEmail) return true;
-          
-          // Match por nome do cliente
-          const projetoClienteNome = (projeto.clienteNome || '').toLowerCase();
-          if (projetoClienteNome && projetoClienteNome === clienteNome) return true;
-          
-          // Match por empresa
-          const projetoEmpresa = (projeto.clienteEmpresa || '').toLowerCase();
-          if (projetoEmpresa && projetoEmpresa === clienteEmpresa && clienteEmpresa !== 'não informada') return true;
-          
-          return false;
+          projetosDoCliente.push({ ...doc.data(), id: doc.id });
         });
         
         if (projetosDoCliente.length > 0) {

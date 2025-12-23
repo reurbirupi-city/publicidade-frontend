@@ -105,11 +105,11 @@ service cloud.firestore {
     match /contratos/{contratoId} {
       allow read: if isAdmin() || 
                      (isAuthenticated() && resource.data.clienteId == request.auth.uid);
+      allow create: if isAdmin();
       allow update: if isAdmin() || 
                        (isAuthenticated() && 
-                        resource.data.clienteId == request.auth.uid && 
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assinado', 'dataAssinatura']));
-      allow create, delete: if isAdmin();
+                        resource.data.clienteId == request.auth.uid);
+      allow delete: if isAdmin();
     }
     
     // Coleção de projetos
@@ -118,6 +118,14 @@ service cloud.firestore {
                      (isAdmin() || 
                       resource.data.clienteId == request.auth.uid);
       allow create, update, delete: if isAdmin();
+      
+      // Permitir acesso a subcoleções do projeto (tasks, arquivos, etc)
+      match /{subCollection=**} {
+        allow read: if isAuthenticated() && 
+                       (isAdmin() || 
+                        get(/databases/$(database)/documents/projetos/$(projetoId)).data.clienteId == request.auth.uid);
+        allow write: if isAdmin();
+      }
     }
     
     // Coleção de portfólio
