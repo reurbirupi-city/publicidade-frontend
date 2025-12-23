@@ -380,17 +380,62 @@ export const listarClientesParaPromocao = async (): Promise<any[]> => {
  */
 export const vincularClienteAoAdmin = async (clienteId: string, adminId: string): Promise<boolean> => {
   try {
-    // 1. Obter dados do cliente de clientes/{clienteId}
-    const clienteDoc = await getDoc(doc(db, 'clientes', clienteId));
-    if (!clienteDoc.exists()) {
-      console.error('❌ Cliente não encontrado em clientes:', clienteId);
-      return false;
-    }
-    
     const adminData = (await getDoc(doc(db, 'admins', adminId))).data();
     const nomeAgencia = adminData?.nomeAgencia || adminData?.nome;
     
-    // 2. Atualizar em clientes/{clienteId}
+    // 1. Obter dados do cliente de clientes/{clienteId}
+    const clienteDoc = await getDoc(doc(db, 'clientes', clienteId));
+    
+    if (!clienteDoc.exists()) {
+      console.warn('⚠️ Cliente não existe em Firestore, tenta criar a partir de localStorage');
+      
+      // Tentar recuperar dados do localStorage para criar o documento
+      try {
+        const { getClientes } = await import('./dataIntegration');
+        const clientesLocal = getClientes();
+        const clienteLocal = clientesLocal.find((c: any) => c.id === clienteId);
+        
+        if (!clienteLocal) {
+          console.error('❌ Cliente não encontrado em localStorage também:', clienteId);
+          return false;
+        }
+        
+        // Criar documento no Firestore com dados do localStorage
+        const clienteParaFirestore: any = {
+          nome: clienteLocal.nome,
+          empresa: clienteLocal.empresa,
+          email: clienteLocal.email,
+          telefone: clienteLocal.telefone,
+          endereco: clienteLocal.endereco || '',
+          cidade: clienteLocal.cidade || '',
+          estado: clienteLocal.estado || '',
+          status: clienteLocal.status || 'prospect',
+          valorTotal: clienteLocal.valorTotal || 0,
+          projetos: clienteLocal.projetos || 0,
+          dataContato: clienteLocal.dataContato,
+          observacoes: clienteLocal.observacoes || '',
+          rating: clienteLocal.rating || 3,
+          etapaFunil: clienteLocal.etapaFunil || 'prospect',
+          contratoAssinado: clienteLocal.contratoAssinado || false,
+          portalAtivo: clienteLocal.portalAtivo || false,
+          criadoEm: new Date().toISOString(),
+          syncedAt: new Date().toISOString(),
+          // Vincular ao admin agora
+          adminId,
+          adminNome: nomeAgencia,
+          dataVinculo: new Date().toISOString()
+        };
+        
+        await setDoc(doc(db, 'clientes', clienteId), clienteParaFirestore);
+        console.log('✅ Cliente criado no Firestore a partir de localStorage e vinculado:', clienteId);
+        return true;
+      } catch (localError) {
+        console.error('❌ Erro ao recuperar cliente de localStorage:', localError);
+        return false;
+      }
+    }
+    
+    // 2. Se já existe, atualizar em clientes/{clienteId}
     await updateDoc(doc(db, 'clientes', clienteId), {
       adminId,
       adminNome: nomeAgencia,

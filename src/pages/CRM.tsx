@@ -128,6 +128,10 @@ interface Cliente {
   adminId?: string;
   adminNome?: string;
   dataVinculo?: string;
+  
+  // Novos campos - Sincronização Firestore
+  criadoEm?: string;
+  syncedAt?: string;
 }
 
 const CRM: React.FC = () => {
@@ -394,11 +398,50 @@ const CRM: React.FC = () => {
       const newCliente: Cliente = {
         ...formData as Cliente,
         id: Date.now().toString(),
-        dataContato: new Date().toISOString().split('T')[0]
+        dataContato: new Date().toISOString().split('T')[0],
+        criadoEm: new Date().toISOString(),
+        syncedAt: new Date().toISOString()
       };
+      
+      // 1. Salvar no Firestore
+      try {
+        const clienteParaFirestore: any = {
+          nome: newCliente.nome,
+          empresa: newCliente.empresa,
+          email: newCliente.email,
+          telefone: newCliente.telefone,
+          endereco: newCliente.endereco || '',
+          cidade: newCliente.cidade || '',
+          estado: newCliente.estado || '',
+          status: newCliente.status || 'prospect',
+          valorTotal: newCliente.valorTotal || 0,
+          projetos: newCliente.projetos || 0,
+          dataContato: newCliente.dataContato,
+          observacoes: newCliente.observacoes || '',
+          rating: newCliente.rating || 3,
+          etapaFunil: newCliente.etapaFunil || 'prospect',
+          contratoAssinado: newCliente.contratoAssinado || false,
+          portalAtivo: newCliente.portalAtivo || false,
+          criadoEm: newCliente.criadoEm,
+          syncedAt: newCliente.syncedAt,
+          // Se o admin atual estiver definido, vincular automaticamente
+          ...(adminAtual && {
+            adminId: adminAtual.id,
+            adminNome: adminAtual.nomeAgencia || adminAtual.nome,
+            dataVinculo: new Date().toISOString()
+          })
+        };
+        
+        await setDoc(doc(db, 'clientes', newCliente.id), clienteParaFirestore);
+        console.log('✅ Cliente salvo no Firestore:', newCliente.id);
+      } catch (firestoreError) {
+        console.error('⚠️ Erro ao salvar cliente no Firestore (continuando):', firestoreError);
+      }
+      
+      // 2. Atualizar no estado local
       setClientes([...clientes, newCliente]);
       
-      // Notificar sobre novo cliente cadastrado
+      // 3. Notificar sobre novo cliente cadastrado
       try {
         const { notificarNovoCliente } = await import('../services/notificacoes');
         await notificarNovoCliente(
@@ -413,8 +456,38 @@ const CRM: React.FC = () => {
         console.error('❌ Erro ao enviar notificação:', error);
       }
     } else if (modalMode === 'edit' && selectedCliente) {
+      const clienteAtualizado = { ...formData as Cliente, id: selectedCliente.id };
+      
+      // Atualizar no Firestore também
+      try {
+        const clienteParaFirestore: any = {
+          nome: clienteAtualizado.nome,
+          empresa: clienteAtualizado.empresa,
+          email: clienteAtualizado.email,
+          telefone: clienteAtualizado.telefone,
+          endereco: clienteAtualizado.endereco || '',
+          cidade: clienteAtualizado.cidade || '',
+          estado: clienteAtualizado.estado || '',
+          status: clienteAtualizado.status || 'prospect',
+          valorTotal: clienteAtualizado.valorTotal || 0,
+          projetos: clienteAtualizado.projetos || 0,
+          dataContato: clienteAtualizado.dataContato,
+          observacoes: clienteAtualizado.observacoes || '',
+          rating: clienteAtualizado.rating || 3,
+          etapaFunil: clienteAtualizado.etapaFunil || 'prospect',
+          contratoAssinado: clienteAtualizado.contratoAssinado || false,
+          portalAtivo: clienteAtualizado.portalAtivo || false,
+          syncedAt: new Date().toISOString()
+        };
+        
+        await setDoc(doc(db, 'clientes', selectedCliente.id), clienteParaFirestore);
+        console.log('✅ Cliente atualizado no Firestore:', selectedCliente.id);
+      } catch (firestoreError) {
+        console.error('⚠️ Erro ao atualizar cliente no Firestore:', firestoreError);
+      }
+      
       setClientes(clientes.map(c => 
-        c.id === selectedCliente.id ? { ...formData as Cliente, id: c.id } : c
+        c.id === selectedCliente.id ? clienteAtualizado : c
       ));
     }
     setShowModal(false);
