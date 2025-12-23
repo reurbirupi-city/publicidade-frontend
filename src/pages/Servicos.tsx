@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { useAuth } from '../contexts/AuthContext';
+import { getAdminByEmail } from '../services/adminService';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
 import ModalCriarEditarServico from '../components/ModalCriarEditarServico';
@@ -327,6 +329,7 @@ const CATEGORIAS: Record<string, { nome: string; cor: string; icone: React.React
 
 const Servicos: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -379,12 +382,28 @@ const Servicos: React.FC = () => {
   // Salvar serviço (criar ou editar)
   const salvarServico = async (servico: Servico) => {
     try {
+      // Salvar no catálogo geral
       await setDoc(doc(db, 'servicos_catalogo', servico.id), servico);
+      console.log('✅ Serviço salvo no catálogo geral');
+      
+      // Se for um admin, também salvar na subcoleção específica
+      if (user?.email) {
+        try {
+          const admin = await getAdminByEmail(user.email);
+          if (admin) {
+            await setDoc(doc(db, 'admins', admin.id, 'servicos', servico.id), servico);
+            console.log('✅ Serviço salvo nos serviços específicos do admin:', admin.id);
+          }
+        } catch (adminError) {
+          console.warn('⚠️ Não foi possível salvar nos serviços do admin (pode ser cliente):', adminError);
+        }
+      }
+      
       await carregarServicos();
       setShowModal(false);
       setServicoEditando(null);
     } catch (error) {
-      console.error('Erro ao salvar serviço:', error);
+      console.error('❌ Erro ao salvar serviço:', error);
       alert('Erro ao salvar serviço. Tente novamente.');
     }
   };

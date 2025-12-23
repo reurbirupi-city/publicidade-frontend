@@ -137,15 +137,27 @@ const ClientPortal: React.FC = () => {
   const [catalogoServicos, setCatalogoServicos] = useState<any[]>([]);
   const [loadingServicos, setLoadingServicos] = useState(true);
 
-  // Buscar catálogo de serviços do Firebase
+  // Buscar catálogo de serviços do admin específico do cliente
   useEffect(() => {
     const carregarServicos = async () => {
       setLoadingServicos(true);
       try {
-        const servicosRef = collection(db, 'servicos_catalogo');
+        // Se cliente não tem admin associado, mostrar serviços padrão
+        if (!clientData?.adminId) {
+          console.log('⚠️ Cliente não tem admin associado, usando catálogo padrão');
+          setCatalogoServicos(catalogoServicosPadrao);
+          setLoadingServicos(false);
+          return;
+        }
+
+        console.log('📋 Carregando serviços do admin:', clientData.adminId);
+
+        // Tentar carregar serviços da subcoleção admins/{adminId}/servicos
+        const servicosRef = collection(db, 'admins', clientData.adminId, 'servicos');
         const snapshot = await getDocs(servicosRef);
         
         if (!snapshot.empty) {
+          console.log('✅ Serviços encontrados no admin:', snapshot.docs.length);
           const servicosFirebase = snapshot.docs
             .map(doc => {
               const data = doc.data();
@@ -166,18 +178,48 @@ const ClientPortal: React.FC = () => {
             .filter(s => s.ativo);
           setCatalogoServicos(servicosFirebase);
         } else {
-          // Fallback para catálogo padrão se não houver serviços no Firebase
-          setCatalogoServicos(catalogoServicosPadrao);
+          // Se não houver serviços no admin, tentar catálogo geral
+          console.log('⚠️ Nenhum serviço encontrado para este admin, tentando catálogo geral');
+          const catalogoRef = collection(db, 'servicos_catalogo');
+          const catalogoSnapshot = await getDocs(catalogoRef);
+          
+          if (!catalogoSnapshot.empty) {
+            const servicosFirebase = catalogoSnapshot.docs
+              .map(doc => {
+                const data = doc.data();
+                return {
+                  id: doc.id,
+                  titulo: data.nome,
+                  categoria: getCategoriaLabel(data.categoria),
+                  descricao: data.descricao,
+                  preco: data.preco,
+                  prazo: data.tempo_estimado,
+                  icone: getCategoriaIcone(data.categoria),
+                  popular: data.destaque,
+                  recorrente: data.tempo_estimado?.toLowerCase().includes('mensal'),
+                  inclui: data.recursos || [],
+                  ativo: data.ativo
+                };
+              })
+              .filter(s => s.ativo);
+            setCatalogoServicos(servicosFirebase);
+          } else {
+            // Fallback para catálogo padrão
+            console.log('⚠️ Catálogo padrão será usado');
+            setCatalogoServicos(catalogoServicosPadrao);
+          }
         }
       } catch (error) {
-        console.error('Erro ao carregar catálogo de serviços:', error);
+        console.error('❌ Erro ao carregar catálogo de serviços:', error);
         setCatalogoServicos(catalogoServicosPadrao);
       }
       setLoadingServicos(false);
     };
 
-    carregarServicos();
-  }, []);
+    if (clientData) {
+      carregarServicos();
+    }
+  }, [clientData]);
 
   // Mapeamento de categorias para labels
   const getCategoriaLabel = (categoria: string): string => {
