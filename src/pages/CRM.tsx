@@ -227,14 +227,15 @@ const CRM: React.FC = () => {
     carregarClientesFirestore();
   }, [user]);
 
-  // Carregar lista de admins se for webmaster
+  // Carregar lista de admins (não webmaster) se for webmaster
   useEffect(() => {
     const carregarAdmins = async () => {
       if (!user?.email || !isWebmaster(user.email)) return;
       
       try {
-        console.log('📋 Carregando lista de admins para webmaster...');
-        const q = query(collection(db, 'admins'));
+        console.log('📋 Carregando lista de administradores para webmaster vincular clientes...');
+        // Buscar apenas admins que NÃO são webmaster
+        const q = query(collection(db, 'admins'), where('role', '!=', 'webmaster'));
         const snapshot = await getDocs(q);
         const admins = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -242,9 +243,9 @@ const CRM: React.FC = () => {
         }));
         
         setListaAdmins(admins);
-        console.log('✅ Admins carregados:', admins.length);
+        console.log('✅ Administradores carregados:', admins.length);
       } catch (error) {
-        console.error('❌ Erro ao carregar admins:', error);
+        console.error('❌ Erro ao carregar administradores:', error);
       }
     };
     
@@ -1471,39 +1472,45 @@ const CRM: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full border border-gray-200 dark:border-gray-800">
             <div className="border-b border-gray-200 dark:border-gray-800 p-6 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Vincular Cliente
-              </h2>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  Vincular Cliente a Admin
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Selecione qual administrador será responsável por este cliente
+                </p>
+              </div>
               <button
                 onClick={() => {
                   setShowModalVincularAdmin(false);
                   setClienteParaVincular(null);
                   setAdminSelecionado('');
                 }}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex-shrink-0"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  Cliente: <span className="font-semibold text-gray-900 dark:text-white">{clienteParaVincular.nome}</span>
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-sm text-blue-700 dark:text-blue-400 mb-1">
+                  <span className="font-semibold">Cliente:</span> {clienteParaVincular.nome}
                 </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Empresa: <span className="font-semibold text-gray-900 dark:text-white">{clienteParaVincular.empresa}</span>
+                <p className="text-sm text-blue-700 dark:text-blue-400">
+                  <span className="font-semibold">Empresa:</span> {clienteParaVincular.empresa}
                 </p>
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-3">
-                  Selecione o Admin
+                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-3 flex items-center gap-2">
+                  <UserPlus className="w-4 h-4" />
+                  Selecione o Administrador
                 </label>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {listaAdmins.length === 0 ? (
                     <p className="text-sm text-gray-500 dark:text-gray-400 p-3 text-center">
-                      Nenhum admin disponível
+                      ⚠️ Nenhum administrador disponível
                     </p>
                   ) : (
                     listaAdmins.map((admin) => (
@@ -1512,15 +1519,20 @@ const CRM: React.FC = () => {
                         onClick={() => setAdminSelecionado(admin.id)}
                         className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
                           adminSelecionado === admin.id
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                            : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
+                            : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
                         }`}
                       >
-                        <p className="font-semibold text-gray-900 dark:text-white">
-                          {admin.nomeAgencia || admin.nome}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {admin.email}
+                        <div className="flex items-center gap-2">
+                          {adminSelecionado === admin.id && (
+                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                          )}
+                          <p className="font-semibold text-gray-900 dark:text-white">
+                            {admin.nomeAgencia || admin.nome}
+                          </p>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-4">
+                          📧 {admin.email}
                         </p>
                       </button>
                     ))
@@ -1528,7 +1540,7 @@ const CRM: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button
                   onClick={() => {
                     setShowModalVincularAdmin(false);
