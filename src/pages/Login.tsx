@@ -131,37 +131,105 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-gray-950 text-white overflow-hidden">
-      {/* Background Animado */}
+    <div className="min-h-screen bg-[#030014] text-white overflow-hidden">
+      {/* Background Futurístico */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-950/30 via-blue-950/20 to-pink-950/30"></div>
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/3 w-96 h-96 bg-blue-500/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute top-1/2 right-1/4 w-96 h-96 bg-pink-500/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '4s' }}></div>
-        <div className="absolute bottom-0 left-1/2 w-[600px] h-[600px] bg-gradient-to-t from-purple-600/10 to-transparent rounded-full blur-3xl"></div>
+        {/* Gradient orbs com movimento */}
+        <div className="absolute w-[800px] h-[800px] rounded-full opacity-30 blur-[120px] animate-pulse"
+          style={{
+            background: 'radial-gradient(circle, rgba(139, 92, 246, 0.5) 0%, transparent 70%)',
+            top: '-20%',
+            left: '-10%',
+          }}
+        />
+        <div className="absolute w-[600px] h-[600px] rounded-full opacity-30 blur-[100px] animate-pulse"
+          style={{
+            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.5) 0%, transparent 70%)',
+            bottom: '-10%',
+            right: '-5%',
+            animationDelay: '1s'
+          }}
+        />
+        <div className="absolute w-[500px] h-[500px] rounded-full opacity-25 blur-[80px] animate-pulse"
+          style={{
+            background: 'radial-gradient(circle, rgba(236, 72, 153, 0.5) 0%, transparent 70%)',
+            top: '30%',
+            right: '10%',
+            animationDelay: '2s'
+          }}
+        />
+
+        {/* Grid futurístico */}
+        <div className="absolute inset-0 opacity-[0.03]">
+          <div className="h-full w-full" style={{
+            backgroundImage: `
+              linear-gradient(rgba(139, 92, 246, 0.5) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(139, 92, 246, 0.5) 1px, transparent 1px)
+            `,
+            backgroundSize: '80px 80px'
+          }} />
+        </div>
+
+        {/* Partículas flutuantes */}
+        {Array.from({ length: 30 }, (_, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full bg-purple-500/30 animate-float-particle"
+            style={{
+              width: Math.random() * 4 + 2,
+              height: Math.random() * 4 + 2,
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDuration: `${Math.random() * 15 + 10}s`,
+              animationDelay: `${Math.random() * 5}s`
+            }}
+          />
+        ))}
+
+        {/* Linha de scan */}
+        <div className="absolute inset-0 overflow-hidden opacity-[0.03]">
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-500 to-transparent h-[30px] animate-scanline" />
+        </div>
+
+        {/* Círculos concêntricos */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] opacity-[0.02]">
+          {[...Array(8)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-purple-500"
+              style={{
+                width: `${(i + 1) * 120}px`,
+                height: `${(i + 1) * 120}px`,
+                animationDelay: `${i * 0.5}s`
+              }}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Content */}
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Header */}
-        <nav className="backdrop-blur-xl bg-gray-900/50 border-b border-purple-500/20">
+        <nav className="backdrop-blur-2xl bg-[#030014]/80 border-b border-purple-500/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <button
                 onClick={() => navigate('/')}
-                className="flex items-center gap-3 text-gray-400 hover:text-white transition-colors group"
+                className="flex items-center gap-3 text-gray-400 hover:text-white transition-all group"
               >
-                <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                <span>Voltar</span>
+                <div className="p-2 rounded-lg bg-white/5 group-hover:bg-white/10 transition-colors">
+                  <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                </div>
+                <span className="font-medium">Voltar</span>
               </button>
               <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500 blur-lg opacity-50 animate-pulse"></div>
-                  <div className="relative w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center">
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500 blur-xl opacity-50 group-hover:opacity-70 animate-pulse transition-opacity"></div>
+                  <div className="relative w-10 h-10 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 rounded-xl flex items-center justify-center shadow-2xl">
                     <Sparkles className="w-5 h-5 text-white" />
                   </div>
                 </div>
-                <span className="text-xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent">
+                <span className="text-xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
                   Gestão Criativa
                 </span>
               </div>
@@ -175,26 +243,32 @@ const Login: React.FC = () => {
             className={`w-full max-w-md transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
           >
             {/* Login Card */}
-            <div className="relative">
-              {/* Glow Effect */}
-              <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 via-blue-600 to-purple-600 rounded-3xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity"></div>
+            <div className="relative group">
+              {/* Glow Effect Animado */}
+              <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 rounded-3xl blur-xl opacity-30 group-hover:opacity-50 transition-opacity animate-pulse"></div>
               
-              <div className="relative backdrop-blur-xl bg-gray-800/50 border border-purple-500/30 rounded-3xl p-8 shadow-2xl">
-                {/* Icon */}
+              <div className="relative backdrop-blur-2xl bg-white/5 border border-white/10 rounded-3xl p-8 shadow-2xl">
+                {/* Icon com energia */}
                 <div className="flex justify-center mb-6">
                   <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500 blur-xl opacity-60 animate-pulse"></div>
-                    <div className="relative w-16 h-16 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center shadow-2xl">
-                      <ShieldCheck className="w-8 h-8 text-white" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 blur-2xl opacity-60 animate-pulse"></div>
+                    <div className="relative w-20 h-20 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 rounded-2xl flex items-center justify-center shadow-2xl animate-energy-pulse">
+                      <ShieldCheck className="w-10 h-10 text-white" />
+                    </div>
+                    {/* Partículas orbitando */}
+                    <div className="absolute inset-0 animate-orbit">
+                      <Sparkles className="absolute -top-2 left-1/2 w-4 h-4 text-purple-400" />
                     </div>
                   </div>
                 </div>
 
-                <h2 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent">
-                  Bem-vindo de volta!
+                <h2 className="text-3xl font-black text-center mb-2">
+                  <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
+                    Bem-vindo de volta!
+                  </span>
                 </h2>
                 <p className="text-gray-400 text-center mb-8">
-                  Entre para acessar seu sistema de gestão
+                  Acesse sua conta para continuar
                 </p>
 
                 <form onSubmit={handleSubmit} className="space-y-5">

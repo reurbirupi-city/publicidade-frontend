@@ -39,6 +39,7 @@ import ModalGerarProposta from '../components/ModalGerarProposta';
 import ModalContratoAssinatura from '../components/ModalContratoAssinatura';
 import ChatWhatsApp from '../components/ChatWhatsApp';
 import EntregasProjeto from '../components/EntregasProjeto';
+import CelebracaoPrimeiroAcesso from '../components/CelebracaoPrimeiroAcesso';
 import {
   notificarNovaSolicitacao,
   notificarPropostaAceita,
@@ -55,11 +56,28 @@ const ClientPortal: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [contactMessage, setContactMessage] = useState('');
+  const [showCelebracao, setShowCelebracao] = useState(false);
   
   // Definir tipo de usuário como cliente para o tutorial
   useEffect(() => {
     setUserType('cliente');
   }, [setUserType]);
+
+  // Verificar primeiro acesso do cliente
+  useEffect(() => {
+    if (user?.uid) {
+      const primeiroAcessoKey = `primeiro_acesso_cliente_${user.uid}`;
+      const jaCelebrou = localStorage.getItem(primeiroAcessoKey);
+      
+      if (!jaCelebrou) {
+        // Primeiro acesso! Mostrar celebração
+        setTimeout(() => {
+          setShowCelebracao(true);
+        }, 1000);
+        localStorage.setItem(primeiroAcessoKey, 'true');
+      }
+    }
+  }, [user?.uid]);
   
   const [showServicesModal, setShowServicesModal] = useState(false);
   const [showCustomServiceModal, setShowCustomServiceModal] = useState(false);
@@ -1519,6 +1537,15 @@ const ClientPortal: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Celebração de Primeiro Acesso */}
+      {showCelebracao && (
+        <CelebracaoPrimeiroAcesso
+          nome={clientData?.nome || user?.displayName || user?.email?.split('@')[0] || 'Cliente'}
+          tipo="cliente"
+          onClose={() => setShowCelebracao(false)}
+        />
+      )}
+
       {/* Header */}
       <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

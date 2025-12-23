@@ -111,6 +111,19 @@ service cloud.firestore {
                         resource.data.clienteId == request.auth.uid);
       allow delete: if isAdmin();
     }
+
+    // ============================================================================
+    // COLEÇÃO: contratos_assinados (PDF e assinatura salvos pelo cliente)
+    // ============================================================================
+    match /contratos_assinados/{contratoId} {
+      // Cliente pode criar quando assina contrato
+      allow create: if isAuthenticated();
+      // Cliente pode ler seus próprios contratos, admin pode ler todos
+      allow read: if isAdmin() || 
+                     (isAuthenticated() && resource.data.clienteId == request.auth.uid);
+      // Apenas admin pode atualizar/deletar
+      allow update, delete: if isAdmin();
+    }
     
     // Coleção de projetos
     match /projetos/{projetoId} {

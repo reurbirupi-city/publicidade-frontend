@@ -37,6 +37,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
 import ModalGestaoAdmins from '../components/ModalGestaoAdmins';
 import { TutorialOverlay, TutorialSettingsButton } from '../components/TutorialOverlay';
+import CelebracaoPrimeiroAcesso from '../components/CelebracaoPrimeiroAcesso';
 import { getSystemStats } from '../services/dataIntegration';
 import { useAuth } from '../contexts/AuthContext';
 import { useTutorial } from '../contexts/TutorialContext';
@@ -49,6 +50,7 @@ const Dashboard: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showGestaoAdmins, setShowGestaoAdmins] = useState(false);
+  const [showCelebracao, setShowCelebracao] = useState(false);
   const [adminData, setAdminData] = useState<Admin | null>(null);
   const [linkCopiado, setLinkCopiado] = useState(false);
   const [linkAdminCopiado, setLinkAdminCopiado] = useState(false);
@@ -65,6 +67,22 @@ const Dashboard: React.FC = () => {
   const { user, signOut } = useAuth();
   const { setUserType } = useTutorial();
   const userIsWebmaster = user?.email ? isWebmaster(user.email) : false;
+  
+  // Verificar primeiro acesso do admin
+  useEffect(() => {
+    if (user?.uid) {
+      const primeiroAcessoKey = `primeiro_acesso_admin_${user.uid}`;
+      const jaCelebrou = localStorage.getItem(primeiroAcessoKey);
+      
+      if (!jaCelebrou) {
+        // Primeiro acesso! Mostrar celebração
+        setTimeout(() => {
+          setShowCelebracao(true);
+        }, 500);
+        localStorage.setItem(primeiroAcessoKey, 'true');
+      }
+    }
+  }, [user?.uid]);
   
   // Definir tipo de usuário como admin para o tutorial
   useEffect(() => {
@@ -411,6 +429,15 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-300">
+      {/* Celebração de Primeiro Acesso */}
+      {showCelebracao && (
+        <CelebracaoPrimeiroAcesso
+          nome={user?.displayName || adminData?.nome || user?.email?.split('@')[0] || 'Administrador'}
+          tipo="admin"
+          onClose={() => setShowCelebracao(false)}
+        />
+      )}
+
       {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-purple-50/30 to-blue-50/30 dark:from-gray-950 dark:via-purple-950/30 dark:to-blue-950/30 transition-colors duration-500"></div>
