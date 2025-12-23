@@ -123,6 +123,11 @@ interface Cliente {
   portalAtivo: boolean;
   senhaPortal?: string;
   ultimoAcessoPortal?: string;
+  
+  // Novos campos - Vínculo com admin
+  adminId?: string;
+  adminNome?: string;
+  dataVinculo?: string;
 }
 
 const CRM: React.FC = () => {
@@ -184,7 +189,7 @@ const CRM: React.FC = () => {
           const q = query(collection(db, 'clientes'));
           const querySnapshot = await getDocs(q);
           querySnapshot.forEach((doc) => {
-            const data = { ...doc.data(), id: doc.id };
+            const data = { ...doc.data() as any, id: doc.id };
             clientesFirestore.push(data);
             // Identificar órfãos (sem adminId)
             if (!data.adminId) {
@@ -202,14 +207,14 @@ const CRM: React.FC = () => {
             const qVinculados = query(collection(db, 'clientes'), where('adminId', '==', admin.id));
             const snapshotVinculados = await getDocs(qVinculados);
             snapshotVinculados.forEach((doc) => {
-              clientesFirestore.push({ ...doc.data(), id: doc.id });
+              clientesFirestore.push({ ...doc.data() as any, id: doc.id });
             });
             
             // Buscar clientes órfãos (sem adminId) para o admin poder vinculá-los
             const qTodos = query(collection(db, 'clientes'));
             const snapshotTodos = await getDocs(qTodos);
             snapshotTodos.forEach((doc) => {
-              const data = { ...doc.data(), id: doc.id };
+              const data = { ...doc.data() as any, id: doc.id };
               if (!data.adminId) {
                 orfaos.push(data);
               }
