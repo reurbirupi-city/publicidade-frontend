@@ -20,7 +20,10 @@ import {
   Briefcase,
   FileText,
   FileSignature,
-  ShoppingCart
+  ShoppingCart,
+  Link2,
+  UserPlus,
+  AlertCircle
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
@@ -31,7 +34,7 @@ import ModalGerarProposta from '../components/ModalGerarProposta';
 import ModalContratoAssinatura from '../components/ModalContratoAssinatura';
 import ModalFinalizarServico from '../components/ModalFinalizarServico';
 import { db } from '../services/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { isWebmaster, getAdminByEmail } from '../services/adminService';
 
@@ -126,10 +129,13 @@ const CRM: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'todos' | 'ativo' | 'inativo' | 'prospect'>('todos');
+  const [filterVinculo, setFilterVinculo] = useState<'todos' | 'vinculados' | 'orfaos'>('todos');
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'view' | 'create' | 'edit'>('view');
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [clientesOrfaos, setClientesOrfaos] = useState<Cliente[]>([]);
+  const [adminAtual, setAdminAtual] = useState<any>(null);
   
   // Estados para os novos modais do workflow de contratação
   const [showModalCotacao, setShowModalCotacao] = useState(false);
@@ -170,6 +176,7 @@ const CRM: React.FC = () => {
       try {
         console.log('🔄 CRM: Buscando clientes do Firestore...');
         let clientesFirestore: any[] = [];
+        let orfaos: any[] = [];
         
         // Verificar se é webmaster (vê tudo) ou admin comum (vê só seus clientes)
         if (isWebmaster(user.email)) {
@@ -177,19 +184,38 @@ const CRM: React.FC = () => {
           const q = query(collection(db, 'clientes'));
           const querySnapshot = await getDocs(q);
           querySnapshot.forEach((doc) => {
-            clientesFirestore.push({ ...doc.data(), id: doc.id });
+            const data = { ...doc.data(), id: doc.id };
+            clientesFirestore.push(data);
+            // Identificar órfãos (sem adminId)
+            if (!data.adminId) {
+              orfaos.push(data);
+            }
           });
-          console.log('👑 Webmaster: carregando todos os clientes:', clientesFirestore.length);
+          console.log('👑 Webmaster: carregando todos os clientes:', clientesFirestore.length, `(${orfaos.length} órfãos)`);
         } else {
-          // Admin comum: buscar apenas seus clientes
+          // Admin comum: buscar clientes vinculados + clientes órfãos
           const admin = await getAdminByEmail(user.email);
           if (admin) {
-            const q = query(collection(db, 'clientes'), where('adminId', '==', admin.id));
-            const querySnapshot = await getDocs(q);
-            querySnapshot.forEach((doc) => {
+            setAdminAtual(admin);
+            
+            // Buscar clientes vinculados a este admin
+            const qVinculados = query(collection(db, 'clientes'), where('adminId', '==', admin.id));
+            const snapshotVinculados = await getDocs(qVinculados);
+            snapshotVinculados.forEach((doc) => {
               clientesFirestore.push({ ...doc.data(), id: doc.id });
             });
-            console.log(`📋 Admin ${admin.nome}: carregando ${clientesFirestore.length} clientes`);
+            
+            // Buscar clientes órfãos (sem adminId) para o admin poder vinculá-los
+            const qTodos = query(collection(db, 'clientes'));
+            const snapshotTodos = await getDocs(qTodos);
+            snapshotTodos.forEach((doc) => {
+              const data = { ...doc.data(), id: doc.id };
+              if (!data.adminId) {
+                orfaos.push(data);
+              }
+            });
+            
+            console.log(`📋 Admin ${admin.nome}: ${clientesFirestore.length} clientes vinculados, ${orfaos.length} órfãos disponíveis`);
           } else {
             // Fallback: carregar todos (para admins não cadastrados ainda)
             const q = query(collection(db, 'clientes'));
@@ -200,8 +226,10 @@ const CRM: React.FC = () => {
             console.log('⚠️ Admin não encontrado no sistema, mostrando todos:', clientesFirestore.length);
           }
         }
+        
+        setClientesOrfaos(orfaos as any[]);
 
-        if (clientesFirestore.length > 0) {
+        if (clientesFirestore.length > 0 || orfaos.length > 0) {
           console.log('✅ CRM: Carregou', clientesFirestore.length, 'clientes do Firestore');
           
           // Mesclar com localStorage (priorizar Firestore)
@@ -279,18 +307,71 @@ const CRM: React.FC = () => {
       color: 'from-yellow-500 to-orange-500'
     },
     {
-      label: 'Receita Total',
-      value: `R$ ${(clientes.reduce((acc, c) => acc + c.valorTotal, 0) / 1000).toFixed(0)}K`,
-      icon: DollarSign,
-      color: 'from-purple-500 to-pink-500'
+      label: clientesOrfaos.length > 0 ? 'Sem Vínculo' : 'Receita Total',
+      value: clientesOrfaos.length > 0 
+        ? clientesOrfaos.length.toString() 
+        : `R$ ${(clientes.reduce((acc, c) => acc + c.valorTotal, 0) / 1000).toFixed(0)}K`,
+      icon: clientesOrfaos.length > 0 ? AlertCircle : DollarSign,
+      color: clientesOrfaos.length > 0 ? 'from-amber-500 to-orange-500' : 'from-purple-500 to-pink-500'
     }
   ];
 
-  const filteredClientes = clientes.filter(cliente => {
+  // Função para vincular cliente órfão ao admin atual
+  const handleVincularCliente = async (clienteId: string) => {
+    if (!adminAtual) {
+      alert('Erro: Admin não identificado');
+      return;
+    }
+    
+    try {
+      // Atualizar no Firestore
+      await updateDoc(doc(db, 'clientes', clienteId), {
+        adminId: adminAtual.id,
+        adminNome: adminAtual.nomeAgencia || adminAtual.nome,
+        dataVinculo: new Date().toISOString()
+      });
+      
+      // Atualizar também na coleção users
+      try {
+        await updateDoc(doc(db, 'users', clienteId), {
+          adminId: adminAtual.id,
+          adminNome: adminAtual.nomeAgencia || adminAtual.nome
+        });
+      } catch (e) {
+        console.log('Usuário não encontrado na coleção users (pode ser normal)');
+      }
+      
+      // Mover da lista de órfãos para a lista de clientes
+      const clienteVinculado = clientesOrfaos.find(c => c.id === clienteId);
+      if (clienteVinculado) {
+        setClientesOrfaos(prev => prev.filter(c => c.id !== clienteId));
+        setClientes(prev => [...prev, { 
+          ...clienteVinculado, 
+          adminId: adminAtual.id,
+          adminNome: adminAtual.nomeAgencia || adminAtual.nome 
+        }]);
+      }
+      
+      console.log('✅ Cliente vinculado ao admin:', clienteId, '->', adminAtual.id);
+      alert('Cliente vinculado com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro ao vincular cliente:', error);
+      alert('Erro ao vincular cliente. Tente novamente.');
+    }
+  };
+
+  // Combinar clientes vinculados com órfãos baseado no filtro
+  const clientesParaExibir = filterVinculo === 'orfaos' 
+    ? clientesOrfaos 
+    : filterVinculo === 'vinculados' 
+      ? clientes 
+      : [...clientes, ...clientesOrfaos];
+
+  const filteredClientes = clientesParaExibir.filter(cliente => {
     const matchSearch = 
-      cliente.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cliente.empresa.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cliente.email.toLowerCase().includes(searchQuery.toLowerCase());
+      cliente.nome?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      cliente.empresa?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      cliente.email?.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchFilter = filterStatus === 'todos' || cliente.status === filterStatus;
     
@@ -620,6 +701,19 @@ const CRM: React.FC = () => {
                 <option value="inativo">Inativos</option>
               </select>
               
+              {/* Filtro de vínculo - apenas para admins não-webmaster */}
+              {clientesOrfaos.length > 0 && (
+                <select
+                  value={filterVinculo}
+                  onChange={(e) => setFilterVinculo(e.target.value as any)}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-gray-900 dark:text-white"
+                >
+                  <option value="todos">📋 Todos ({clientes.length + clientesOrfaos.length})</option>
+                  <option value="vinculados">✅ Vinculados ({clientes.length})</option>
+                  <option value="orfaos">⚠️ Sem Vínculo ({clientesOrfaos.length})</option>
+                </select>
+              )}
+              
               <button
                 onClick={() => {
                   if (confirm('⚠️ Tem certeza que deseja limpar todos os dados mockados?\n\nIsso apagará todos os clientes atuais!')) {
@@ -661,11 +755,21 @@ const CRM: React.FC = () => {
 
         {/* Clients Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredClientes.map((cliente) => (
+          {filteredClientes.map((cliente) => {
+            const isOrfao = !cliente.adminId;
+            
+            return (
             <div
               key={cliente.id}
-              className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 border-l-4 border-l-blue-500 dark:border-l-amber-500 rounded-xl p-6 transition-all hover:scale-105 hover:shadow-xl group"
+              className={`relative backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 border-l-4 ${isOrfao ? 'border-l-amber-500' : 'border-l-blue-500 dark:border-l-amber-500'} rounded-xl p-6 transition-all hover:scale-105 hover:shadow-xl group ${isOrfao ? 'ring-2 ring-amber-500/30' : ''}`}
             >
+              {/* Badge de cliente órfão */}
+              {isOrfao && (
+                <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-semibold z-10">
+                  Sem vínculo
+                </div>
+              )}
+              
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg">
@@ -750,8 +854,19 @@ const CRM: React.FC = () => {
                   ))}
                 </div>
               </div>
+              
+              {/* Botão de vincular para clientes órfãos */}
+              {isOrfao && adminAtual && (
+                <button
+                  onClick={() => handleVincularCliente(cliente.id)}
+                  className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg transition-all font-semibold"
+                >
+                  <Link2 className="w-4 h-4" />
+                  Vincular a mim
+                </button>
+              )}
             </div>
-          ))}
+          )})}
         </div>
 
         {filteredClientes.length === 0 && (

@@ -114,16 +114,19 @@ const Solicitacoes: React.FC = () => {
             const clientesDoAdmin = await getClientesDoAdmin(admin.id);
             const clienteIds = clientesDoAdmin.map(c => c.id);
             
-            if (clienteIds.length > 0) {
-              // Buscar solicitações que pertencem aos clientes do admin
-              const snapshot = await getDocs(colRef);
-              dados = snapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() }))
-                .filter((sol: any) => clienteIds.includes(sol.clienteId));
-              console.log(`📋 Admin ${admin.nome}: carregando ${dados.length} solicitações de ${clienteIds.length} clientes`);
-            } else {
-              console.log('⚠️ Admin sem clientes vinculados');
-              dados = [];
+            // Buscar TODAS as solicitações e filtrar por:
+            // 1. clienteId está na lista de clientes do admin OU
+            // 2. adminId da solicitação é igual ao ID do admin
+            const snapshot = await getDocs(colRef);
+            dados = snapshot.docs
+              .map(doc => ({ id: doc.id, ...doc.data() }))
+              .filter((sol: any) => 
+                clienteIds.includes(sol.clienteId) || sol.adminId === admin.id
+              );
+            console.log(`📋 Admin ${admin.nome}: carregando ${dados.length} solicitações (${clienteIds.length} clientes vinculados)`);
+            
+            if (dados.length === 0 && clienteIds.length === 0) {
+              console.log('⚠️ Admin sem clientes vinculados e sem solicitações diretas');
             }
           } else {
             // Fallback: carregar todas (para admins não cadastrados ainda)

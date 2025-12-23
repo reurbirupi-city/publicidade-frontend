@@ -74,16 +74,34 @@ const Dashboard: React.FC = () => {
   // Carrega estatísticas integradas do sistema
   const systemStats = getSystemStats();
   
-  // Buscar solicitações pendentes do Firestore
+  // Buscar solicitações pendentes do Firestore (filtradas por admin)
   useEffect(() => {
     const buscarSolicitacoesPendentes = async () => {
+      if (!user?.email) return;
+      
       try {
-        const q = query(
-          collection(db, 'solicitacoes_clientes'),
-          where('status', 'in', ['nova', 'analisando', 'proposta-criada'])
-        );
-        const snapshot = await getDocs(q);
-        setSolicitacoesPendentes(snapshot.size);
+        const colRef = collection(db, 'solicitacoes_clientes');
+        const snapshot = await getDocs(colRef);
+        let solicitacoesFiltradas = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter((sol: any) => ['nova', 'analisando', 'proposta-criada'].includes(sol.status));
+        
+        // Se não for webmaster, filtrar apenas as do admin
+        if (!isWebmaster(user.email)) {
+          const admin = await getAdminByEmail(user.email);
+          if (admin) {
+            const { getClientesDoAdmin } = await import('../services/adminService');
+            const clientesDoAdmin = await getClientesDoAdmin(admin.id);
+            const clienteIds = clientesDoAdmin.map((c: any) => c.id);
+            
+            // Filtrar por clienteId OU adminId
+            solicitacoesFiltradas = solicitacoesFiltradas.filter((sol: any) => 
+              clienteIds.includes(sol.clienteId) || sol.adminId === admin.id
+            );
+          }
+        }
+        
+        setSolicitacoesPendentes(solicitacoesFiltradas.length);
       } catch (error) {
         console.error('Erro ao buscar solicitações:', error);
       }
@@ -93,7 +111,7 @@ const Dashboard: React.FC = () => {
     // Atualizar a cada 30 segundos
     const interval = setInterval(buscarSolicitacoesPendentes, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user?.email]);
 
   // Função para formatar tempo relativo
   const formatTimeAgo = (date: Date): string => {
