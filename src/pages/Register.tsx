@@ -357,25 +357,21 @@ const Register: React.FC = () => {
 
       console.log('📝 Salvando cliente no Firestore...', clienteParaFirestore);
 
-      // 3. Salvar na coleção "clientes" do Firestore (sempre, para todos os clientes)
-      try {
-        await setDoc(doc(db, 'clientes', uid), clienteParaFirestore);
-        console.log('✅ Cliente salvo na coleção clientes do Firestore:', uid);
-      } catch (firestoreError: any) {
-        console.error('❌ ERRO ao salvar cliente na coleção clientes:', firestoreError);
-        console.error('Código do erro:', firestoreError.code);
-        console.error('Mensagem:', firestoreError.message);
-        // Não interrompe o fluxo
-      }
-
-      // 3.1 Se vinculado a um admin, TAMBÉM salvar na subcoleção admins/{adminId}/clientes/{clienteId}
+      // 3. Salvar cliente: 
+      //    - Se vinculado a admin: salvar em admins/{adminId}/clientes/{clienteId}
+      //    - Se órfão: salvar apenas em users (será buscado depois de um admin vinculá-lo)
+      
       if (adminConvite) {
+        // Salvar na subcoleção do admin
         try {
           await setDoc(doc(db, 'admins', adminConvite.id, 'clientes', uid), clienteParaFirestore);
-          console.log('✅ Cliente também salvo na subcoleção do admin:', adminConvite.id);
+          console.log('✅ Cliente salvo na subcoleção do admin:', adminConvite.id);
         } catch (subcolError: any) {
-          console.error('⚠️ Erro ao salvar cliente na subcoleção do admin (não bloqueante):', subcolError);
+          console.error('❌ Erro ao salvar cliente na subcoleção do admin:', subcolError);
+          throw subcolError;
         }
+      } else {
+        console.log('⚠️ Cliente cadastrado sem vínculo com admin (órfão)');
       }
 
       // 4. Criar documento do usuário no Firestore (coleção users)

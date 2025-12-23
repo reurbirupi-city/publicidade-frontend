@@ -376,83 +376,66 @@ export const listarClientesParaPromocao = async (): Promise<any[]> => {
 
 /**
  * Vincula um cliente a um admin
- * Agora salva também na subcoleção admins/{adminId}/clientes/{clienteId}
+ * Salva na subcoleção admins/{adminId}/clientes/{clienteId}
+ * Atualiza também em users/{clienteId}
  */
 export const vincularClienteAoAdmin = async (clienteId: string, adminId: string): Promise<boolean> => {
   try {
-    // 1. Obter dados do cliente da coleção clientes
-    const clienteDoc = await getDoc(doc(db, 'clientes', clienteId));
-    if (!clienteDoc.exists()) {
-      console.error('❌ Cliente não encontrado:', clienteId);
+    // 1. Obter dados do cliente do Firestore (users collection)
+    const userDoc = await getDoc(doc(db, 'users', clienteId));
+    if (!userDoc.exists()) {
+      console.error('❌ Cliente não encontrado em users:', clienteId);
       return false;
     }
     
-    const clienteData = clienteDoc.data();
-    const nomeAgencia = (await getDoc(doc(db, 'admins', adminId))).data()?.nomeAgencia;
+    const userData = userDoc.data();
+    const adminData = (await getDoc(doc(db, 'admins', adminId))).data();
+    const nomeAgencia = adminData?.nomeAgencia || adminData?.nome;
     
-    // 2. Atualizar o documento do cliente com o adminId
-    await updateDoc(doc(db, 'clientes', clienteId), { 
+    // 2. Salvar na subcoleção admins/{adminId}/clientes/{clienteId}
+    const clienteData = {
+      ...userData,
+      id: clienteId,
       adminId,
       adminNome: nomeAgencia,
       dataVinculo: new Date().toISOString()
-    });
+    };
+    
+    await setDoc(doc(db, 'admins', adminId, 'clientes', clienteId), clienteData);
+    console.log('✅ Cliente vinculado ao admin na subcoleção');
 
-    // 3. Salvar também na subcoleção admins/{adminId}/clientes/{clienteId}
-    await setDoc(doc(db, 'admins', adminId, 'clientes', clienteId), {
-      ...clienteData,
-      adminId,
-      adminNome: nomeAgencia,
-      dataVinculo: new Date().toISOString()
-    });
-
-    // 4. Também atualizar na coleção users
+    // 3. Atualizar em users/{clienteId}
     try {
       await updateDoc(doc(db, 'users', clienteId), { 
         adminId,
-        adminNome: nomeAgencia
+        adminNome: nomeAgencia,
+        dataVinculo: new Date().toISOString()
       });
-    } catch (e) {
-      console.log('⚠️ Usuário não encontrado na coleção users (pode ser normal)');
+      console.log('✅ Cliente atualizado em users');
+    } catch (usersError) {
+      console.error('⚠️ Erro ao atualizar users (não bloqueante):', usersError);
     }
 
-    console.log('✅ Cliente vinculado ao admin:', { clienteId, adminId });
     return true;
   } catch (error) {
-    console.error('❌ Erro ao vincular cliente:', error);
+    console.error('❌ Erro ao vincular cliente ao admin:', error);
     return false;
   }
 };
 
 /**
  * Obtém todos os clientes de um admin específico
- * AGORA: Busca na subcoleção admins/{adminId}/clientes
- * FALLBACK: Busca na coleção clientes com adminId (compatibilidade)
+ * Busca na subcoleção admins/{adminId}/clientes
  */
 export const getClientesDoAdmin = async (adminId: string): Promise<any[]> => {
   try {
-    // 1. Buscar na subcoleção (novo método)
     const subcolSnapshot = await getDocs(collection(db, 'admins', adminId, 'clientes'));
     const clientesSubcol = subcolSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
-    // 2. Fallback: Buscar na coleção clientes com adminId (compatibilidade com dados antigos)
-    const q = query(collection(db, 'clientes'), where('adminId', '==', adminId));
-    const snapshot = await getDocs(q);
-    const clientesColeção = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    
-    // 3. Mesclar e remover duplicatas
-    const clientesMap = new Map();
-    clientesSubcol.forEach(c => clientesMap.set(c.id, c));
-    clientesColeção.forEach(c => {
-      if (!clientesMap.has(c.id)) {
-        clientesMap.set(c.id, c);
-      }
-    });
-    
-    const clientesMesclados = Array.from(clientesMap.values());
-    if (clientesSubcol.length > 0 || clientesColeção.length > 0) {
-      console.log(`📊 Admin ${adminId}: ${clientesSubcol.length} clientes na subcoleção, ${clientesColeção.length} na coleção = ${clientesMesclados.length} total`);
+    if (clientesSubcol.length > 0) {
+      console.log(`📊 Admin ${adminId}: ${clientesSubcol.length} clientes encontrados`);
     }
-    return clientesMesclados;
+    return clientesSubcol;
   } catch (error) {
     console.error('Erro ao buscar clientes do admin:', error);
     return [];
