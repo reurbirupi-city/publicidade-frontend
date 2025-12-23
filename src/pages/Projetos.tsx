@@ -148,7 +148,28 @@ interface Projeto {
   descricaoFaseAtual?: string;
   faseAtualizadaEm?: string;
   aguardandoAprovacaoCliente?: boolean;
+  
+  // Feedback do cliente
+  feedbackCliente?: {
+    rating: number;
+    comentario: string;
+    dataEnvio: string;
+  };
 }
+
+// Função para calcular progresso baseado no status
+const getProgressoByStatus = (status: StatusProjeto): number => {
+  switch (status) {
+    case 'planejamento': return 10;
+    case 'em_andamento': return 40;
+    case 'pausado': return 30;
+    case 'revisao': return 70;
+    case 'aprovacao': return 90;
+    case 'concluido': return 100;
+    case 'cancelado': return 0;
+    default: return 0;
+  }
+};
 
 // ============================================================================
 // COMPONENTE KANBAN CARD
@@ -843,12 +864,16 @@ const Projetos: React.FC = () => {
 
   // Função para atualizar status do projeto
   const atualizarStatusProjeto = async (projetoId: string, newStatus: StatusProjeto, descricaoAprovacao?: string) => {
+    // Calcular novo progresso baseado no status
+    const novoProgresso = getProgressoByStatus(newStatus);
+    
     // Atualiza o status do projeto arrastado
     const projetosAtualizados = projetos.map(p =>
       p.id === projetoId
         ? { 
             ...p, 
-            status: newStatus, 
+            status: newStatus,
+            progresso: novoProgresso, // Atualiza progresso automaticamente
             atualizadoEm: new Date().toISOString(),
             descricaoFaseAtual: descricaoAprovacao || p.descricaoFaseAtual,
             faseAtualizadaEm: descricaoAprovacao ? new Date().toISOString() : p.faseAtualizadaEm
@@ -865,6 +890,7 @@ const Projetos: React.FC = () => {
       if (projetoAtualizado) {
         await updateDoc(doc(db, 'projetos', projetoId), {
           status: newStatus,
+          progresso: novoProgresso, // Salva progresso no Firestore também
           atualizadoEm: new Date().toISOString(),
           syncedAt: new Date().toISOString(),
           descricaoFaseAtual: descricaoAprovacao || null,

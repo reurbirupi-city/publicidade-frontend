@@ -33,6 +33,8 @@ export type TipoNotificacao =
   | 'projeto_concluido'       // Projeto concluído
   | 'pagamento_recebido'      // Pagamento confirmado
   | 'lembrete_prazo'          // Lembrete de prazo
+  | 'feedback_negativo'       // Feedback negativo do cliente (rating <= 2)
+  | 'feedback_recebido'       // Feedback recebido do cliente
   | 'sistema';                // Notificação do sistema
 
 export type DestinatarioTipo = 'admin' | 'cliente';
@@ -53,6 +55,10 @@ export interface Notificacao {
   link?: string; // Link para navegação
   icone?: string; // Emoji ou ícone
   prioridade?: 'baixa' | 'normal' | 'alta' | 'urgente';
+  // Campos para feedback negativo persistente
+  persistente?: boolean; // Notificação que não some até ser resolvida
+  resolvidaEm?: string;  // Data em que foi resolvida
+  requerAcao?: boolean;  // Indica que requer ação do admin
 }
 
 // ============================================================================
@@ -561,6 +567,8 @@ export const getNotificacaoColor = (tipo: TipoNotificacao): string => {
     projeto_concluido: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
     pagamento_recebido: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
     lembrete_prazo: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+    feedback_negativo: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+    feedback_recebido: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
     sistema: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
   };
   return colors[tipo] || colors.sistema;
@@ -584,4 +592,70 @@ export const formatarDataRelativa = (dataString: string): string => {
   if (diffDay < 7) return `há ${diffDay} dias`;
   
   return data.toLocaleDateString('pt-BR');
+};
+
+/**
+ * Notifica admin sobre feedback do cliente
+ * Se rating <= 2, cria notificação persistente que requer ação
+ */
+export const notificarFeedbackRecebido = async (
+  adminId: string,
+  clienteNome: string,
+  projetoTitulo: string,
+  projetoId: string,
+  rating: number,
+  comentario?: string
+): Promise<void> => {
+  const isNegativo = rating <= 2;
+  
+  await criarNotificacao({
+    tipo: isNegativo ? 'feedback_negativo' : 'feedback_recebido',
+    titulo: isNegativo 
+      ? '⚠️ Feedback Negativo - Ação Necessária!' 
+      : `⭐ Feedback Recebido: ${rating}/5`,
+    mensagem: isNegativo
+      ? `O cliente ${clienteNome} avaliou o projeto "${projetoTitulo}" com ${rating}/5 estrelas. ${comentario ? `Comentário: "${comentario}"` : ''} Ação necessária para resolver a insatisfação!`
+      : `O cliente ${clienteNome} avaliou o projeto "${projetoTitulo}" com ${rating}/5 estrelas. ${comentario ? `Comentário: "${comentario}"` : ''}`,
+    destinatarioTipo: 'admin',
+    destinatarioId: adminId,
+    remetenteNome: clienteNome,
+    referenciaId: projetoId,
+    referenciaTipo: 'projeto',
+    link: '/projetos',
+    icone: isNegativo ? '⚠️' : '⭐',
+    prioridade: isNegativo ? 'urgente' : 'normal',
+    persistente: isNegativo, // Feedback negativo é persistente
+    requerAcao: isNegativo   // Requer ação do admin
+  });
+};
+
+/**
+ * Marca notificação persistente como resolvida (quando cliente der nova avaliação)
+ */
+export const resolverNotificacaoPersistente = async (
+  projetoId: string
+): Promise<void> => {
+  try {
+    // Buscar notificações persistentes não resolvidas para este projeto
+    const notificacoesRef = collection(db, 'notificacoes');
+    const q = query(
+      notificacoesRef,
+      where('referenciaId', '==', projetoId),
+      where('persistente', '==', true),
+      where('resolvidaEm', '==', null)
+    );
+    
+    const snapshot = await getDocs(q);
+    
+    for (const docSnap of snapshot.docs) {
+      await updateDoc(doc(db, 'notificacoes', docSnap.id), {
+        resolvidaEm: new Date().toISOString(),
+        requerAcao: false
+      });
+    }
+    
+    console.log(`✅ ${snapshot.size} notificações persistentes resolvidas para o projeto ${projetoId}`);
+  } catch (error) {
+    console.error('❌ Erro ao resolver notificações persistentes:', error);
+  }
 };

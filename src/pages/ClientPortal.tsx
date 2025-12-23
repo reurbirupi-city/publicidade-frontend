@@ -45,7 +45,9 @@ import {
   notificarPropostaAceita,
   notificarContratoAssinado,
   notificarProjetoAprovado,
-  notificarNovaMensagem
+  notificarNovaMensagem,
+  notificarFeedbackRecebido,
+  resolverNotificacaoPersistente
 } from '../services/notificacoes';
 
 const ClientPortal: React.FC = () => {
@@ -896,13 +898,19 @@ const ClientPortal: React.FC = () => {
         atualizadoEm: new Date().toISOString()
       });
 
-      // Notificar admin sobre o feedback
-      await notificarNovaMensagem(
-        'admin', // destinatarioTipo
-        clientData?.adminId || selectedProject.adminId || 'admin', // destinatarioId
-        clientData?.nome || 'Cliente', // remetenteNome
-        `⭐ Feedback recebido para o projeto "${selectedProject.titulo}": ${feedbackRating}/5 estrelas`, // mensagemPreview
-        selectedProject.id // solicitacaoId (usado como referência)
+      // Se o feedback for positivo (>= 3), resolver notificações persistentes anteriores
+      if (feedbackRating >= 3) {
+        await resolverNotificacaoPersistente(selectedProject.id);
+      }
+
+      // Notificar admin sobre o feedback (com tratamento especial para negativo)
+      await notificarFeedbackRecebido(
+        clientData?.adminId || selectedProject.adminId || 'admin',
+        clientData?.nome || 'Cliente',
+        selectedProject.titulo,
+        selectedProject.id,
+        feedbackRating,
+        feedbackTexto.trim() || undefined
       );
 
       setFeedbackEnviado(true);

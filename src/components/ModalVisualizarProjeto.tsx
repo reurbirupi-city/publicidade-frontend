@@ -405,6 +405,75 @@ const ModalVisualizarProjeto: React.FC<ModalVisualizarProjetoProps> = ({
                 </div>
               </div>
 
+              {/* Feedback do Cliente */}
+              {projeto.feedbackCliente && (
+                <div className={`p-4 rounded-lg border-2 ${
+                  projeto.feedbackCliente.rating <= 2
+                    ? 'bg-red-50 dark:bg-red-950/30 border-red-300 dark:border-red-800'
+                    : projeto.feedbackCliente.rating <= 3
+                    ? 'bg-yellow-50 dark:bg-yellow-950/30 border-yellow-300 dark:border-yellow-800'
+                    : 'bg-green-50 dark:bg-green-950/30 border-green-300 dark:border-green-800'
+                }`}>
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                    ⭐ Feedback do Cliente
+                    {projeto.feedbackCliente.rating <= 2 && (
+                      <span className="px-2 py-0.5 bg-red-500 text-white rounded-full text-xs animate-pulse">
+                        ATENÇÃO
+                      </span>
+                    )}
+                  </h3>
+                  <div className="space-y-3">
+                    {/* Estrelas */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Avaliação:</span>
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <span
+                            key={star}
+                            className={`text-xl ${
+                              star <= projeto.feedbackCliente.rating
+                                ? 'text-yellow-500'
+                                : 'text-gray-300 dark:text-gray-600'
+                            }`}
+                          >
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                      <span className="font-bold text-lg ml-2">{projeto.feedbackCliente.rating}/5</span>
+                    </div>
+                    {/* Comentário */}
+                    {projeto.feedbackCliente.comentario && (
+                      <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <p className="text-sm text-gray-700 dark:text-gray-300 italic">
+                          "{projeto.feedbackCliente.comentario}"
+                        </p>
+                      </div>
+                    )}
+                    {/* Data */}
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Enviado em: {new Date(projeto.feedbackCliente.dataEnvio).toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                    {/* Alerta de feedback negativo */}
+                    {projeto.feedbackCliente.rating <= 2 && (
+                      <div className="flex items-start gap-2 p-3 bg-red-100 dark:bg-red-900/50 rounded-lg">
+                        <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-red-700 dark:text-red-300">
+                          <p className="font-semibold">Cliente insatisfeito!</p>
+                          <p>Entre em contato para entender as melhorias necessárias e resolver os problemas apontados.</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Eventos vinculados */}
               {eventos.length > 0 && (
                 <div>
