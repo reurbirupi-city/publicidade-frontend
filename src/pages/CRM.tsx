@@ -36,7 +36,7 @@ import ModalFinalizarServico from '../components/ModalFinalizarServico';
 import { db } from '../services/firebase';
 import { collection, getDocs, query, where, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { isWebmaster, getAdminByEmail, getClientesDoAdmin } from '../services/adminService';
+import { isWebmaster, getAdminByEmail } from '../services/adminService';
 
 // Tipos auxiliares para o módulo de clientes
 interface ServicoContratado {
@@ -180,8 +180,6 @@ const CRM: React.FC = () => {
       
       try {
         console.log('🔄 CRM: Buscando clientes do Firestore...');
-        let clientesFirestore: any[] = [];
-        let orfaos: any[] = [];
         
         const admin = await getAdminByEmail(user.email);
         if (!admin) {
@@ -192,38 +190,15 @@ const CRM: React.FC = () => {
         
         setAdminAtual(admin);
         
-        // Buscar clientes vinculados a este admin usando getClientesDoAdmin
-        clientesFirestore = await getClientesDoAdmin(admin.id);
+        // Buscar clientes vinculados a este admin na coleção clientes
+        const q = query(collection(db, 'clientes'), where('adminId', '==', admin.id));
+        const snapshot = await getDocs(q);
+        const clientesFirestore = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+        
         console.log(`📋 CRM: Carregou ${clientesFirestore.length} clientes para admin ${admin.nome}`);
         
-        // Se for webmaster, também buscar órfãos para mostrar opção de vincular
-        if (isWebmaster(user.email)) {
-          // Buscar TODOS os docs de todos os admins para encontrar órfãos
-          const adminCollections = await getDocs(collection(db, 'admins'));
-          const todosClientsIds = new Set<string>();
-          
-          // Coletar IDs de todos os clientes em todas as subcoleções
-          for (const adminDoc of adminCollections.docs) {
-            const clientesSubcol = await getDocs(collection(db, 'admins', adminDoc.id, 'clientes'));
-            clientesSubcol.docs.forEach(doc => {
-              todosClientsIds.add(doc.id);
-            });
-          }
-          
-          // Buscar todos os usuários que se registraram (users collection)
-          const usersSnapshot = await getDocs(collection(db, 'users'));
-          usersSnapshot.docs.forEach(doc => {
-            const data = doc.data();
-            if (data.tipo === 'cliente' && !todosClientsIds.has(doc.id)) {
-              orfaos.push({ id: doc.id, ...data });
-            }
-          });
-          
-          console.log(`👑 Webmaster: encontrou ${orfaos.length} clientes órfãos`);
-        }
-        
-        setClientesOrfaos(orfaos as any[]);
-        setClientes(clientesFirestore as any[]);
+        setClientes(clientesFirestore);
+        setClientesOrfaos([]);
         console.log('✅ CRM: Carregou', clientesFirestore.length, 'clientes vinculados ao admin');
       } catch (error) {
         console.error('❌ CRM: Erro ao carregar clientes do Firestore:', error);

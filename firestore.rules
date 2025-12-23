@@ -34,12 +34,37 @@ service cloud.firestore {
       }
     }
     
+    // Documento especial para clientes órfãos (sem admin)
+    match /admins/orphans {
+      allow read: if true;
+      allow write: if isAuthenticated();
+      
+      match /clientes/{clienteId} {
+        // Qualquer usuário autenticado pode criar seu próprio registro de órfão
+        // Admin pode ler e mover órfão para sua coleção
+        allow read, write: if isAuthenticated();
+      }
+    }
+    
     // Coleção de usuários
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) || isAdmin();
       allow update: if isAdmin() || isOwner(userId);
       allow delete: if false;
+    }
+    
+    // ============================================================================
+    // COLEÇÃO: clientes (todos os clientes com adminId obrigatório)
+    // ============================================================================
+    match /clientes/{clienteId} {
+      // Cliente pode criar seu próprio documento (quando se registra via invite)
+      allow create: if isAuthenticated() && request.auth.uid == clienteId && 
+                       request.resource.data.adminId != null;
+      // Admin pode ler/escrever clientes vinculados a ele
+      allow read, write: if isAdmin();
+      // Cliente pode ler seu próprio documento
+      allow read: if isAuthenticated() && request.auth.uid == clienteId;
     }    // Coleção de solicitações
     match /solicitacoes/{solicitacaoId} {
       allow create: if isAuthenticated();

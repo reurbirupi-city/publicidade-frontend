@@ -209,6 +209,15 @@ const Register: React.FC = () => {
     try {
       console.log('📝 Verificando dados...');
 
+      // ============================================================
+      // VALIDAÇÃO: Cliente precisa de link de convite obrigatoriamente
+      // ============================================================
+      if (!isAdminRegister && !adminConvite) {
+        setError('❌ É necessário um link de convite para se registrar como cliente. Solicite ao seu administrador.');
+        setLoading(false);
+        return;
+      }
+
       // Verificar se email já existe no Firebase Auth
       const methods = await fetchSignInMethodsForEmail(auth, formData.email);
       if (methods.length > 0) {
@@ -338,13 +347,16 @@ const Register: React.FC = () => {
         syncedAt: new Date().toISOString(),
       };
 
-      // Se veio de link de convite, vincular ao admin
+      // Se veio de link de convite, vincular ao admin (OBRIGATÓRIO para cliente)
       if (adminConvite) {
         clienteParaFirestore.adminId = adminConvite.id;
         clienteParaFirestore.adminNome = adminConvite.nomeAgencia || adminConvite.nome;
         clienteParaFirestore.dataVinculo = new Date().toISOString();
         clienteParaFirestore.observacoes = `Cliente cadastrado via link de convite de ${adminConvite.nomeAgencia || adminConvite.nome}`;
         console.log('🔗 Cliente vinculado ao admin:', adminConvite.id, '-', adminConvite.nomeAgencia);
+      } else {
+        // Esta situação não deve mais acontecer (validação anterior)
+        throw new Error('Cliente deve ser vinculado a um admin');
       }
 
       // Adicionar CPF ou CNPJ apenas se existir
@@ -355,23 +367,15 @@ const Register: React.FC = () => {
         (clienteParaFirestore as any).cnpj = formData.cnpj.replace(/[^\d]/g, '');
       }
 
-      console.log('📝 Salvando cliente no Firestore...', clienteParaFirestore);
+      console.log('📝 Salvando cliente no Firestore (coleção clientes)...', clienteParaFirestore);
 
-      // 3. Salvar cliente: 
-      //    - Se vinculado a admin: salvar em admins/{adminId}/clientes/{clienteId}
-      //    - Se órfão: salvar apenas em users (será buscado depois de um admin vinculá-lo)
-      
-      if (adminConvite) {
-        // Salvar na subcoleção do admin
-        try {
-          await setDoc(doc(db, 'admins', adminConvite.id, 'clientes', uid), clienteParaFirestore);
-          console.log('✅ Cliente salvo na subcoleção do admin:', adminConvite.id);
-        } catch (subcolError: any) {
-          console.error('❌ Erro ao salvar cliente na subcoleção do admin:', subcolError);
-          throw subcolError;
-        }
-      } else {
-        console.log('⚠️ Cliente cadastrado sem vínculo com admin (órfão)');
+      // 3. Salvar sempre na coleção clientes/{uid} (OBRIGATÓRIO com adminId)
+      try {
+        await setDoc(doc(db, 'clientes', uid), clienteParaFirestore);
+        console.log('✅ Cliente salvo na coleção clientes:', uid);
+      } catch (clientesError: any) {
+        console.error('❌ Erro ao salvar cliente na coleção clientes:', clientesError);
+        throw clientesError;
       }
 
       // 4. Criar documento do usuário no Firestore (coleção users)
@@ -384,14 +388,10 @@ const Register: React.FC = () => {
         clienteId: uid,
         status: 'ativo',
         dataCadastro: new Date().toISOString(),
-        uid: uid
+        uid: uid,
+        adminId: adminConvite!.id,
+        adminNome: adminConvite!.nomeAgencia || adminConvite!.nome
       };
-
-      // Vincular usuário ao admin se veio de link de convite
-      if (adminConvite) {
-        userDataFirestore.adminId = adminConvite.id;
-        userDataFirestore.adminNome = adminConvite.nomeAgencia || adminConvite.nome;
-      }
 
       await setDoc(doc(db, 'users', uid), userDataFirestore);
       console.log('✅ Documento de usuário criado no Firestore (coleção users)');

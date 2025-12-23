@@ -376,37 +376,31 @@ export const listarClientesParaPromocao = async (): Promise<any[]> => {
 
 /**
  * Vincula um cliente a um admin
- * Salva na subcoleção admins/{adminId}/clientes/{clienteId}
- * Atualiza também em users/{clienteId}
+ * Atualiza adminId em clientes/{clienteId}
  */
 export const vincularClienteAoAdmin = async (clienteId: string, adminId: string): Promise<boolean> => {
   try {
-    // 1. Obter dados do cliente do Firestore (users collection)
-    const userDoc = await getDoc(doc(db, 'users', clienteId));
-    if (!userDoc.exists()) {
-      console.error('❌ Cliente não encontrado em users:', clienteId);
+    // 1. Obter dados do cliente de clientes/{clienteId}
+    const clienteDoc = await getDoc(doc(db, 'clientes', clienteId));
+    if (!clienteDoc.exists()) {
+      console.error('❌ Cliente não encontrado em clientes:', clienteId);
       return false;
     }
     
-    const userData = userDoc.data();
     const adminData = (await getDoc(doc(db, 'admins', adminId))).data();
     const nomeAgencia = adminData?.nomeAgencia || adminData?.nome;
     
-    // 2. Salvar na subcoleção admins/{adminId}/clientes/{clienteId}
-    const clienteData = {
-      ...userData,
-      id: clienteId,
+    // 2. Atualizar em clientes/{clienteId}
+    await updateDoc(doc(db, 'clientes', clienteId), {
       adminId,
       adminNome: nomeAgencia,
       dataVinculo: new Date().toISOString()
-    };
-    
-    await setDoc(doc(db, 'admins', adminId, 'clientes', clienteId), clienteData);
-    console.log('✅ Cliente vinculado ao admin na subcoleção');
+    });
+    console.log('✅ Cliente vinculado ao admin em clientes');
 
-    // 3. Atualizar em users/{clienteId}
+    // 3. Atualizar também em users/{clienteId}
     try {
-      await updateDoc(doc(db, 'users', clienteId), { 
+      await updateDoc(doc(db, 'users', clienteId), {
         adminId,
         adminNome: nomeAgencia,
         dataVinculo: new Date().toISOString()
@@ -425,17 +419,18 @@ export const vincularClienteAoAdmin = async (clienteId: string, adminId: string)
 
 /**
  * Obtém todos os clientes de um admin específico
- * Busca na subcoleção admins/{adminId}/clientes
+ * Busca na coleção clientes com adminId == adminId
  */
 export const getClientesDoAdmin = async (adminId: string): Promise<any[]> => {
   try {
-    const subcolSnapshot = await getDocs(collection(db, 'admins', adminId, 'clientes'));
-    const clientesSubcol = subcolSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const q = query(collection(db, 'clientes'), where('adminId', '==', adminId));
+    const snapshot = await getDocs(q);
+    const clientes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
-    if (clientesSubcol.length > 0) {
-      console.log(`📊 Admin ${adminId}: ${clientesSubcol.length} clientes encontrados`);
+    if (clientes.length > 0) {
+      console.log(`📊 Admin ${adminId}: ${clientes.length} clientes encontrados`);
     }
-    return clientesSubcol;
+    return clientes;
   } catch (error) {
     console.error('Erro ao buscar clientes do admin:', error);
     return [];
