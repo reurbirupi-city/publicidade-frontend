@@ -35,7 +35,8 @@ service cloud.firestore {
     // Coleção de usuários
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create, update: if isAdmin() || isOwner(userId);
+      allow create: if isOwner(userId) || isAdmin();
+      allow update: if isAdmin() || isOwner(userId);
       allow delete: if false;
     }    // Coleção de solicitações
     match /solicitacoes/{solicitacaoId} {
