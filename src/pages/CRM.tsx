@@ -277,6 +277,7 @@ const CRM: React.FC = () => {
   ];
 
   // Função para vincular cliente órfão ao admin atual
+  // Função para vincular cliente ao admin (para webmaster)
   const handleVincularCliente = async (clienteId: string) => {
     if (!adminAtual) {
       alert('Erro: Admin não identificado');
@@ -284,49 +285,44 @@ const CRM: React.FC = () => {
     }
     
     try {
-      // Atualizar no Firestore
-      await updateDoc(doc(db, 'clientes', clienteId), {
-        adminId: adminAtual.id,
-        adminNome: adminAtual.nomeAgencia || adminAtual.nome,
-        dataVinculo: new Date().toISOString()
-      });
+      console.log('🔗 Tentando vincular cliente', clienteId, 'ao admin', adminAtual.id);
       
-      // Salvar também na subcoleção admins/{adminId}/clientes/{clienteId}
-      const clienteVinculado = clientesOrfaos.find(c => c.id === clienteId);
-      if (clienteVinculado) {
-        await setDoc(doc(db, 'admins', adminAtual.id, 'clientes', clienteId), {
-          ...clienteVinculado,
-          adminId: adminAtual.id,
-          adminNome: adminAtual.nomeAgencia || adminAtual.nome,
-          dataVinculo: new Date().toISOString()
-        });
+      // Usar a função vincularClienteAoAdmin que já trata ambos casos:
+      // 1. Cliente só em localStorage (cria no Firestore e vincula)
+      // 2. Cliente já em Firestore (só vincula)
+      const { vincularClienteAoAdmin } = await import('../services/adminService');
+      const sucesso = await vincularClienteAoAdmin(clienteId, adminAtual.id);
+      
+      if (sucesso) {
+        // Atualizar a lista local de clientes
+        const cliente = clientes.find(c => c.id === clienteId) || clientesOrfaos.find(c => c.id === clienteId);
+        if (cliente) {
+          const clienteAtualizado = {
+            ...cliente,
+            adminId: adminAtual.id,
+            adminNome: adminAtual.nomeAgencia || adminAtual.nome,
+            dataVinculo: new Date().toISOString()
+          };
+          
+          // Remover de órfãos se estava lá
+          setClientesOrfaos(prev => prev.filter(c => c.id !== clienteId));
+          
+          // Atualizar na lista de clientes
+          if (clientes.find(c => c.id === clienteId)) {
+            setClientes(prev => prev.map(c => c.id === clienteId ? clienteAtualizado : c));
+          } else {
+            setClientes(prev => [...prev, clienteAtualizado]);
+          }
+        }
+        
+        console.log('✅ Cliente vinculado ao admin:', clienteId, '->', adminAtual.id);
+        alert('✅ Cliente vinculado com sucesso ao admin!');
+      } else {
+        alert('❌ Erro ao vincular cliente. Verifique o console.');
       }
-      
-      // Atualizar também na coleção users
-      try {
-        await updateDoc(doc(db, 'users', clienteId), {
-          adminId: adminAtual.id,
-          adminNome: adminAtual.nomeAgencia || adminAtual.nome
-        });
-      } catch (e) {
-        console.log('Usuário não encontrado na coleção users (pode ser normal)');
-      }
-      
-      // Mover da lista de órfãos para a lista de clientes
-      if (clienteVinculado) {
-        setClientesOrfaos(prev => prev.filter(c => c.id !== clienteId));
-        setClientes(prev => [...prev, { 
-          ...clienteVinculado, 
-          adminId: adminAtual.id,
-          adminNome: adminAtual.nomeAgencia || adminAtual.nome 
-        }]);
-      }
-      
-      console.log('✅ Cliente vinculado ao admin:', clienteId, '->', adminAtual.id);
-      alert('Cliente vinculado com sucesso!');
     } catch (error) {
       console.error('❌ Erro ao vincular cliente:', error);
-      alert('Erro ao vincular cliente. Tente novamente.');
+      alert('❌ Erro ao vincular cliente. Tente novamente.');
     }
   };
 
@@ -1014,6 +1010,27 @@ const CRM: React.FC = () => {
                       <Briefcase className="w-5 h-5" />
                       Ações do Cliente
                     </h4>
+                    
+                    {/* Botão de vincular se cliente não tiver admin e for webmaster */}
+                    {!selectedCliente.adminId && isWebmaster(user?.email || '') && (
+                      <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                        <p className="text-amber-700 dark:text-amber-400 mb-3 font-semibold">
+                          Este cliente ainda não está vinculado a nenhum admin
+                        </p>
+                        <button
+                          onClick={() => {
+                            if (adminAtual) {
+                              handleVincularCliente(selectedCliente.id);
+                            }
+                          }}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg transition-all font-semibold"
+                        >
+                          <UserPlus className="w-5 h-5" />
+                          Vincular a um Admin
+                        </button>
+                      </div>
+                    )}
+                    
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <button
                         onClick={handleAbrirCotacao}
