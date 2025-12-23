@@ -278,7 +278,7 @@ const Solicitacoes: React.FC = () => {
       // Notificar cliente
       if (solicitacao.clienteId) {
         await notificarNovaMensagem(
-          solicitacao.clienteId,
+          'cliente',
           solicitacao.clienteId,
           'Equipe',
           texto.substring(0, 50) + (texto.length > 50 ? '...' : ''),
@@ -329,7 +329,7 @@ const Solicitacoes: React.FC = () => {
       // Notificar cliente sobre nova mensagem
       if (selectedSolicitacao.clienteId) {
         await notificarNovaMensagem(
-          selectedSolicitacao.clienteId,
+          'cliente',
           selectedSolicitacao.clienteId,
           'Equipe',
           resposta.substring(0, 50) + (resposta.length > 50 ? '...' : ''),

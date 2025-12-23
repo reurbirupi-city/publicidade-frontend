@@ -964,14 +964,18 @@ const ClientPortal: React.FC = () => {
       });
 
       // Notificar admin sobre nova mensagem do cliente
-      await notificarNovaMensagem(
-        'admin',
-        'admin',
-        clientData?.nome || user?.email || 'Cliente',
-        texto.substring(0, 50) + (texto.length > 50 ? '...' : ''),
-        solicitacao.id
-      );
-      console.log('🔔 Notificação enviada: nova mensagem do cliente');
+      if (clientData?.adminId) {
+        await notificarNovaMensagem(
+          'admin',
+          clientData.adminId,
+          clientData?.nome || user?.email || 'Cliente',
+          texto.substring(0, 50) + (texto.length > 50 ? '...' : ''),
+          solicitacao.id
+        );
+        console.log('🔔 Notificação enviada ao admin específico:', clientData.adminId);
+      } else {
+        console.warn('⚠️ Cliente sem adminId, notificação não enviada');
+      }
 
       setSolicitacoesServico(prev => prev.map(s => s.id === solicitacao.id ? { ...s, respostas: [...(s.respostas || []), novaResposta] } : s));
       setPropostasPendentes(prev => prev.map(p => p.solicitacaoId === solicitacao.id ? { ...p, respostas: [...(p.respostas || []), novaResposta] } : p));
@@ -1044,13 +1048,16 @@ const ClientPortal: React.FC = () => {
 
         // Notificar admin
         try {
-          await notificarNovaMensagem(
-            'admin',
-            'admin',
-            clientData?.nome || user?.email || 'Cliente',
-            texto.substring(0, 50) + (texto.length > 50 ? '...' : ''),
-            primeira.id
-          );
+          if (primeira.adminId) {
+            await notificarNovaMensagem(
+              'admin',
+              primeira.adminId,
+              clientData?.nome || user?.email || 'Cliente',
+              texto.substring(0, 50) + (texto.length > 50 ? '...' : ''),
+              primeira.id
+            );
+            console.log('🔔 Notificação enviada ao admin específico:', primeira.adminId);
+          }
         } catch (notifError) {
           console.warn('⚠️ Erro ao notificar admin, mas mensagem foi salva:', notifError);
         }
@@ -1092,13 +1099,16 @@ const ClientPortal: React.FC = () => {
         
         // Notificar admin
         try {
-          await notificarNovaMensagem(
-            'admin',
-            'admin',
-            clientData?.nome || user?.email || 'Cliente',
-            texto.substring(0, 50) + (texto.length > 50 ? '...' : ''),
-            novaSolicitacao.id
-          );
+          if (novaSolicitacao.adminId) {
+            await notificarNovaMensagem(
+              'admin',
+              novaSolicitacao.adminId,
+              clientData?.nome || user?.email || 'Cliente',
+              texto.substring(0, 50) + (texto.length > 50 ? '...' : ''),
+              novaSolicitacao.id
+            );
+            console.log('🔔 Notificação enviada ao admin específico:', novaSolicitacao.adminId);
+          }
         } catch (notifError) {
           console.warn('⚠️ Erro ao notificar admin, mas mensagem foi salva:', notifError);
         }
