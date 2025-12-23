@@ -41,7 +41,12 @@ service cloud.firestore {
     
     // Coleção de clientes (CRM)
     match /clientes/{clienteId} {
+      // Admin pode ler e escrever
       allow read, write: if isAdmin();
+      // Cliente pode criar seu próprio registro (uid == clienteId)
+      allow create: if isAuthenticated() && request.auth.uid == clienteId;
+      // Cliente pode ler seu próprio registro
+      allow read: if isAuthenticated() && request.auth.uid == clienteId;
     }
     
     // Coleção de solicitações

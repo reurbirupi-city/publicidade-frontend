@@ -355,14 +355,14 @@ const Register: React.FC = () => {
         (clienteParaFirestore as any).cnpj = formData.cnpj.replace(/[^\d]/g, '');
       }
 
-      console.log('📝 Salvando cliente no Firestore (coleção clientes)...', clienteParaFirestore);
+      console.log('📝 Salvando cliente no Firestore...', clienteParaFirestore);
 
-      // 3. Salvar na coleção "clientes" do Firestore
+      // 3. Salvar na coleção "clientes" do Firestore (sempre, para todos os clientes)
       try {
         await setDoc(doc(db, 'clientes', uid), clienteParaFirestore);
         console.log('✅ Cliente salvo na coleção clientes do Firestore:', uid);
       } catch (firestoreError: any) {
-        console.error('❌ ERRO ao salvar cliente no Firestore:', firestoreError);
+        console.error('❌ ERRO ao salvar cliente na coleção clientes:', firestoreError);
         console.error('Código do erro:', firestoreError.code);
         console.error('Mensagem:', firestoreError.message);
         // Não interrompe o fluxo
