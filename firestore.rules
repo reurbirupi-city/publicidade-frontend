@@ -21,7 +21,10 @@ service cloud.firestore {
     // Coleção de admins (gestão multi-admin)
     match /admins/{adminId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      // Admin pode criar seu próprio documento no cadastro (quando adminId == request.auth.uid)
+      // Admins existentes podem atualizar/deletar outros admins
+      allow create: if isAuthenticated() && request.auth.uid == adminId;
+      allow update, delete: if isAdmin();
       
       // ============================================================================
       // SUBCOLEÇÃO: clientes de cada admin

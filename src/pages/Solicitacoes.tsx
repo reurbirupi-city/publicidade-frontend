@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, doc, updateDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { isWebmaster, getAdminByEmail, getClientesDoAdmin } from '../services/adminService';
@@ -89,65 +89,83 @@ const Solicitacoes: React.FC = () => {
   const [resposta, setResposta] = useState('');
 
   useEffect(() => {
-    const carregarSolicitacoes = async () => {
-      if (!user?.email) return;
+    if (!user?.email) return;
+    
+    const colRef = collection(db, 'solicitacoes_clientes');
+    let unsubscribe: () => void;
+    
+    const iniciarListener = async () => {
+      setLoading(true);
       
       try {
-        setLoading(true);
-        const colRef = collection(db, 'solicitacoes_clientes');
-        let dados: any[] = [];
-        
+        const userEmail = user.email || '';
         // Verificar se é webmaster (vê tudo) ou admin comum (vê só seus clientes)
-        if (isWebmaster(user.email)) {
-          // Webmaster vê todas as solicitações
-          const snapshot = await getDocs(colRef);
-          dados = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          console.log('👑 Webmaster: carregando todas as solicitações:', dados.length);
+        if (isWebmaster(userEmail)) {
+          // Webmaster vê todas as solicitações em tempo real
+          unsubscribe = onSnapshot(colRef, (snapshot) => {
+            const dados = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+            console.log('👑 Webmaster: atualizando solicitações em tempo real:', dados.length);
+            setSolicitacoes(dados);
+            setLoading(false);
+          }, (error) => {
+            console.error('❌ Erro no listener:', error);
+            setLoading(false);
+          });
         } else {
           // Admin comum: buscar apenas de seus clientes
-          const admin = await getAdminByEmail(user.email);
+          const admin = await getAdminByEmail(userEmail);
           if (admin) {
             // Buscar IDs dos clientes do admin
             const clientesDoAdmin = await getClientesDoAdmin(admin.id);
             const clienteIds = clientesDoAdmin.map(c => c.id);
             
-            // Buscar TODAS as solicitações e filtrar por:
-            // 1. clienteId está na lista de clientes do admin OU
-            // 2. adminId da solicitação é igual ao ID do admin
-            const snapshot = await getDocs(colRef);
-            dados = snapshot.docs
-              .map(doc => ({ id: doc.id, ...doc.data() }))
-              .filter((sol: any) => 
-                clienteIds.includes(sol.clienteId) || sol.adminId === admin.id
-              );
-            console.log(`📋 Admin ${admin.nome}: carregando ${dados.length} solicitações (${clienteIds.length} clientes vinculados)`);
-            
-            if (dados.length === 0 && clienteIds.length === 0) {
-              console.log('⚠️ Admin sem clientes vinculados e sem solicitações diretas');
-            }
+            // Listener em tempo real filtrando por clientes do admin
+            unsubscribe = onSnapshot(colRef, (snapshot) => {
+              const dados = snapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter((sol: any) => 
+                  clienteIds.includes(sol.clienteId) || sol.adminId === admin.id
+                );
+              console.log(`📋 Admin ${admin.nome}: atualizando ${dados.length} solicitações em tempo real`);
+              setSolicitacoes(dados);
+              setLoading(false);
+            }, (error) => {
+              console.error('❌ Erro no listener:', error);
+              setLoading(false);
+            });
           } else {
-            // Fallback: carregar todas (para admins não cadastrados ainda)
-            const snapshot = await getDocs(colRef);
-            dados = snapshot.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            }));
-            console.log('⚠️ Admin não encontrado no sistema, mostrando todas:', dados.length);
+            // Fallback: carregar todas em tempo real
+            unsubscribe = onSnapshot(colRef, (snapshot) => {
+              const dados = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+              }));
+              console.log('⚠️ Admin não encontrado, mostrando todas em tempo real:', dados.length);
+              setSolicitacoes(dados);
+              setLoading(false);
+            }, (error) => {
+              console.error('❌ Erro no listener:', error);
+              setLoading(false);
+            });
           }
         }
-        
-        setSolicitacoes(dados);
       } catch (error) {
-        console.error('❌ Erro ao carregar solicitações:', error);
-      } finally {
+        console.error('❌ Erro ao iniciar listener:', error);
         setLoading(false);
       }
     };
 
-    carregarSolicitacoes();
+    iniciarListener();
+    
+    // Cleanup: parar listener ao desmontar
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [user]);
 
   const handleCriarProposta = (solicitacao: any) => {
