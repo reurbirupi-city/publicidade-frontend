@@ -1015,7 +1015,12 @@ const ClientPortal: React.FC = () => {
 
   // Enviar mensagem via chat WhatsApp
   const handleEnviarMensagemChat = async (texto: string) => {
-    if (!texto.trim()) return;
+    if (!texto.trim()) {
+      console.warn('⚠️ Texto vazio, não enviar');
+      return;
+    }
+
+    console.log('📤 Iniciando envio de mensagem do chat:', { texto, user: user?.uid, clientData });
 
     const novaResposta = {
       texto,
@@ -1027,6 +1032,8 @@ const ClientPortal: React.FC = () => {
       // Se já existe alguma solicitação, adicionar mensagem na primeira
       if (solicitacoesServico.length > 0) {
         const primeira = solicitacoesServico[0];
+        console.log('📝 Adicionando resposta à solicitação existente:', primeira.id);
+        
         const docRef = doc(db, 'solicitacoes_clientes', primeira.id);
         const respostasExistentes = primeira.respostas || [];
         
@@ -1036,13 +1043,17 @@ const ClientPortal: React.FC = () => {
         });
 
         // Notificar admin
-        await notificarNovaMensagem(
-          'admin',
-          'admin',
-          clientData?.nome || user?.email || 'Cliente',
-          texto.substring(0, 50) + (texto.length > 50 ? '...' : ''),
-          primeira.id
-        );
+        try {
+          await notificarNovaMensagem(
+            'admin',
+            'admin',
+            clientData?.nome || user?.email || 'Cliente',
+            texto.substring(0, 50) + (texto.length > 50 ? '...' : ''),
+            primeira.id
+          );
+        } catch (notifError) {
+          console.warn('⚠️ Erro ao notificar admin, mas mensagem foi salva:', notifError);
+        }
 
         setSolicitacoesServico(prev => prev.map(s => 
           s.id === primeira.id 
@@ -1075,24 +1086,31 @@ const ClientPortal: React.FC = () => {
           novaSolicitacao.adminNome = clientData.adminNome;
         }
 
+        console.log('📝 Criando nova solicitação:', novaSolicitacao);
+
         await setDoc(doc(db, 'solicitacoes_clientes', novaSolicitacao.id), novaSolicitacao);
         
         // Notificar admin
-        await notificarNovaMensagem(
-          'admin',
-          'admin',
-          clientData?.nome || user?.email || 'Cliente',
-          texto.substring(0, 50) + (texto.length > 50 ? '...' : ''),
-          novaSolicitacao.id
-        );
+        try {
+          await notificarNovaMensagem(
+            'admin',
+            'admin',
+            clientData?.nome || user?.email || 'Cliente',
+            texto.substring(0, 50) + (texto.length > 50 ? '...' : ''),
+            novaSolicitacao.id
+          );
+        } catch (notifError) {
+          console.warn('⚠️ Erro ao notificar admin, mas mensagem foi salva:', notifError);
+        }
 
         setSolicitacoesServico(prev => [novaSolicitacao, ...prev]);
       }
 
-      console.log('✅ Mensagem enviada via chat');
+      console.log('✅ Mensagem enviada via chat com sucesso!');
     } catch (error) {
-      console.error('❌ Erro ao enviar mensagem via chat:', error);
-      throw error;
+      console.error('❌ Erro crítico ao enviar mensagem via chat:', error);
+      // Não throw, deixar o chat continuar funcionando
+      alert('Erro ao enviar mensagem. Tente novamente.');
     }
   };
 
