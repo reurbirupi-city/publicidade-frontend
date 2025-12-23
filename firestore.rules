@@ -27,8 +27,10 @@ service cloud.firestore {
       // SUBCOLEÇÃO: clientes de cada admin
       // ============================================================================
       match /clientes/{clienteId} {
-        // Admin pode gerenciar seus clientes
-        allow read, write: if isAuthenticated() && request.auth.uid == adminId;
+        // Admin pode ler e escrever seus próprios clientes
+        // O request.auth.uid deve ser o ID do admin na coleção admins
+        allow read, write: if isAdmin() && 
+                              request.auth.uid == adminId;
       }
     }
     
