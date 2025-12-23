@@ -2691,6 +2691,7 @@ const ClientPortal: React.FC = () => {
             setContratoSelecionado(null);
           }}
           contratoId={contratoSelecionado.id}
+          adminName={clientData?.adminNome || 'Gestor de Projeto'}
           cliente={{
             nome: clientData.nome,
             empresa: clientData.empresa,

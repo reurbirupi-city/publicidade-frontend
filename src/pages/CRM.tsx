@@ -1425,6 +1425,7 @@ const CRM: React.FC = () => {
         <ModalContratoAssinatura
           isOpen={showModalContrato}
           onClose={() => setShowModalContrato(false)}
+          adminName={adminAtual?.nome || user?.displayName || 'Gestor de Projeto'}
           cliente={{
             nome: selectedCliente.nome,
             empresa: selectedCliente.empresa,

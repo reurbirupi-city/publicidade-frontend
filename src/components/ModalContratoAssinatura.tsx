@@ -16,6 +16,7 @@ interface ModalContratoAssinaturaProps {
   isOpen: boolean;
   onClose: () => void;
   contratoId?: string;
+  adminName?: string;
   cliente: {
     nome: string;
     empresa: string;
@@ -36,6 +37,7 @@ const ModalContratoAssinatura: React.FC<ModalContratoAssinaturaProps> = ({
   isOpen,
   onClose,
   contratoId,
+  adminName,
   cliente,
   servicos,
   valorTotal,
@@ -102,7 +104,7 @@ const ModalContratoAssinatura: React.FC<ModalContratoAssinaturaProps> = ({
 
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text('Creative Agency - Soluções Criativas', pageWidth / 2, 25, { align: 'center' });
+      doc.text(adminName || 'Creative Agency - Soluções Criativas', pageWidth / 2, 25, { align: 'center' });
 
       yPos = 45;
 
@@ -155,13 +157,13 @@ const ModalContratoAssinatura: React.FC<ModalContratoAssinaturaProps> = ({
       
       doc.setFont('helvetica', 'normal');
       yPos += 6;
-      doc.text('Razão Social: Creative Agency LTDA', margin + 5, yPos);
+      doc.text(`Razão Social: ${adminName || 'Creative Agency LTDA'}`, margin + 5, yPos);
       yPos += 5;
-      doc.text('CNPJ: 12.345.678/0001-90', margin + 5, yPos);
+      doc.text('CNPJ: A ser preenchido', margin + 5, yPos);
       yPos += 5;
-      doc.text('E-mail: contato@creativeagency.com', margin + 5, yPos);
+      doc.text('E-mail: A ser preenchido', margin + 5, yPos);
       yPos += 5;
-      doc.text('Telefone: (11) 9999-9999', margin + 5, yPos);
+      doc.text('Telefone: A ser preenchido', margin + 5, yPos);
 
       yPos += 15;
 
@@ -417,10 +419,10 @@ const ModalContratoAssinatura: React.FC<ModalContratoAssinaturaProps> = ({
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 0, 0);
-      doc.text('João Silva', pageWidth - margin - 80, yPosEmpresa + imgHeight + 8);
+      doc.text(adminName || 'Gestor de Projeto', pageWidth - margin - 80, yPosEmpresa + imgHeight + 8);
       doc.setFont('helvetica', 'normal');
-      doc.text('Creative Agency LTDA - CONTRATADA', pageWidth - margin - 80, yPosEmpresa + imgHeight + 12);
-      doc.text('CNPJ: 12.345.678/0001-90', pageWidth - margin - 80, yPosEmpresa + imgHeight + 16);
+      doc.text(`${adminName || 'Creative Agency'} - CONTRATADA`, pageWidth - margin - 80, yPosEmpresa + imgHeight + 12);
+      doc.text('CNPJ: A ser preenchido', pageWidth - margin - 80, yPosEmpresa + imgHeight + 16);
 
       // ========== RODAPÉ COM INFORMAÇÕES DE AUTENTICIDADE ==========
       const footerY = pageHeight - 25;
