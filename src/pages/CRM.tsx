@@ -151,6 +151,12 @@ const CRM: React.FC = () => {
   const [showModalProposta, setShowModalProposta] = useState(false);
   const [showModalContrato, setShowModalContrato] = useState(false);
   const [showModalFinalizar, setShowModalFinalizar] = useState(false);
+  const [showModalVincularAdmin, setShowModalVincularAdmin] = useState(false);
+  
+  // Estados para vincular cliente a admin
+  const [clienteParaVincular, setClienteParaVincular] = useState<Cliente | null>(null);
+  const [listaAdmins, setListaAdmins] = useState<any[]>([]);
+  const [adminSelecionado, setAdminSelecionado] = useState<string>('');
   
   // Dados temporários para fluxo entre modais
   const [servicosCotados, setServicosCotados] = useState<any[]>([]);
@@ -221,6 +227,30 @@ const CRM: React.FC = () => {
     carregarClientesFirestore();
   }, [user]);
 
+  // Carregar lista de admins se for webmaster
+  useEffect(() => {
+    const carregarAdmins = async () => {
+      if (!user?.email || !isWebmaster(user.email)) return;
+      
+      try {
+        console.log('📋 Carregando lista de admins para webmaster...');
+        const q = query(collection(db, 'admins'));
+        const snapshot = await getDocs(q);
+        const admins = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data() as any
+        }));
+        
+        setListaAdmins(admins);
+        console.log('✅ Admins carregados:', admins.length);
+      } catch (error) {
+        console.error('❌ Erro ao carregar admins:', error);
+      }
+    };
+    
+    carregarAdmins();
+  }, [user]);
+
   // Salva no localStorage sempre que clientes mudar (mantido para compatibilidade)
   useEffect(() => {
     saveClientes(clientes as any[]);
@@ -277,30 +307,38 @@ const CRM: React.FC = () => {
   ];
 
   // Função para vincular cliente órfão ao admin atual
-  // Função para vincular cliente ao admin (para webmaster)
-  const handleVincularCliente = async (clienteId: string) => {
-    if (!adminAtual) {
-      alert('Erro: Admin não identificado');
+  // Função para iniciar processo de vincular cliente (abre modal de seleção de admin)
+  const handleAbrirModalVincular = (cliente: Cliente) => {
+    setClienteParaVincular(cliente);
+    setAdminSelecionado('');
+    setShowModalVincularAdmin(true);
+  };
+
+  // Função para vincular cliente a um admin específico
+  const handleVincularClienteAoAdmin = async (clienteId: string, adminIdAlvo: string) => {
+    if (!adminIdAlvo) {
+      alert('⚠️ Selecione um admin');
       return;
     }
     
     try {
-      console.log('🔗 Tentando vincular cliente', clienteId, 'ao admin', adminAtual.id);
+      console.log('🔗 Tentando vincular cliente', clienteId, 'ao admin', adminIdAlvo);
       
-      // Usar a função vincularClienteAoAdmin que já trata ambos casos:
-      // 1. Cliente só em localStorage (cria no Firestore e vincula)
-      // 2. Cliente já em Firestore (só vincula)
       const { vincularClienteAoAdmin } = await import('../services/adminService');
-      const sucesso = await vincularClienteAoAdmin(clienteId, adminAtual.id);
+      const sucesso = await vincularClienteAoAdmin(clienteId, adminIdAlvo);
       
       if (sucesso) {
+        // Obter dados do admin vinculado
+        const adminVinculado = listaAdmins.find(a => a.id === adminIdAlvo);
+        const nomeAdminVinculado = adminVinculado?.nomeAgencia || adminVinculado?.nome;
+        
         // Atualizar a lista local de clientes
         const cliente = clientes.find(c => c.id === clienteId) || clientesOrfaos.find(c => c.id === clienteId);
         if (cliente) {
           const clienteAtualizado = {
             ...cliente,
-            adminId: adminAtual.id,
-            adminNome: adminAtual.nomeAgencia || adminAtual.nome,
+            adminId: adminIdAlvo,
+            adminNome: nomeAdminVinculado,
             dataVinculo: new Date().toISOString()
           };
           
@@ -313,10 +351,17 @@ const CRM: React.FC = () => {
           } else {
             setClientes(prev => [...prev, clienteAtualizado]);
           }
+          
+          // Atualizar cliente selecionado se estiver no modal
+          if (selectedCliente?.id === clienteId) {
+            setSelectedCliente(clienteAtualizado);
+          }
         }
         
-        console.log('✅ Cliente vinculado ao admin:', clienteId, '->', adminAtual.id);
-        alert('✅ Cliente vinculado com sucesso ao admin!');
+        console.log('✅ Cliente vinculado ao admin:', clienteId, '->', adminIdAlvo);
+        alert(`✅ Cliente vinculado com sucesso a ${nomeAdminVinculado}!`);
+        setShowModalVincularAdmin(false);
+        setClienteParaVincular(null);
       } else {
         alert('❌ Erro ao vincular cliente. Verifique o console.');
       }
@@ -893,11 +938,11 @@ const CRM: React.FC = () => {
               {/* Botão de vincular para clientes órfãos */}
               {isOrfao && adminAtual && (
                 <button
-                  onClick={() => handleVincularCliente(cliente.id)}
+                  onClick={() => handleAbrirModalVincular(cliente)}
                   className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg transition-all font-semibold"
                 >
                   <Link2 className="w-4 h-4" />
-                  Vincular a mim
+                  Vincular a um Admin
                 </button>
               )}
             </div>
@@ -1018,11 +1063,7 @@ const CRM: React.FC = () => {
                           Este cliente ainda não está vinculado a nenhum admin
                         </p>
                         <button
-                          onClick={() => {
-                            if (adminAtual) {
-                              handleVincularCliente(selectedCliente.id);
-                            }
-                          }}
+                          onClick={() => handleAbrirModalVincular(selectedCliente)}
                           className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg transition-all font-semibold"
                         >
                           <UserPlus className="w-5 h-5" />
@@ -1423,6 +1464,93 @@ const CRM: React.FC = () => {
           }}
           onFinalizar={handleFinalizarServico}
         />
+      )}
+
+      {/* Modal de Seleção de Admin para Vincular Cliente */}
+      {showModalVincularAdmin && clienteParaVincular && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full border border-gray-200 dark:border-gray-800">
+            <div className="border-b border-gray-200 dark:border-gray-800 p-6 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Vincular Cliente
+              </h2>
+              <button
+                onClick={() => {
+                  setShowModalVincularAdmin(false);
+                  setClienteParaVincular(null);
+                  setAdminSelecionado('');
+                }}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  Cliente: <span className="font-semibold text-gray-900 dark:text-white">{clienteParaVincular.nome}</span>
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Empresa: <span className="font-semibold text-gray-900 dark:text-white">{clienteParaVincular.empresa}</span>
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-3">
+                  Selecione o Admin
+                </label>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {listaAdmins.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 p-3 text-center">
+                      Nenhum admin disponível
+                    </p>
+                  ) : (
+                    listaAdmins.map((admin) => (
+                      <button
+                        key={admin.id}
+                        onClick={() => setAdminSelecionado(admin.id)}
+                        className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                          adminSelecionado === admin.id
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                            : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                        }`}
+                      >
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          {admin.nomeAgencia || admin.nome}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {admin.email}
+                        </p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => {
+                    setShowModalVincularAdmin(false);
+                    setClienteParaVincular(null);
+                    setAdminSelecionado('');
+                  }}
+                  className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleVincularClienteAoAdmin(clienteParaVincular.id, adminSelecionado)}
+                  disabled={!adminSelecionado}
+                  className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <UserPlus className="w-5 h-5" />
+                  Vincular
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Tutorial Overlay */}
