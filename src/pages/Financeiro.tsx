@@ -206,14 +206,19 @@ const Financeiro: React.FC = () => {
 
   const handleCriarTransacao = async (novaTransacao: Transacao) => {
     try {
-      // Adicionar adminId à transação
+      // Adicionar adminId à transação e remover campos undefined
       const transacaoComAdmin = {
         ...novaTransacao,
         adminId: adminId || ''
       };
       
+      // Remover campos undefined (Firestore não aceita undefined)
+      const transacaoLimpa = Object.fromEntries(
+        Object.entries(transacaoComAdmin).filter(([_, value]) => value !== undefined)
+      );
+      
       // Salvar no Firestore
-      const docRef = await addDoc(collection(db, 'transacoes'), transacaoComAdmin);
+      const docRef = await addDoc(collection(db, 'transacoes'), transacaoLimpa);
       
       // Atualizar estado local
       setTransacoes(prev => [...prev, { ...transacaoComAdmin, id: docRef.id }]);
@@ -242,11 +247,16 @@ const Financeiro: React.FC = () => {
         return;
       }
       
+      // Remover campos undefined (Firestore não aceita undefined)
+      const transacaoLimpa = Object.fromEntries(
+        Object.entries({
+          ...transacaoAtualizada,
+          atualizadoEm: new Date().toISOString()
+        }).filter(([_, value]) => value !== undefined)
+      );
+      
       // Atualizar no Firestore
-      await updateDoc(doc(db, 'transacoes', transacaoAtualizada.id), {
-        ...transacaoAtualizada,
-        atualizadoEm: new Date().toISOString()
-      });
+      await updateDoc(doc(db, 'transacoes', transacaoAtualizada.id), transacaoLimpa);
       
       // Atualizar estado local
       setTransacoes(prev => 
