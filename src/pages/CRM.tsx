@@ -36,7 +36,7 @@ import ModalFinalizarServico from '../components/ModalFinalizarServico';
 import { db } from '../services/firebase';
 import { collection, getDocs, query, where, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { isWebmaster, getAdminByEmail } from '../services/adminService';
+import { isWebmaster, getAdminByEmail, getClientesDoAdmin } from '../services/adminService';
 
 // Tipos auxiliares para o módulo de clientes
 interface ServicoContratado {
@@ -183,80 +183,48 @@ const CRM: React.FC = () => {
         let clientesFirestore: any[] = [];
         let orfaos: any[] = [];
         
-        // Verificar se é webmaster (vê tudo) ou admin comum (vê só seus clientes)
+        const admin = await getAdminByEmail(user.email);
+        if (!admin) {
+          console.log('⚠️ CRM: Admin não encontrado');
+          setClientes([]);
+          return;
+        }
+        
+        setAdminAtual(admin);
+        
+        // Buscar clientes vinculados a este admin usando getClientesDoAdmin
+        clientesFirestore = await getClientesDoAdmin(admin.id);
+        console.log(`📋 CRM: Carregou ${clientesFirestore.length} clientes para admin ${admin.nome}`);
+        
+        // Se for webmaster, também buscar órfãos para mostrar opção de vincular
         if (isWebmaster(user.email)) {
-          // Webmaster vê todos os clientes
-          const q = query(collection(db, 'clientes'));
-          const querySnapshot = await getDocs(q);
-          querySnapshot.forEach((doc) => {
-            const data = { ...doc.data() as any, id: doc.id };
-            clientesFirestore.push(data);
-            // Identificar órfãos (sem adminId)
-            if (!data.adminId) {
-              orfaos.push(data);
+          // Buscar TODOS os docs de todos os admins para encontrar órfãos
+          const adminCollections = await getDocs(collection(db, 'admins'));
+          const todosClientsIds = new Set<string>();
+          
+          // Coletar IDs de todos os clientes em todas as subcoleções
+          for (const adminDoc of adminCollections.docs) {
+            const clientesSubcol = await getDocs(collection(db, 'admins', adminDoc.id, 'clientes'));
+            clientesSubcol.docs.forEach(doc => {
+              todosClientsIds.add(doc.id);
+            });
+          }
+          
+          // Buscar todos os usuários que se registraram (users collection)
+          const usersSnapshot = await getDocs(collection(db, 'users'));
+          usersSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (data.tipo === 'cliente' && !todosClientsIds.has(doc.id)) {
+              orfaos.push({ id: doc.id, ...data });
             }
           });
-          console.log('👑 Webmaster: carregando todos os clientes:', clientesFirestore.length, `(${orfaos.length} órfãos)`);
-        } else {
-          // Admin comum: buscar clientes vinculados + clientes órfãos
-          const admin = await getAdminByEmail(user.email);
-          if (admin) {
-            setAdminAtual(admin);
-            
-            // Buscar clientes vinculados a este admin
-            const qVinculados = query(collection(db, 'clientes'), where('adminId', '==', admin.id));
-            const snapshotVinculados = await getDocs(qVinculados);
-            snapshotVinculados.forEach((doc) => {
-              clientesFirestore.push({ ...doc.data() as any, id: doc.id });
-            });
-            
-            // Buscar clientes órfãos (sem adminId) para o admin poder vinculá-los
-            const qTodos = query(collection(db, 'clientes'));
-            const snapshotTodos = await getDocs(qTodos);
-            snapshotTodos.forEach((doc) => {
-              const data = { ...doc.data() as any, id: doc.id };
-              if (!data.adminId) {
-                orfaos.push(data);
-              }
-            });
-            
-            console.log(`📋 Admin ${admin.nome}: ${clientesFirestore.length} clientes vinculados, ${orfaos.length} órfãos disponíveis`);
-          } else {
-            // Fallback: carregar todos (para admins não cadastrados ainda)
-            const q = query(collection(db, 'clientes'));
-            const querySnapshot = await getDocs(q);
-            querySnapshot.forEach((doc) => {
-              clientesFirestore.push({ ...doc.data(), id: doc.id });
-            });
-            console.log('⚠️ Admin não encontrado no sistema, mostrando todos:', clientesFirestore.length);
-          }
+          
+          console.log(`👑 Webmaster: encontrou ${orfaos.length} clientes órfãos`);
         }
         
         setClientesOrfaos(orfaos as any[]);
-
-        if (clientesFirestore.length > 0 || orfaos.length > 0) {
-          console.log('✅ CRM: Carregou', clientesFirestore.length, 'clientes do Firestore');
-          
-          // Mesclar com localStorage (priorizar Firestore)
-          const clientesLocal = getClientes();
-          const clientesMap = new Map();
-          
-          // Adicionar clientes locais primeiro (apenas se for webmaster)
-          if (isWebmaster(user.email)) {
-            clientesLocal.forEach(c => clientesMap.set(c.id, c));
-          }
-          
-          // Sobrescrever com clientes do Firestore
-          clientesFirestore.forEach(c => clientesMap.set(c.id, c));
-          
-          const clientesMesclados = Array.from(clientesMap.values());
-          setClientes(clientesMesclados as any[]);
-          saveClientes(clientesMesclados as any[]);
-          console.log('✅ CRM: Total de', clientesMesclados.length, 'clientes mesclados');
-        } else {
-          console.log('⚠️ CRM: Nenhum cliente encontrado no Firestore');
-          setClientes([]);
-        }
+        setClientes(clientesFirestore as any[]);
+        console.log('✅ CRM: Carregou', clientesFirestore.length, 'clientes vinculados ao admin');
       } catch (error) {
         console.error('❌ CRM: Erro ao carregar clientes do Firestore:', error);
       }
@@ -265,10 +233,9 @@ const CRM: React.FC = () => {
     carregarClientesFirestore();
   }, [user]);
 
-  // Salva no localStorage sempre que clientes mudar
+  // Salva no localStorage sempre que clientes mudar (mantido para compatibilidade)
   useEffect(() => {
     saveClientes(clientes as any[]);
-    console.log('💾 CRM: Salvou', clientes.length, 'clientes no localStorage');
   }, [clientes]);
 
   const [formData, setFormData] = useState<Partial<Cliente>>({
