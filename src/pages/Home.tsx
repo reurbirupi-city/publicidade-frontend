@@ -19,7 +19,6 @@ import {
   Star
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
-import NotificacoesBell from '../components/NotificacoesBell';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -199,7 +198,6 @@ const Home: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-4">
-                <NotificacoesBell />
                 <ThemeToggle />
                 <button
                   onClick={handleLogin}
