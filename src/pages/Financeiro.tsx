@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../services/firebase';
+import { useAuth } from '../contexts/AuthContext';
+import { isWebmaster, getAdminByEmail } from '../services/adminService';
 import {
   ArrowLeft,
   Plus,
@@ -22,7 +26,8 @@ import {
   Receipt,
   Building2,
   User,
-  FileText
+  FileText,
+  RefreshCw
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
@@ -87,254 +92,135 @@ const Financeiro: React.FC = () => {
   const [modalEditar, setModalEditar] = useState(false);
   const [modalDeletar, setModalDeletar] = useState(false);
   const [transacaoSelecionada, setTransacaoSelecionada] = useState<Transacao | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [adminId, setAdminId] = useState<string | null>(null);
 
-  // Carrega dados
+  // Auth e dados
+  const { user } = useAuth();
   const clientes = getClientes();
   const projetos = getProjetos();
 
   // ============================================================================
-  // DADOS MOCK INICIAIS
+  // CARREGAMENTO DE TRANSAÇÕES DO FIRESTORE
   // ============================================================================
 
-  const TRANSACOES_MOCK: Transacao[] = [
-    // RECEITAS
-    {
-      id: 'REC-001',
-      tipo: 'receita',
-      descricao: 'Projeto Identidade Visual Tech Innovations',
-      valor: 15000,
-      categoria: 'projeto',
-      status: 'pago',
-      dataVencimento: '2025-12-10',
-      dataPagamento: '2025-12-08',
-      formaPagamento: 'pix',
-      clienteId: '1',
-      clienteNome: 'Maria Silva',
-      projetoId: 'PROJ-2025-001',
-      projetoTitulo: 'Identidade Visual Completa',
-      recorrente: false,
-      criadoEm: '2025-11-20T10:00:00',
-      atualizadoEm: '2025-12-08T14:30:00'
-    },
-    {
-      id: 'REC-002',
-      tipo: 'receita',
-      descricao: 'Parcela 1/3 - E-commerce Moda Primavera',
-      valor: 15000,
-      categoria: 'projeto',
-      status: 'pago',
-      dataVencimento: '2025-11-05',
-      dataPagamento: '2025-11-05',
-      formaPagamento: 'transferencia',
-      clienteId: '1',
-      clienteNome: 'Maria Silva',
-      projetoId: 'PROJ-2025-004',
-      projetoTitulo: 'E-commerce Moda Primavera/Verão',
-      recorrente: false,
-      criadoEm: '2025-11-01T09:00:00',
-      atualizadoEm: '2025-11-05T10:15:00'
-    },
-    {
-      id: 'REC-003',
-      tipo: 'receita',
-      descricao: 'Parcela 2/3 - E-commerce Moda Primavera',
-      valor: 15000,
-      categoria: 'projeto',
-      status: 'pendente',
-      dataVencimento: '2025-12-20',
-      clienteId: '1',
-      clienteNome: 'Maria Silva',
-      projetoId: 'PROJ-2025-004',
-      projetoTitulo: 'E-commerce Moda Primavera/Verão',
-      recorrente: false,
-      criadoEm: '2025-11-01T09:00:00',
-      atualizadoEm: '2025-11-01T09:00:00'
-    },
-    {
-      id: 'REC-004',
-      tipo: 'receita',
-      descricao: 'Consultoria Digital - Dezembro',
-      valor: 5000,
-      categoria: 'consultoria',
-      status: 'pago',
-      dataVencimento: '2025-12-01',
-      dataPagamento: '2025-12-01',
-      formaPagamento: 'pix',
-      clienteId: '3',
-      clienteNome: 'Ana Costa',
-      recorrente: true,
-      criadoEm: '2025-12-01T08:00:00',
-      atualizadoEm: '2025-12-01T11:00:00'
-    },
-    {
-      id: 'REC-005',
-      tipo: 'receita',
-      descricao: 'Gestão de Redes Sociais - Dezembro',
-      valor: 3500,
-      categoria: 'mensalidade',
-      status: 'pendente',
-      dataVencimento: '2025-12-25',
-      clienteId: '2',
-      clienteNome: 'João Santos',
-      recorrente: true,
-      criadoEm: '2025-12-01T08:00:00',
-      atualizadoEm: '2025-12-01T08:00:00'
-    },
-    {
-      id: 'REC-006',
-      tipo: 'receita',
-      descricao: 'Parcela 1/2 - Website Costa Marketing',
-      valor: 9000,
-      categoria: 'projeto',
-      status: 'pendente',
-      dataVencimento: '2025-12-30',
-      clienteId: '3',
-      clienteNome: 'Ana Costa',
-      projetoId: 'PROJ-2025-003',
-      projetoTitulo: 'Website Institucional Costa Marketing',
-      recorrente: false,
-      criadoEm: '2025-12-14T10:00:00',
-      atualizadoEm: '2025-12-14T10:00:00'
-    },
+  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
 
-    // DESPESAS
-    {
-      id: 'DESP-001',
-      tipo: 'despesa',
-      descricao: 'Adobe Creative Cloud - Time Completo',
-      valor: 850,
-      categoria: 'ferramentas',
-      status: 'pago',
-      dataVencimento: '2025-12-05',
-      dataPagamento: '2025-12-05',
-      formaPagamento: 'cartao_credito',
-      recorrente: true,
-      criadoEm: '2025-12-01T08:00:00',
-      atualizadoEm: '2025-12-05T09:00:00'
-    },
-    {
-      id: 'DESP-002',
-      tipo: 'despesa',
-      descricao: 'Freelancer Designer - Projeto Tech Innovations',
-      valor: 3500,
-      categoria: 'equipe',
-      status: 'pago',
-      dataVencimento: '2025-12-10',
-      dataPagamento: '2025-12-10',
-      formaPagamento: 'pix',
-      recorrente: false,
-      observacoes: 'Camila Designer - 40h trabalhadas',
-      criadoEm: '2025-11-20T10:00:00',
-      atualizadoEm: '2025-12-10T15:00:00'
-    },
-    {
-      id: 'DESP-003',
-      tipo: 'despesa',
-      descricao: 'Google Workspace + Drive Storage',
-      valor: 350,
-      categoria: 'ferramentas',
-      status: 'pago',
-      dataVencimento: '2025-12-08',
-      dataPagamento: '2025-12-08',
-      formaPagamento: 'cartao_credito',
-      recorrente: true,
-      criadoEm: '2025-12-01T08:00:00',
-      atualizadoEm: '2025-12-08T10:00:00'
-    },
-    {
-      id: 'DESP-004',
-      tipo: 'despesa',
-      descricao: 'Anúncios Facebook/Instagram - Campanha Dezembro',
-      valor: 2500,
-      categoria: 'marketing',
-      status: 'pago',
-      dataVencimento: '2025-12-12',
-      dataPagamento: '2025-12-11',
-      formaPagamento: 'cartao_credito',
-      recorrente: false,
-      criadoEm: '2025-12-01T09:00:00',
-      atualizadoEm: '2025-12-11T16:00:00'
-    },
-    {
-      id: 'DESP-005',
-      tipo: 'despesa',
-      descricao: 'AWS Hosting + CDN',
-      valor: 450,
-      categoria: 'infraestrutura',
-      status: 'pendente',
-      dataVencimento: '2025-12-20',
-      recorrente: true,
-      criadoEm: '2025-12-01T08:00:00',
-      atualizadoEm: '2025-12-01T08:00:00'
-    },
-    {
-      id: 'DESP-006',
-      tipo: 'despesa',
-      descricao: 'ISS + Impostos Municipais - Dezembro',
-      valor: 1850,
-      categoria: 'impostos',
-      status: 'pendente',
-      dataVencimento: '2025-12-28',
-      recorrente: true,
-      criadoEm: '2025-12-01T08:00:00',
-      atualizadoEm: '2025-12-01T08:00:00'
-    },
-    {
-      id: 'DESP-007',
-      tipo: 'despesa',
-      descricao: 'Fotógrafo Profissional - Sessão E-commerce',
-      valor: 1200,
-      categoria: 'equipe',
-      status: 'pago',
-      dataVencimento: '2025-12-14',
-      dataPagamento: '2025-12-14',
-      formaPagamento: 'pix',
-      recorrente: false,
-      observacoes: 'Pedro Fotógrafo - 100 fotos produto',
-      criadoEm: '2025-12-08T10:00:00',
-      atualizadoEm: '2025-12-14T17:00:00'
-    },
-    {
-      id: 'DESP-008',
-      tipo: 'despesa',
-      descricao: 'Figma Professional Plan',
-      valor: 240,
-      categoria: 'ferramentas',
-      status: 'pago',
-      dataVencimento: '2025-12-03',
-      dataPagamento: '2025-12-03',
-      formaPagamento: 'cartao_credito',
-      recorrente: true,
-      criadoEm: '2025-12-01T08:00:00',
-      atualizadoEm: '2025-12-03T09:00:00'
-    }
-  ];
-
-  const [transacoes, setTransacoes] = useState<Transacao[]>(() => {
-    const storageKey = 'financeiro_v1';
-    const stored = localStorage.getItem(storageKey);
-    if (stored) {
-      console.log('✅ Financeiro: Carregado do localStorage');
-      return JSON.parse(stored);
-    }
-    console.log('📦 Financeiro: Usando dados mock iniciais');
-    localStorage.setItem(storageKey, JSON.stringify(TRANSACOES_MOCK));
-    return TRANSACOES_MOCK;
-  });
-
-  // Salva no localStorage quando transações mudar
+  // Carregar adminId
   useEffect(() => {
-    localStorage.setItem('financeiro_v1', JSON.stringify(transacoes));
-    console.log('💾 Financeiro: Salvou', transacoes.length, 'transações');
-  }, [transacoes]);
+    const carregarAdmin = async () => {
+      if (user?.email) {
+        const admin = await getAdminByEmail(user.email);
+        if (admin) {
+          setAdminId(admin.id);
+        }
+      }
+    };
+    carregarAdmin();
+  }, [user]);
+
+  // Carregar transações do Firestore + Contratos assinados como receitas
+  useEffect(() => {
+    if (!user?.email) return;
+
+    const carregarDados = async () => {
+      setLoading(true);
+      try {
+        const userEmail = user.email || '';
+        const isUserWebmaster = isWebmaster(userEmail);
+        const admin = await getAdminByEmail(userEmail);
+        
+        // 1. Carregar transações manuais do Firestore
+        const transacoesRef = collection(db, 'transacoes');
+        let transacoesData: Transacao[] = [];
+        
+        if (isUserWebmaster) {
+          // Webmaster vê todas as transações
+          const snapshot = await getDocs(transacoesRef);
+          transacoesData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as Transacao[];
+        } else if (admin) {
+          // Admin vê apenas suas transações
+          const q = query(transacoesRef, where('adminId', '==', admin.id));
+          const snapshot = await getDocs(q);
+          transacoesData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as Transacao[];
+        }
+        
+        // 2. Carregar contratos assinados e transformar em receitas
+        const contratosRef = collection(db, 'contratos_assinados');
+        let contratosData: any[] = [];
+        
+        if (isUserWebmaster) {
+          const snapshot = await getDocs(contratosRef);
+          contratosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } else if (admin) {
+          const q = query(contratosRef, where('adminId', '==', admin.id));
+          const snapshot = await getDocs(q);
+          contratosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        }
+        
+        // Transformar contratos em transações de receita
+        const receitasContratos: Transacao[] = contratosData.map(contrato => ({
+          id: `CONTRATO-${contrato.id}`,
+          tipo: 'receita' as TipoTransacao,
+          descricao: `Contrato: ${contrato.titulo || 'Serviço'}`,
+          valor: contrato.valor || 0,
+          categoria: 'projeto' as CategoriaReceita,
+          status: 'pago' as StatusPagamento, // Contrato assinado = pago
+          dataVencimento: contrato.dataAssinatura?.split('T')[0] || new Date().toISOString().split('T')[0],
+          dataPagamento: contrato.dataAssinatura?.split('T')[0],
+          formaPagamento: 'pix' as FormaPagamento,
+          clienteId: contrato.clienteId,
+          clienteNome: contrato.clienteNome || 'Cliente',
+          projetoId: contrato.solicitacaoId,
+          projetoTitulo: contrato.titulo,
+          recorrente: false,
+          observacoes: `Contrato assinado em ${new Date(contrato.dataAssinatura).toLocaleDateString('pt-BR')}`,
+          criadoEm: contrato.dataAssinatura || new Date().toISOString(),
+          atualizadoEm: contrato.dataAssinatura || new Date().toISOString()
+        }));
+        
+        // Combinar transações manuais + receitas de contratos
+        const todasTransacoes = [...transacoesData, ...receitasContratos];
+        setTransacoes(todasTransacoes);
+        console.log(`💰 Financeiro: ${transacoesData.length} transações manuais + ${receitasContratos.length} contratos = ${todasTransacoes.length} total`);
+        
+      } catch (error) {
+        console.error('❌ Erro ao carregar transações:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    carregarDados();
+  }, [user, adminId]);
 
   // ============================================================================
   // HANDLERS DOS MODAIS
   // ============================================================================
 
-  const handleCriarTransacao = (novaTransacao: Transacao) => {
-    setTransacoes(prev => [...prev, novaTransacao]);
-    console.log('✅ Transação criada:', novaTransacao.id);
+  const handleCriarTransacao = async (novaTransacao: Transacao) => {
+    try {
+      // Adicionar adminId à transação
+      const transacaoComAdmin = {
+        ...novaTransacao,
+        adminId: adminId || ''
+      };
+      
+      // Salvar no Firestore
+      const docRef = await addDoc(collection(db, 'transacoes'), transacaoComAdmin);
+      
+      // Atualizar estado local
+      setTransacoes(prev => [...prev, { ...transacaoComAdmin, id: docRef.id }]);
+      console.log('✅ Transação criada no Firestore:', docRef.id);
+    } catch (error) {
+      console.error('❌ Erro ao criar transação:', error);
+    }
   };
 
   const handleVisualizarTransacao = (transacao: Transacao) => {
@@ -348,11 +234,28 @@ const Financeiro: React.FC = () => {
     setModalEditar(true);
   };
 
-  const handleSalvarEdicao = (transacaoAtualizada: Transacao) => {
-    setTransacoes(prev => 
-      prev.map(t => t.id === transacaoAtualizada.id ? transacaoAtualizada : t)
-    );
-    console.log('✅ Transação atualizada:', transacaoAtualizada.id);
+  const handleSalvarEdicao = async (transacaoAtualizada: Transacao) => {
+    try {
+      // Verificar se é uma transação de contrato (não editável diretamente)
+      if (transacaoAtualizada.id.startsWith('CONTRATO-')) {
+        console.log('⚠️ Transações de contrato não podem ser editadas diretamente');
+        return;
+      }
+      
+      // Atualizar no Firestore
+      await updateDoc(doc(db, 'transacoes', transacaoAtualizada.id), {
+        ...transacaoAtualizada,
+        atualizadoEm: new Date().toISOString()
+      });
+      
+      // Atualizar estado local
+      setTransacoes(prev => 
+        prev.map(t => t.id === transacaoAtualizada.id ? transacaoAtualizada : t)
+      );
+      console.log('✅ Transação atualizada no Firestore:', transacaoAtualizada.id);
+    } catch (error) {
+      console.error('❌ Erro ao atualizar transação:', error);
+    }
   };
 
   const handleDeletarTransacao = (transacao: Transacao) => {
@@ -361,9 +264,23 @@ const Financeiro: React.FC = () => {
     setModalDeletar(true);
   };
 
-  const handleConfirmarDelecao = (transacao: Transacao) => {
-    setTransacoes(prev => prev.filter(t => t.id !== transacao.id));
-    console.log('🗑️ Transação deletada:', transacao.id);
+  const handleConfirmarDelecao = async (transacao: Transacao) => {
+    try {
+      // Verificar se é uma transação de contrato (não deletável)
+      if (transacao.id.startsWith('CONTRATO-')) {
+        console.log('⚠️ Transações de contrato não podem ser deletadas');
+        return;
+      }
+      
+      // Deletar do Firestore
+      await deleteDoc(doc(db, 'transacoes', transacao.id));
+      
+      // Atualizar estado local
+      setTransacoes(prev => prev.filter(t => t.id !== transacao.id));
+      console.log('🗑️ Transação deletada do Firestore:', transacao.id);
+    } catch (error) {
+      console.error('❌ Erro ao deletar transação:', error);
+    }
   };
 
   // ============================================================================

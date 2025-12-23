@@ -116,6 +116,14 @@ service cloud.firestore {
     }
 
     // ============================================================================
+    // COLEÇÃO: transacoes (financeiro - receitas e despesas)
+    // ============================================================================
+    match /transacoes/{transacaoId} {
+      // Apenas admins podem criar, ler, atualizar e deletar transações
+      allow read, write: if isAdmin();
+    }
+
+    // ============================================================================
     // COLEÇÃO: contratos_assinados (PDF e assinatura salvos pelo cliente)
     // ============================================================================
     match /contratos_assinados/{contratoId} {
