@@ -112,10 +112,45 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
   // HANDLERS
   // ============================================================================
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    console.log('🎯 Validando formulário...');
+    
     if (validarFormulario()) {
-      onSalvar(formData);
-      onClose();
+      console.log('✅ Formulário válido, salvando...');
+      
+      try {
+        await onSalvar(formData);
+        console.log('✅ Portfólio salvo com sucesso');
+        
+        // Limpar formulário após sucesso
+        setFormData({
+          clienteNome: '',
+          clienteEmpresa: '',
+          titulo: '',
+          descricao: '',
+          categoria: 'web',
+          autorizadoPublicacao: true,
+          imagemCapa: '',
+          imagensGaleria: [],
+          tags: [],
+          destaque: false,
+          dataFinalizacao: new Date().toISOString().split('T')[0],
+          alcance: '',
+          engajamento: '',
+          conversao: '',
+          roi: '',
+          testemunhoTexto: '',
+          testemunhoAutor: '',
+          testemunhoCargo: ''
+        });
+        setErros([]);
+        onClose();
+      } catch (error) {
+        console.error('❌ Erro ao salvar portfólio:', error);
+        setErros(['Erro ao salvar portfólio. Tente novamente.']);
+      }
+    } else {
+      console.log('❌ Formulário inválido:', erros);
     }
   };
 

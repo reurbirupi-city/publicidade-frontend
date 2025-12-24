@@ -241,25 +241,48 @@ const Portfolio: React.FC = () => {
   };
 
   const handleAdicionarItem = async (novoItem: any) => {
+    console.log('🚀 handleAdicionarItem chamado com:', novoItem);
+    
     const itemData = {
       ...novoItem,
       adminId: user?.uid,
       criadoEm: new Date().toISOString()
     };
 
+    console.log('📦 Dados preparados para salvar:', itemData);
+
     try {
+      console.log('💾 Tentando salvar no Firestore...');
       const docRef = await addDoc(collection(db, 'portfolio'), itemData);
       console.log('✅ Item de portfólio criado no Firestore:', docRef.id);
       setModalAdicionarOpen(false);
     } catch (error) {
-      console.error('Erro ao adicionar item ao portfólio no Firestore:', error);
-      // Fallback local
-      const item: ItemPortfolio = {
-        ...itemData,
-        id: `PF-${Date.now()}`
-      } as ItemPortfolio;
-      setPortfolio([...portfolio, item]);
-      setModalAdicionarOpen(false);
+      console.error('❌ Erro ao adicionar item ao portfólio no Firestore:', error);
+      console.error('❌ Detalhes do erro:', error);
+      
+      // Fallback local com tratamento de erro
+      try {
+        const item: ItemPortfolio = {
+          ...itemData,
+          id: `PF-${Date.now()}`,
+          projetoId: itemData.projetoId || '',
+          clienteId: itemData.clienteId || ''
+        } as ItemPortfolio;
+        
+        console.log('🔄 Salvando localmente como fallback:', item);
+        setPortfolio([...portfolio, item]);
+        setModalAdicionarOpen(false);
+        
+        // Salvar também no localStorage como backup
+        const portfolioAtual = JSON.parse(localStorage.getItem('portfolio_backup') || '[]');
+        portfolioAtual.push(item);
+        localStorage.setItem('portfolio_backup', JSON.stringify(portfolioAtual));
+        console.log('💾 Item salvo no localStorage como backup');
+        
+      } catch (localError) {
+        console.error('❌ Erro também no fallback local:', localError);
+        alert('Erro ao salvar portfólio. Tente novamente.');
+      }
     }
   };
 

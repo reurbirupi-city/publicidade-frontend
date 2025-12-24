@@ -57,7 +57,7 @@ import { isWebmaster, getAdminByEmail, Admin } from '../services/adminService';
 import { useNotificacoes } from '../contexts/NotificacoesContext';
 import { notificarEventoAgenda } from '../services/notificacoes';
 import { db } from '../services/firebase';
-import { collection, addDoc, onSnapshot, query, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, where, doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 
 // ============================================================================
 // INTERFACES
@@ -145,8 +145,36 @@ const Agenda: React.FC = () => {
   const [adminData, setAdminData] = useState<Admin | null>(null);
   const [linkCopiado, setLinkCopiado] = useState(false);
   const [linkAdminCopiado, setLinkAdminCopiado] = useState(false);
+  const [nomeUsuario, setNomeUsuario] = useState<string>('Profissional');
   const settingsRef = React.useRef<HTMLDivElement>(null);
   const userIsWebmaster = user?.email ? isWebmaster(user.email) : false;
+
+  // Buscar nome do usuário
+  useEffect(() => {
+    const buscarNomeUsuario = async () => {
+      if (user?.uid) {
+        try {
+          const userDoc = await doc(db, 'users', user.uid);
+          const userSnapshot = await getDoc(userDoc);
+          if (userSnapshot.exists()) {
+            const userData = userSnapshot.data();
+            setNomeUsuario(userData.nome || userData.displayName || user.displayName || user.email?.split('@')[0] || 'Profissional');
+          } else if (user.displayName) {
+            setNomeUsuario(user.displayName);
+          } else if (user.email) {
+            // Usar parte do email antes do @ como nome
+            setNomeUsuario(user.email.split('@')[0]);
+          }
+        } catch (error) {
+          console.error('Erro ao buscar nome do usuário:', error);
+          // Fallback para displayName ou email
+          setNomeUsuario(user.displayName || user.email?.split('@')[0] || 'Profissional');
+        }
+      }
+    };
+
+    buscarNomeUsuario();
+  }, [user]);
 
   // Eventos - Carregados do Firestore com fallback para localStorage
   const [eventos, setEventos] = useState<Evento[]>([]);
@@ -216,6 +244,57 @@ const Agenda: React.FC = () => {
   }));
   const clientes = getClientes();
   const systemStats = getSystemStats();
+
+  // Dicas do Dia Dinâmicas
+  const dicasMotivacionais = [
+    {
+      texto: "🚀 A produtividade não é sobre fazer mais coisas, mas sobre fazer as coisas certas!",
+      cor: "from-purple-500 to-pink-500",
+      icone: Rocket
+    },
+    {
+      texto: "💡 Cada projeto concluído é uma vitória. Celebre seus pequenos sucessos!",
+      cor: "from-blue-500 to-cyan-500",
+      icone: Target
+    },
+    {
+      texto: "⚡ Focus é a chave: uma tarefa por vez, com toda sua atenção!",
+      cor: "from-green-500 to-emerald-500",
+      icone: Zap
+    },
+    {
+      texto: "🌟 Seu talento + disciplina = resultados extraordinários!",
+      cor: "from-orange-500 to-red-500",
+      icone: Star
+    },
+    {
+      texto: "🎯 Defina metas claras e transforme sonhos em realidade!",
+      cor: "from-indigo-500 to-purple-500",
+      icone: Target
+    },
+    {
+      texto: "💎 Qualidade supera quantidade. Faça menos, mas faça melhor!",
+      cor: "from-pink-500 to-rose-500",
+      icone: Award
+    },
+    {
+      texto: "🔥 Persistência é o combustível do sucesso. Continue avançando!",
+      cor: "from-red-500 to-orange-500",
+      icone: Flame
+    },
+    {
+      texto: "✨ Criatividade flui melhor com organização e planejamento!",
+      cor: "from-teal-500 to-blue-500",
+      icone: Sparkles
+    }
+  ];
+
+  // Seleciona uma dica baseada na data para variar diariamente
+  const dicaDoDia = useMemo(() => {
+    const hoje = new Date();
+    const indiceDica = (hoje.getDate() + hoje.getMonth()) % dicasMotivacionais.length;
+    return dicasMotivacionais[indiceDica];
+  }, []);
 
   // Função auxiliar para converter Date para string sem problema de fuso horário
   const dateToLocalString = (date: Date): string => {
@@ -476,7 +555,7 @@ const Agenda: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {periodo.label}, <span className="bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">Profissional</span>
+                      {periodo.label}, <span className="bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">{nomeUsuario}</span>
                     </h1>
                     <Sparkles className="w-5 h-5 text-orange-500 animate-pulse" />
                   </div>
@@ -867,170 +946,45 @@ const Agenda: React.FC = () => {
 
             {/* Right Column - Widgets */}
             <div className="col-span-12 lg:col-span-4 space-y-6">
-              {/* Quick Stats */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-4 hover:scale-105 transition-transform cursor-pointer" onClick={() => navigate('/projetos')}>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                      <Briefcase className="w-5 h-5 text-white" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{systemStats.projetosAtivos || projetos.filter(p => p.status === 'em_andamento').length || 0}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Projetos Ativos</div>
-                </div>
+              {/* Apenas o calendário e eventos ficam na sidebar */}
 
-                <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-4 hover:scale-105 transition-transform cursor-pointer" onClick={() => navigate('/financeiro')}>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-                      <DollarSign className="w-5 h-5 text-white" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                    R${((systemStats.valorTotalContratos || 0) / 1000).toFixed(0)}k
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Contratos</div>
-                </div>
-
-                <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-4 hover:scale-105 transition-transform cursor-pointer" onClick={() => navigate('/crm')}>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                      <Users className="w-5 h-5 text-white" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{systemStats.clientesAtivos || clientes.length || 0}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Clientes</div>
-                </div>
-
-                <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-4">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-                      <Calendar className="w-5 h-5 text-white" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{eventosHoje.length}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Eventos Hoje</div>
-                </div>
-              </div>
-
-              {/* Pending Payments */}
-              <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <DollarSign className="w-5 h-5 text-green-500" />
-                    A Receber
-                  </h3>
-                  <button
-                    onClick={() => navigate('/financeiro')}
-                    className="text-sm text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1"
-                  >
-                    Ver tudo
-                    <ArrowUpRight className="w-3 h-3" />
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  {transacoesPendentes.slice(0, 3).map(transacao => (
-                    <div
-                      key={transacao.id}
-                      className="flex items-center justify-between p-3 rounded-xl bg-green-500/10 border border-green-500/20 hover:scale-[1.02] transition-transform cursor-pointer"
-                      onClick={() => navigate('/financeiro')}
-                    >
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-white text-sm">{transacao.descricao}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{transacao.clienteNome}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-green-600 dark:text-green-400">
-                          R$ {transacao.valor.toLocaleString('pt-BR')}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {new Date(transacao.dataVencimento).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-gray-200/50 dark:border-gray-800/50">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Total Pendente</span>
-                    <span className="text-xl font-bold text-green-600 dark:text-green-400">
-                      R$ {transacoesPendentes.reduce((sum, t) => sum + t.valor, 0).toLocaleString('pt-BR')}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Active Projects */}
-              <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <Briefcase className="w-5 h-5 text-purple-500" />
-                    Projetos Ativos
-                  </h3>
-                  <button
-                    onClick={() => navigate('/projetos')}
-                    className="text-sm text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1"
-                  >
-                    Ver tudo
-                    <ArrowUpRight className="w-3 h-3" />
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  {(projetos.length > 0 ? projetos.slice(0, 3) : [
-                    { id: '1', titulo: 'Campanha Digital Q1', clienteEmpresa: 'Silva & Associados', progresso: 45, prioridade: 'alta' },
-                    { id: '2', titulo: 'Rebranding Tech Solutions', clienteEmpresa: 'Tech Solutions', progresso: 90, prioridade: 'media' },
-                  ]).map((projeto: any) => (
-                    <div
-                      key={projeto.id}
-                      className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 cursor-pointer hover:scale-[1.02] transition-transform"
-                      onClick={() => navigate('/projetos')}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="font-medium text-gray-900 dark:text-white text-sm truncate">{projeto.titulo}</p>
-                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                          projeto.prioridade === 'alta' || projeto.prioridade === 'urgente'
-                            ? 'bg-red-500/20 text-red-600 dark:text-red-400'
-                            : 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
-                        }`}>
-                          {projeto.prioridade}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{projeto.clienteEmpresa}</p>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all"
-                            style={{ width: `${projeto.progresso}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-bold text-gray-600 dark:text-gray-400">{projeto.progresso}%</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Motivational Card */}
-              <div className="backdrop-blur-xl bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl p-6 text-white relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
-                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
+              {/* Dica do Dia Melhorada */}
+              <div className={`backdrop-blur-xl bg-gradient-to-br ${dicaDoDia.cor} rounded-2xl p-6 text-white relative overflow-hidden transform hover:scale-105 transition-all duration-300 group cursor-pointer`}>
+                {/* Efeitos de Background */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl animate-pulse" />
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '1s' }} />
+                <div className="absolute top-1/2 left-1/2 w-16 h-16 bg-white/5 rounded-full blur-xl animate-ping" style={{ animationDelay: '2s' }} />
                 
                 <div className="relative">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Rocket className="w-6 h-6" />
-                    <span className="font-bold">Dica do Dia</span>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-xl group-hover:rotate-12 transition-transform">
+                        <dicaDoDia.icone className="w-6 h-6" />
+                      </div>
+                      <span className="font-bold text-lg">Dica do Dia</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <RefreshCw className="w-4 h-4 opacity-70 group-hover:rotate-180 transition-transform duration-500" />
+                      <span className="text-xs opacity-70">Diária</span>
+                    </div>
                   </div>
-                  <p className="text-sm text-white/90 mb-4">
-                    "A produtividade não é sobre fazer mais coisas, mas sobre fazer as coisas certas."
+                  
+                  <p className="text-base text-white/95 mb-4 leading-relaxed font-medium">
+                    {dicaDoDia.texto}
                   </p>
-                  <div className="flex items-center gap-2">
-                    <Star className="w-4 h-4 text-yellow-300 fill-yellow-300" />
-                    <Star className="w-4 h-4 text-yellow-300 fill-yellow-300" />
-                    <Star className="w-4 h-4 text-yellow-300 fill-yellow-300" />
-                    <Star className="w-4 h-4 text-yellow-300 fill-yellow-300" />
-                    <Star className="w-4 h-4 text-yellow-300 fill-yellow-300" />
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1">
+                      <Star className="w-4 h-4 text-yellow-300 fill-yellow-300 animate-pulse" />
+                      <Star className="w-4 h-4 text-yellow-300 fill-yellow-300 animate-pulse" style={{ animationDelay: '0.2s' }} />
+                      <Star className="w-4 h-4 text-yellow-300 fill-yellow-300 animate-pulse" style={{ animationDelay: '0.4s' }} />
+                      <Star className="w-4 h-4 text-yellow-300 fill-yellow-300 animate-pulse" style={{ animationDelay: '0.6s' }} />
+                      <Star className="w-4 h-4 text-yellow-300 fill-yellow-300 animate-pulse" style={{ animationDelay: '0.8s' }} />
+                    </div>
+                    <div className="flex items-center gap-2 text-xs opacity-70">
+                      <Clock className="w-3 h-3" />
+                      <span>{new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+                    </div>
                   </div>
                 </div>
               </div>
