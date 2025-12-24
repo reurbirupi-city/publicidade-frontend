@@ -23,6 +23,7 @@ import {
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
 import { TutorialOverlay } from '../components/TutorialOverlay';
+import Sidebar from '../components/Sidebar';
 import ModalCriarProjeto from '../components/ModalCriarProjeto';
 import ModalVisualizarProjeto from '../components/ModalVisualizarProjeto';
 import ModalEditarProjeto from '../components/ModalEditarProjeto';
@@ -143,6 +144,7 @@ interface Projeto {
   // Timestamps
   criadoEm: string;
   atualizadoEm: string;
+  adminId?: string;
   
   // Campos para workflow de aprovação
   descricaoFaseAtual?: string;
@@ -286,324 +288,9 @@ const Projetos: React.FC = () => {
   const [descricaoFase, setDescricaoFase] = useState('');
   const [novoStatusPendente, setNovoStatusPendente] = useState<StatusProjeto | null>(null);
 
-  /* Mock data desativado
   // ============================================================================
-  // DADOS MOCK - Em produção virá do Firebase
+  // ESTADO INICIAL
   // ============================================================================
-
-  // Dados mock para inicialização
-  const PROJETOS_MOCK: Projeto[] = [
-    {
-      id: 'PROJ-2025-001',
-      titulo: 'Campanha Digital Q1 2025',
-      descricao: 'Desenvolvimento de campanha completa para redes sociais incluindo artes, copies e estratégia de conteúdo',
-      clienteId: '1',
-      clienteNome: 'Maria Silva',
-      clienteEmpresa: 'Silva & Associados',
-      servicosContratados: ['Social Media', 'Design Gráfico', 'Copywriting', 'Planejamento Estratégico'],
-      valorContratado: 15000,
-      valorPago: 7500,
-      status: 'em_andamento',
-      prioridade: 'alta',
-      etapaAtual: 'criacao',
-      progresso: 45,
-      dataInicio: '2025-12-01',
-      prazoEstimado: '2025-12-30',
-      diasRestantes: 15,
-      revisoes: [
-        {
-          id: 'REV-001',
-          numero: 1,
-          solicitadoEm: '2025-12-10',
-          solicitadoPor: 'Maria Silva',
-          descricao: 'Ajustar cores do logo e aumentar fonte nos posts',
-          status: 'concluida',
-          concluidaEm: '2025-12-12',
-          tempoGasto: 3
-        }
-      ],
-      limiteRevisoes: 3,
-      revisoesUsadas: 1,
-      responsavel: 'João Designer',
-      equipe: ['João Designer', 'Ana Copywriter', 'Carlos Social Media'],
-      arquivos: [
-        {
-          id: 'ARQ-001',
-          nome: 'briefing_campanha_q1.pdf',
-          tipo: 'application/pdf',
-          tamanho: 2048576,
-          url: '/uploads/briefing_001.pdf',
-          uploadPor: 'Maria Silva',
-          uploadEm: '2025-12-01',
-          versao: 1,
-          aprovado: true,
-          aprovadoPor: 'João Designer',
-          aprovadoEm: '2025-12-01'
-        },
-        {
-          id: 'ARQ-002',
-          nome: 'artes_instagram_v2.zip',
-          tipo: 'application/zip',
-          tamanho: 15728640,
-          url: '/uploads/artes_v2.zip',
-          uploadPor: 'João Designer',
-          uploadEm: '2025-12-13',
-          versao: 2,
-          aprovado: false
-        }
-      ],
-      comentariosInternos: [
-        {
-          id: 'COM-INT-001',
-          autor: 'João Designer',
-          autorTipo: 'interno',
-          texto: 'Artes finalizadas, aguardando revisão da Ana antes de enviar ao cliente',
-          dataHora: '2025-12-13 14:30'
-        },
-        {
-          id: 'COM-INT-002',
-          autor: 'Ana Copywriter',
-          autorTipo: 'interno',
-          texto: 'Copies aprovadas! Pode enviar para o cliente',
-          dataHora: '2025-12-14 10:15'
-        }
-      ],
-      comentariosCliente: [
-        {
-          id: 'COM-CLI-001',
-          autor: 'Maria Silva',
-          autorTipo: 'cliente',
-          texto: 'Adorei as artes! Apenas ajustar a cor azul para um tom mais escuro',
-          dataHora: '2025-12-10 16:20'
-        }
-      ],
-      aprovacoes: [
-        {
-          id: 'APR-001',
-          etapa: 'briefing',
-          solicitadaEm: '2025-12-01',
-          aprovadaPor: 'Maria Silva',
-          aprovadaEm: '2025-12-01',
-          status: 'aprovada',
-          comentarios: 'Briefing perfeito, pode seguir!',
-          assinaturaDigital: 'MS-20251201-143022'
-        }
-      ],
-      horasEstimadas: 80,
-      horasTrabalhadas: 36,
-      satisfacaoCliente: 5,
-      tags: ['Social Media', 'Urgente', 'Recorrente'],
-      categoria: 'Marketing Digital',
-      criadoEm: '2025-12-01',
-      atualizadoEm: '2025-12-15'
-    },
-    {
-      id: 'PROJ-2025-002',
-      titulo: 'Rebranding Tech Solutions',
-      descricao: 'Redesign completo da identidade visual incluindo logo, manual de marca e aplicações',
-      clienteId: '2',
-      clienteNome: 'João Santos',
-      clienteEmpresa: 'Tech Solutions',
-      servicosContratados: ['Branding', 'Design Gráfico', 'Manual da Marca'],
-      valorContratado: 25000,
-      valorPago: 25000,
-      status: 'aprovacao',
-      prioridade: 'media',
-      etapaAtual: 'aprovacao',
-      progresso: 90,
-      dataInicio: '2025-11-15',
-      prazoEstimado: '2025-12-20',
-      diasRestantes: 5,
-      revisoes: [
-        {
-          id: 'REV-002',
-          numero: 1,
-          solicitadoEm: '2025-12-05',
-          solicitadoPor: 'João Santos',
-          descricao: 'Testar logo em fundo escuro',
-          status: 'concluida',
-          concluidaEm: '2025-12-07',
-          tempoGasto: 2
-        },
-        {
-          id: 'REV-003',
-          numero: 2,
-          solicitadoEm: '2025-12-12',
-          solicitadoPor: 'João Santos',
-          descricao: 'Ajustar tipografia do slogan',
-          status: 'concluida',
-          concluidaEm: '2025-12-14',
-          tempoGasto: 1.5
-        }
-      ],
-      limiteRevisoes: 2,
-      revisoesUsadas: 2,
-      responsavel: 'Paula Brand Designer',
-      equipe: ['Paula Brand Designer', 'Roberto Ilustrador'],
-      arquivos: [
-        {
-          id: 'ARQ-003',
-          nome: 'manual_marca_techsolutions.pdf',
-          tipo: 'application/pdf',
-          tamanho: 52428800,
-          url: '/uploads/manual_marca.pdf',
-          uploadPor: 'Paula Brand Designer',
-          uploadEm: '2025-12-14',
-          versao: 3,
-          aprovado: false
-        }
-      ],
-      comentariosInternos: [
-        {
-          id: 'COM-INT-003',
-          autor: 'Paula Brand Designer',
-          autorTipo: 'interno',
-          texto: 'Manual finalizado! Versão 3 incorpora todos os ajustes solicitados',
-          dataHora: '2025-12-14 18:00'
-        }
-      ],
-      comentariosCliente: [
-        {
-          id: 'COM-CLI-002',
-          autor: 'João Santos',
-          autorTipo: 'cliente',
-          texto: 'Ficou incrível! Vou revisar com a diretoria e dou retorno amanhã',
-          dataHora: '2025-12-14 19:30'
-        }
-      ],
-      aprovacoes: [
-        {
-          id: 'APR-002',
-          etapa: 'aprovacao',
-          solicitadaEm: '2025-12-14',
-          status: 'pendente'
-        }
-      ],
-      horasEstimadas: 120,
-      horasTrabalhadas: 108,
-      satisfacaoCliente: 5,
-      tags: ['Branding', 'Estratégico'],
-      categoria: 'Identidade Visual',
-      criadoEm: '2025-11-15',
-      atualizadoEm: '2025-12-15'
-    },
-    {
-      id: 'PROJ-2025-003',
-      titulo: 'Website Institucional Costa Marketing',
-      descricao: 'Desenvolvimento de site institucional responsivo com CMS integrado',
-      clienteId: '3',
-      clienteNome: 'Ana Costa',
-      clienteEmpresa: 'Costa Marketing',
-      servicosContratados: ['Web Design', 'Desenvolvimento Front-end', 'UX/UI'],
-      valorContratado: 18000,
-      valorPago: 0,
-      status: 'planejamento',
-      prioridade: 'media',
-      etapaAtual: 'briefing',
-      progresso: 10,
-      dataInicio: '2025-12-14',
-      prazoEstimado: '2026-01-31',
-      diasRestantes: 47,
-      revisoes: [],
-      limiteRevisoes: 3,
-      revisoesUsadas: 0,
-      responsavel: 'Lucas Dev',
-      equipe: ['Lucas Dev', 'Mariana UX'],
-      arquivos: [],
-      comentariosInternos: [
-        {
-          id: 'COM-INT-004',
-          autor: 'Lucas Dev',
-          autorTipo: 'interno',
-          texto: 'Agendada reunião de briefing para dia 16/12',
-          dataHora: '2025-12-14 11:00'
-        }
-      ],
-      comentariosCliente: [],
-      aprovacoes: [],
-      horasEstimadas: 160,
-      horasTrabalhadas: 8,
-      tags: ['Website', 'Desenvolvimento'],
-      categoria: 'Desenvolvimento Web',
-      criadoEm: '2025-12-14',
-      atualizadoEm: '2025-12-15'
-    },
-    {
-      id: 'PROJ-2025-004',
-      titulo: 'E-commerce Moda Primavera/Verão',
-      descricao: 'Loja virtual completa com integração de pagamento e sistema de gestão de estoque',
-      clienteId: '1',
-      clienteNome: 'Maria Silva',
-      clienteEmpresa: 'Silva & Associados',
-      servicosContratados: ['E-commerce', 'Design', 'Desenvolvimento', 'Fotografia de Produto'],
-      valorContratado: 45000,
-      valorPago: 15000,
-      status: 'em_andamento',
-      prioridade: 'urgente',
-      etapaAtual: 'criacao',
-      progresso: 60,
-      dataInicio: '2025-11-01',
-      prazoEstimado: '2025-12-25',
-      diasRestantes: 10,
-      revisoes: [
-        {
-          id: 'REV-004',
-          numero: 1,
-          solicitadoEm: '2025-12-08',
-          solicitadoPor: 'Maria Silva',
-          descricao: 'Alterar fluxo de checkout - simplificar para 2 etapas',
-          status: 'em_andamento',
-          tempoGasto: 5
-        }
-      ],
-      limiteRevisoes: 4,
-      revisoesUsadas: 1,
-      responsavel: 'Rafael Full Stack',
-      equipe: ['Rafael Full Stack', 'Camila Designer', 'Pedro Fotógrafo'],
-      arquivos: [
-        {
-          id: 'ARQ-004',
-          nome: 'wireframes_ecommerce.fig',
-          tipo: 'application/figma',
-          tamanho: 10485760,
-          url: '/uploads/wireframes.fig',
-          uploadPor: 'Camila Designer',
-          uploadEm: '2025-11-10',
-          versao: 1,
-          aprovado: true,
-          aprovadoPor: 'Maria Silva',
-          aprovadoEm: '2025-11-12'
-        }
-      ],
-      comentariosInternos: [
-        {
-          id: 'COM-INT-005',
-          autor: 'Rafael Full Stack',
-          autorTipo: 'interno',
-          texto: 'Integração com gateway de pagamento concluída e testada',
-          dataHora: '2025-12-13 16:45'
-        }
-      ],
-      comentariosCliente: [
-        {
-          id: 'COM-CLI-003',
-          autor: 'Maria Silva',
-          autorTipo: 'cliente',
-          texto: 'Está ficando ótimo! Vamos precisar adiantar o prazo em 3 dias se possível',
-          dataHora: '2025-12-12 09:00'
-        }
-      ],
-      aprovacoes: [],
-      horasEstimadas: 200,
-      horasTrabalhadas: 120,
-      satisfacaoCliente: 4,
-      tags: ['E-commerce', 'Urgente', 'Alta Prioridade'],
-      categoria: 'Desenvolvimento Web',
-      criadoEm: '2025-11-01',
-      atualizadoEm: '2025-12-15'
-    }
-  ];
-  */
 
   // Inicializa estado com função lazy - carrega do localStorage ou começa vazio
   const [projetos, setProjetos] = useState<Projeto[]>(() => {
@@ -965,18 +652,17 @@ const Projetos: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+      {/* Sidebar de Navegação */}
+      <Sidebar />
+      
+      {/* Conteúdo Principal */}
+      <main className="flex-1 min-h-screen lg:ml-0">
       {/* Header */}
       <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-40">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-6 h-6 text-gray-900 dark:text-white" />
-              </button>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <Layers className="w-8 h-8 text-orange-600 dark:text-amber-500" />
@@ -1500,6 +1186,7 @@ const Projetos: React.FC = () => {
 
       {/* Tutorial Overlay */}
       <TutorialOverlay page="projetos" />
+      </main>
     </div>
   );
 };

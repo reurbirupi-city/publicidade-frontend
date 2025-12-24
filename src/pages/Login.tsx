@@ -62,15 +62,15 @@ const Login: React.FC = () => {
         
         // Redirecionar baseado no role
         if (userData.role === 'admin') {
-          console.log('➡️ Redirecionando para /dashboard');
-          navigate('/dashboard');
+          console.log('➡️ Redirecionando para /agenda (Command Center)');
+          navigate('/agenda');
         } else {
           console.log('➡️ Redirecionando para /client-portal');
           navigate('/client-portal');
         }
       } else {
         console.log('⚠️ Documento não encontrado. Assumindo admin.');
-        navigate('/dashboard');
+        navigate('/agenda');
       }
     } catch (err: any) {
       console.error('❌ Erro no login:', err);

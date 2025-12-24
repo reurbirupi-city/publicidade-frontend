@@ -25,6 +25,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
 import ModalCriarEditarServico from '../components/ModalCriarEditarServico';
 import { TutorialOverlay } from '../components/TutorialOverlay';
+import Sidebar from '../components/Sidebar';
 
 // Tipos
 interface Servico {
@@ -40,280 +41,6 @@ interface Servico {
   padrao?: boolean;
   customizado?: boolean;
 }
-
-// Catálogo padrão de serviços
-const SERVICOS_PADRAO: Servico[] = [
-  // Branding e Identidade Visual
-  {
-    id: 'srv-001',
-    nome: 'Criação de Logo',
-    descricao: 'Design de logotipo profissional com manual de aplicação',
-    categoria: 'branding',
-    preco: 1500,
-    tempo_estimado: '7-10 dias',
-    destaque: true,
-    ativo: true,
-    recursos: ['3 propostas iniciais', 'Revisões ilimitadas', 'Manual de marca', 'Arquivos em alta resolução'],
-    padrao: true
-  },
-  {
-    id: 'srv-002',
-    nome: 'Identidade Visual Completa',
-    descricao: 'Branding completo incluindo logo, paleta de cores, tipografia e aplicações',
-    categoria: 'branding',
-    preco: 4500,
-    tempo_estimado: '20-30 dias',
-    destaque: true,
-    ativo: true,
-    recursos: ['Logo + variações', 'Paleta de cores', 'Tipografia', 'Papelaria básica', 'Manual de marca completo'],
-    padrao: true
-  },
-  {
-    id: 'srv-003',
-    nome: 'Redesign de Marca',
-    descricao: 'Modernização e atualização da identidade visual existente',
-    categoria: 'branding',
-    preco: 2500,
-    tempo_estimado: '15-20 dias',
-    destaque: false,
-    ativo: true,
-    recursos: ['Análise da marca atual', 'Propostas de modernização', 'Implementação gradual'],
-    padrao: true
-  },
-  // Social Media
-  {
-    id: 'srv-004',
-    nome: 'Gestão de Redes Sociais - Básico',
-    descricao: 'Gerenciamento mensal de 1 rede social com 12 posts',
-    categoria: 'social-media',
-    preco: 1200,
-    tempo_estimado: 'Mensal',
-    destaque: false,
-    ativo: true,
-    recursos: ['12 posts/mês', '1 rede social', 'Calendário editorial', 'Relatório mensal'],
-    padrao: true
-  },
-  {
-    id: 'srv-005',
-    nome: 'Gestão de Redes Sociais - Completo',
-    descricao: 'Gerenciamento mensal de até 3 redes sociais com 30 posts',
-    categoria: 'social-media',
-    preco: 3500,
-    tempo_estimado: 'Mensal',
-    destaque: true,
-    ativo: true,
-    recursos: ['30 posts/mês', 'Até 3 redes sociais', 'Stories diários', 'Calendário editorial', 'Relatório mensal', 'Gestão de comunidade'],
-    padrao: true
-  },
-  {
-    id: 'srv-006',
-    nome: 'Pack de Posts Instagram',
-    descricao: 'Pacote com 15 artes para feed do Instagram',
-    categoria: 'social-media',
-    preco: 800,
-    tempo_estimado: '5-7 dias',
-    destaque: false,
-    ativo: true,
-    recursos: ['15 artes para feed', 'Legendas sugeridas', 'Hashtags otimizadas'],
-    padrao: true
-  },
-  {
-    id: 'srv-007',
-    nome: 'Estratégia de Conteúdo',
-    descricao: 'Planejamento estratégico de conteúdo para redes sociais',
-    categoria: 'social-media',
-    preco: 2000,
-    tempo_estimado: '10-15 dias',
-    destaque: false,
-    ativo: true,
-    recursos: ['Análise de mercado', 'Persona definida', 'Calendário de 3 meses', 'Guidelines de conteúdo'],
-    padrao: true
-  },
-  // Web Development
-  {
-    id: 'srv-008',
-    nome: 'Landing Page',
-    descricao: 'Página de conversão otimizada para campanhas',
-    categoria: 'web',
-    preco: 2500,
-    tempo_estimado: '7-10 dias',
-    destaque: true,
-    ativo: true,
-    recursos: ['Design responsivo', 'Otimização SEO básica', 'Formulário de contato', 'Integração com analytics'],
-    padrao: true
-  },
-  {
-    id: 'srv-009',
-    nome: 'Site Institucional',
-    descricao: 'Website completo com até 10 páginas',
-    categoria: 'web',
-    preco: 6000,
-    tempo_estimado: '20-30 dias',
-    destaque: true,
-    ativo: true,
-    recursos: ['Até 10 páginas', 'Design responsivo', 'SEO completo', 'Blog integrado', 'Painel administrativo'],
-    padrao: true
-  },
-  {
-    id: 'srv-010',
-    nome: 'E-commerce Básico',
-    descricao: 'Loja virtual com até 50 produtos',
-    categoria: 'web',
-    preco: 8000,
-    tempo_estimado: '30-45 dias',
-    destaque: false,
-    ativo: true,
-    recursos: ['Até 50 produtos', 'Carrinho de compras', 'Checkout seguro', 'Integração com pagamentos', 'Painel de gestão'],
-    padrao: true
-  },
-  {
-    id: 'srv-011',
-    nome: 'Manutenção de Site',
-    descricao: 'Serviço mensal de manutenção e atualizações',
-    categoria: 'web',
-    preco: 500,
-    tempo_estimado: 'Mensal',
-    destaque: false,
-    ativo: true,
-    recursos: ['Atualizações de segurança', 'Backup semanal', 'Pequenas alterações', 'Suporte por email'],
-    padrao: true
-  },
-  // Marketing Digital
-  {
-    id: 'srv-012',
-    nome: 'Gestão de Google Ads',
-    descricao: 'Gerenciamento mensal de campanhas no Google Ads',
-    categoria: 'marketing',
-    preco: 1500,
-    tempo_estimado: 'Mensal',
-    destaque: true,
-    ativo: true,
-    recursos: ['Criação de campanhas', 'Otimização contínua', 'Relatórios semanais', 'Ajuste de lances', '+ investimento em mídia'],
-    padrao: true
-  },
-  {
-    id: 'srv-013',
-    nome: 'Gestão de Meta Ads',
-    descricao: 'Gerenciamento mensal de campanhas no Facebook e Instagram',
-    categoria: 'marketing',
-    preco: 1200,
-    tempo_estimado: 'Mensal',
-    destaque: true,
-    ativo: true,
-    recursos: ['Criação de campanhas', 'Públicos personalizados', 'A/B Testing', 'Relatórios mensais', '+ investimento em mídia'],
-    padrao: true
-  },
-  {
-    id: 'srv-014',
-    nome: 'Email Marketing',
-    descricao: 'Configuração e gestão de campanhas de email',
-    categoria: 'marketing',
-    preco: 800,
-    tempo_estimado: 'Mensal',
-    destaque: false,
-    ativo: true,
-    recursos: ['4 campanhas/mês', 'Templates personalizados', 'Automações básicas', 'Relatório de performance'],
-    padrao: true
-  },
-  {
-    id: 'srv-015',
-    nome: 'SEO Completo',
-    descricao: 'Otimização completa para mecanismos de busca',
-    categoria: 'marketing',
-    preco: 2500,
-    tempo_estimado: 'Mensal',
-    destaque: false,
-    ativo: true,
-    recursos: ['Auditoria técnica', 'Otimização on-page', 'Link building', 'Relatórios mensais', 'Análise de concorrência'],
-    padrao: true
-  },
-  // Design Gráfico
-  {
-    id: 'srv-016',
-    nome: 'Design de Cartão de Visita',
-    descricao: 'Criação de cartão de visita profissional',
-    categoria: 'design',
-    preco: 300,
-    tempo_estimado: '3-5 dias',
-    destaque: false,
-    ativo: true,
-    recursos: ['2 propostas iniciais', 'Frente e verso', 'Arquivo para impressão'],
-    padrao: true
-  },
-  {
-    id: 'srv-017',
-    nome: 'Design de Apresentação',
-    descricao: 'Criação de apresentação profissional até 30 slides',
-    categoria: 'design',
-    preco: 1200,
-    tempo_estimado: '5-7 dias',
-    destaque: false,
-    ativo: true,
-    recursos: ['Até 30 slides', 'Template personalizado', 'Ícones e gráficos', 'Arquivo editável'],
-    padrao: true
-  },
-  {
-    id: 'srv-018',
-    nome: 'Design de Catálogo/Folder',
-    descricao: 'Criação de material impresso para divulgação',
-    categoria: 'design',
-    preco: 800,
-    tempo_estimado: '5-7 dias',
-    destaque: false,
-    ativo: true,
-    recursos: ['Design personalizado', 'Até 8 páginas', 'Arquivo para impressão', 'Revisões incluídas'],
-    padrao: true
-  },
-  {
-    id: 'srv-019',
-    nome: 'Design de Embalagem',
-    descricao: 'Criação de design de embalagem para produtos',
-    categoria: 'design',
-    preco: 2000,
-    tempo_estimado: '10-15 dias',
-    destaque: false,
-    ativo: true,
-    recursos: ['Mockups 3D', 'Arquivo para produção', 'Adequação às normas', 'Revisões incluídas'],
-    padrao: true
-  },
-  // Vídeo e Animação
-  {
-    id: 'srv-020',
-    nome: 'Vídeo Institucional',
-    descricao: 'Produção de vídeo institucional até 2 minutos',
-    categoria: 'video',
-    preco: 5000,
-    tempo_estimado: '15-20 dias',
-    destaque: false,
-    ativo: true,
-    recursos: ['Roteiro', 'Captação de imagens', 'Edição profissional', 'Trilha sonora', 'Correção de cor'],
-    padrao: true
-  },
-  {
-    id: 'srv-021',
-    nome: 'Motion Graphics',
-    descricao: 'Animação com motion graphics até 1 minuto',
-    categoria: 'video',
-    preco: 2500,
-    tempo_estimado: '10-15 dias',
-    destaque: false,
-    ativo: true,
-    recursos: ['Storyboard', 'Animação 2D', 'Trilha sonora', 'Locução opcional'],
-    padrao: true
-  },
-  {
-    id: 'srv-022',
-    nome: 'Edição de Vídeo para Redes',
-    descricao: 'Pacote com 10 vídeos editados para redes sociais',
-    categoria: 'video',
-    preco: 1500,
-    tempo_estimado: '7-10 dias',
-    destaque: false,
-    ativo: true,
-    recursos: ['10 vídeos curtos', 'Cortes dinâmicos', 'Legendas', 'Música de fundo'],
-    padrao: true
-  }
-];
 
 // Mapeamento de categorias
 const CATEGORIAS: Record<string, { nome: string; cor: string; icone: React.ReactNode }> = {
@@ -349,25 +76,21 @@ const Servicos: React.FC = () => {
       const servicosRef = collection(db, 'servicos_catalogo');
       const snapshot = await getDocs(servicosRef);
       
-      if (snapshot.empty) {
-        // Primeiro acesso - salvar serviços padrão no Firestore
-        for (const servico of SERVICOS_PADRAO) {
-          await setDoc(doc(db, 'servicos_catalogo', servico.id), servico);
-        }
-        setServicos(SERVICOS_PADRAO);
-        localStorage.setItem('servicos_catalogo', JSON.stringify(SERVICOS_PADRAO));
-      } else {
+      if (!snapshot.empty) {
         const servicosFirestore = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as Servico[];
         setServicos(servicosFirestore);
         localStorage.setItem('servicos_catalogo', JSON.stringify(servicosFirestore));
+      } else {
+        console.log('📦 Catálogo de serviços vazio');
+        setServicos([]);
+        localStorage.setItem('servicos_catalogo', JSON.stringify([]));
       }
     } catch (error) {
       console.error('Erro ao carregar serviços:', error);
-      // Fallback para serviços padrão se falhar
-      setServicos(SERVICOS_PADRAO);
+      setServicos([]);
     }
     setLoading(false);
   };
@@ -491,19 +214,17 @@ const Servicos: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Sidebar de Navegação */}
+      <Sidebar />
+      
+      {/* Conteúdo Principal */}
+      <main className="flex-1 min-h-screen lg:ml-0">
       {/* Header com Navegação */}
       <header className="sticky top-0 z-40 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                title="Voltar ao Dashboard"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              </button>
               <div>
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">Catálogo de Serviços</h1>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Gerencie os serviços oferecidos</p>
@@ -759,6 +480,7 @@ const Servicos: React.FC = () => {
       {/* Tutorial Overlay */}
       <TutorialOverlay page="servicos" />
       </div>
+      </main>
     </div>
   );
 };

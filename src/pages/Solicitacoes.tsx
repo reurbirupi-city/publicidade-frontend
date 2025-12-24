@@ -32,6 +32,7 @@ import NotificacoesBell from '../components/NotificacoesBell';
 import { TutorialOverlay } from '../components/TutorialOverlay';
 import ChatWhatsAppAdmin from '../components/ChatWhatsAppAdmin';
 import { getClientes, getProjetos, saveProjetos, atualizarStatusCliente } from '../services/dataIntegration';
+import Sidebar from '../components/Sidebar';
 
 // Função para baixar contrato assinado do Firestore
 const baixarContratoAssinado = async (solicitacaoId: string) => {
@@ -540,18 +541,17 @@ const Solicitacoes: React.FC = () => {
     : solicitacoes.filter(s => s.status === filtroStatus);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
+      {/* Sidebar de Navegação */}
+      <Sidebar />
+      
+      {/* Conteúdo Principal */}
+      <main className="flex-1 min-h-screen lg:ml-0">
       {/* Header */}
       <header className="sticky top-0 z-10 backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border-b border-gray-200 dark:border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-6 h-6 text-gray-600 dark:text-gray-400" />
-              </button>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                   Solicitações de Clientes
@@ -987,6 +987,7 @@ const Solicitacoes: React.FC = () => {
 
       {/* Tutorial Overlay */}
       <TutorialOverlay page="solicitacoes" />
+      </main>
     </div>
   );
 };

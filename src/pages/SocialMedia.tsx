@@ -23,7 +23,12 @@ import {
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
 import { TutorialOverlay } from '../components/TutorialOverlay';
+import Sidebar from '../components/Sidebar';
 import { getClientes } from '../services/dataIntegration';
+import { db } from '../services/firebase';
+import { collection, addDoc, onSnapshot, query, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { useAuth } from '../contexts/AuthContext';
+import { isWebmaster } from '../services/adminService';
 import ModalCriarConteudo from '../components/ModalCriarConteudo';
 import ModalVisualizarConteudo from '../components/ModalVisualizarConteudo';
 import ModalEditarConteudo from '../components/ModalEditarConteudo';
@@ -76,6 +81,8 @@ interface ConteudoSocial {
 
 const SocialMedia: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const userIsWebmaster = user?.email ? isWebmaster(user.email) : false;
   const [viewMode, setViewMode] = useState<'calendario' | 'kanban' | 'lista' | 'analytics'>('calendario');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRede, setFilterRede] = useState<RedeSocial | 'todas'>('todas');
@@ -83,102 +90,41 @@ const SocialMedia: React.FC = () => {
   const [filterCliente, setFilterCliente] = useState<string>('todos');
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  // Dados mock iniciais
-  const CONTEUDOS_MOCK: ConteudoSocial[] = [
-    {
-      id: 'SM-001',
-      titulo: 'Lançamento de Produto',
-      descricao: 'Post anunciando novo produto da linha premium',
-      clienteId: '1',
-      clienteNome: 'Maria Silva',
-      clienteEmpresa: 'Silva & Associados',
-      projetoId: 'PROJ-2025-001',
-      projetoTitulo: 'Campanha Digital Q1',
-      redeSocial: 'instagram',
-      tipoConteudo: 'carrossel',
-      dataPublicacao: '2025-12-20',
-      horaPublicacao: '10:00',
-      status: 'aprovado',
-      copy: 'Chegou! 🎉 Nossa nova linha premium está disponível. Conheça os detalhes no link da bio.',
-      hashtags: ['novidade', 'premium', 'exclusivo', 'lançamento'],
-      urlImagem: '/assets/post-001.jpg',
-      aprovadoPor: 'Maria Silva',
-      aprovadoEm: '2025-12-16T14:30:00',
-      criadoEm: '2025-12-15T09:00:00',
-      atualizadoEm: '2025-12-16T14:30:00'
-    },
-    {
-      id: 'SM-002',
-      titulo: 'Depoimento de Cliente',
-      descricao: 'Stories com depoimento de cliente satisfeito',
-      clienteId: '2',
-      clienteNome: 'João Santos',
-      clienteEmpresa: 'Tech Solutions',
-      redeSocial: 'instagram',
-      tipoConteudo: 'stories',
-      dataPublicacao: '2025-12-18',
-      horaPublicacao: '15:00',
-      status: 'em_criacao',
-      copy: 'Veja o que nossos clientes estão dizendo! 💬',
-      hashtags: ['depoimento', 'feedback', 'clientes'],
-      criadoEm: '2025-12-16T10:00:00',
-      atualizadoEm: '2025-12-16T10:00:00'
-    },
-    {
-      id: 'SM-003',
-      titulo: 'Artigo LinkedIn - Tendências 2026',
-      descricao: 'Artigo sobre tendências de marketing digital para 2026',
-      clienteId: '1',
-      clienteNome: 'Maria Silva',
-      clienteEmpresa: 'Silva & Associados',
-      redeSocial: 'linkedin',
-      tipoConteudo: 'artigo',
-      dataPublicacao: '2025-12-17',
-      horaPublicacao: '08:00',
-      status: 'publicado',
-      copy: 'As 5 principais tendências de marketing digital para 2026 que você precisa conhecer.',
-      hashtags: ['marketing', 'tendências', '2026', 'digital'],
-      linkExterno: 'https://blog.exemplo.com/tendencias-2026',
-      publicadoEm: '2025-12-17T08:00:00',
-      metricas: {
-        alcance: 2500,
-        engajamento: 180,
-        cliques: 45,
-        compartilhamentos: 12
-      },
-      criadoEm: '2025-12-14T11:00:00',
-      atualizadoEm: '2025-12-17T08:00:00'
-    },
-    {
-      id: 'SM-004',
-      titulo: 'Tutorial em Vídeo',
-      descricao: 'Reels mostrando como usar nova funcionalidade',
-      clienteId: '2',
-      clienteNome: 'João Santos',
-      clienteEmpresa: 'Tech Solutions',
-      redeSocial: 'instagram',
-      tipoConteudo: 'reels',
-      dataPublicacao: '2025-12-22',
-      horaPublicacao: '18:00',
-      status: 'planejado',
-      copy: 'Aprenda em 30 segundos! 🎯 Tutorial rápido da nossa nova feature.',
-      hashtags: ['tutorial', 'aprenda', 'dicas', 'tecnologia'],
-      criadoEm: '2025-12-16T13:00:00',
-      atualizadoEm: '2025-12-16T13:00:00'
-    }
-  ];
+  const [conteudos, setConteudos] = useState<ConteudoSocial[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [conteudos, setConteudos] = useState<ConteudoSocial[]>(() => {
-    const storageKey = 'social_media_v1';
-    const stored = localStorage.getItem(storageKey);
-    if (stored) {
-      console.log('✅ Social Media: Carregado do localStorage');
-      return JSON.parse(stored);
-    }
-    console.log('📦 Social Media: Usando dados mock iniciais');
-    localStorage.setItem(storageKey, JSON.stringify(CONTEUDOS_MOCK));
-    return CONTEUDOS_MOCK;
-  });
+  // Listener em tempo real para conteúdos do Firestore
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    setLoading(true);
+    const conteudosRef = collection(db, 'social_media');
+    
+    // Se for webmaster, vê tudo. Se não, vê apenas os seus.
+    const q = userIsWebmaster 
+      ? query(conteudosRef)
+      : query(conteudosRef, where('adminId', '==', user.uid));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as ConteudoSocial[];
+      
+      setConteudos(docs);
+      setLoading(false);
+      
+      // Sincronizar com localStorage para cache
+      localStorage.setItem('social_media_v1', JSON.stringify(docs));
+    }, (error) => {
+      console.error('Erro ao escutar conteúdos social media:', error);
+      const stored = localStorage.getItem('social_media_v1');
+      if (stored) setConteudos(JSON.parse(stored));
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid, userIsWebmaster]);
 
   // Salva no localStorage quando conteudos mudar
   useEffect(() => {
@@ -207,9 +153,28 @@ const SocialMedia: React.FC = () => {
     setModalCriarOpen(true);
   };
 
-  const handleConteudoCriado = (novoConteudo: ConteudoSocial) => {
-    setConteudos(prev => [novoConteudo, ...prev]);
-    console.log('✅ Conteúdo adicionado à lista:', novoConteudo.id);
+  const handleConteudoCriado = async (novoConteudo: ConteudoSocial) => {
+    const conteudoData = {
+      ...novoConteudo,
+      adminId: user?.uid,
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
+    };
+
+    try {
+      const docRef = await addDoc(collection(db, 'social_media'), conteudoData);
+      console.log('✅ Conteúdo criado no Firestore:', docRef.id);
+      setModalCriarOpen(false);
+    } catch (error) {
+      console.error('Erro ao criar conteúdo no Firestore:', error);
+      // Fallback local
+      const conteudo: ConteudoSocial = {
+        ...conteudoData,
+        id: `SM-${Date.now()}`
+      } as ConteudoSocial;
+      setConteudos([...conteudos, conteudo]);
+      setModalCriarOpen(false);
+    }
   };
 
   const handleVisualizar = (conteudo: ConteudoSocial) => {
@@ -223,11 +188,29 @@ const SocialMedia: React.FC = () => {
     setModalEditarOpen(true);
   };
 
-  const handleConteudoAtualizado = (conteudoAtualizado: ConteudoSocial) => {
+  const handleConteudoAtualizado = async (conteudoAtualizado: ConteudoSocial) => {
     setConteudos(prev => prev.map(c => 
       c.id === conteudoAtualizado.id ? conteudoAtualizado : c
     ));
     console.log('✅ Conteúdo atualizado:', conteudoAtualizado.id);
+
+    try {
+      await updateDoc(doc(db, 'social_media', conteudoAtualizado.id), {
+        ...conteudoAtualizado,
+        atualizadoEm: new Date().toISOString()
+      });
+      setModalEditarOpen(false);
+      setConteudoSelecionado(null);
+    } catch (error) {
+      console.error('Erro ao editar conteúdo no Firestore:', error);
+      if (conteudoSelecionado) {
+        setConteudos(conteudos.map(c => 
+          c.id === conteudoSelecionado.id ? { ...c, ...conteudoAtualizado } : c
+        ));
+      }
+      setModalEditarOpen(false);
+      setConteudoSelecionado(null);
+    }
   };
 
   const handleDeletar = (conteudo: ConteudoSocial) => {
@@ -236,9 +219,19 @@ const SocialMedia: React.FC = () => {
     setModalDeletarOpen(true);
   };
 
-  const handleConteudoDeletado = (conteudoId: string) => {
-    setConteudos(prev => prev.filter(c => c.id !== conteudoId));
-    console.log('🗑️ Conteúdo removido:', conteudoId);
+  const handleConteudoDeletado = async () => {
+    if (!conteudoSelecionado) return;
+
+    try {
+      await deleteDoc(doc(db, 'social_media', conteudoSelecionado.id));
+      setModalDeletarOpen(false);
+      setConteudoSelecionado(null);
+    } catch (error) {
+      console.error('Erro ao deletar conteúdo no Firestore:', error);
+      setConteudos(conteudos.filter(c => c.id !== conteudoSelecionado.id));
+      setModalDeletarOpen(false);
+      setConteudoSelecionado(null);
+    }
   };
 
   // ============================================================================
@@ -408,18 +401,17 @@ const SocialMedia: React.FC = () => {
   // ============================================================================
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 dark:from-gray-900 dark:via-purple-950 dark:to-gray-900 transition-colors duration-500">
+    <div className="flex min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 dark:from-gray-900 dark:via-purple-950 dark:to-gray-900 transition-colors duration-500">
+      {/* Sidebar de Navegação */}
+      <Sidebar />
+      
+      {/* Conteúdo Principal */}
+      <main className="flex-1 min-h-screen lg:ml-0">
       {/* Header */}
       <div className="backdrop-blur-xl bg-white/80 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              </button>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
                   Social Media
@@ -1069,6 +1061,7 @@ const SocialMedia: React.FC = () => {
 
       {/* Tutorial Overlay */}
       <TutorialOverlay page="social-media" />
+      </main>
     </div>
   );
 };

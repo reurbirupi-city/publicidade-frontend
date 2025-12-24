@@ -53,63 +53,21 @@ interface AtividadeRecente {
 
 export default function AdminDashboard() {
   const [metricas, setMetricas] = useState<Metrica>({
-    solicitacoesPendentes: 3,
-    propostasAguardandoResposta: 2,
-    contratosAguardandoAssinatura: 1,
-    parcelasVencendoHoje: 2,
-    parcelasAtrasadas: 1,
-    projetosEmAndamento: 5,
-    receitaMensal: 15000,
-    receitaPendente: 8500,
-    totalClientes: 24,
-    novosClientesMes: 3
+    solicitacoesPendentes: 0,
+    propostasAguardandoResposta: 0,
+    contratosAguardandoAssinatura: 0,
+    parcelasVencendoHoje: 0,
+    parcelasAtrasadas: 0,
+    projetosEmAndamento: 0,
+    receitaMensal: 0,
+    receitaPendente: 0,
+    totalClientes: 0,
+    novosClientesMes: 0
   });
 
-  const [solicitacoesPendentes, setSolicitacoesPendentes] = useState<Solicitacao[]>([
-    {
-      id: 'SOL-2024-001',
-      clienteId: 'CLI-001',
-      clienteNome: 'João Silva',
-      titulo: 'Site Institucional',
-      categoria: 'Web Design',
-      valor: 2800,
-      status: 'enviada',
-      prioridade: 'alta',
-      dataSolicitacao: '2024-12-18'
-    },
-    {
-      id: 'SOL-2024-002',
-      clienteNome: 'Maria Santos',
-      clienteId: 'CLI-002',
-      titulo: 'Gestão de Redes Sociais',
-      categoria: 'Social Media',
-      valor: 1200,
-      status: 'analise',
-      prioridade: 'media',
-      dataSolicitacao: '2024-12-17'
-    }
-  ]);
+  const [solicitacoesPendentes, setSolicitacoesPendentes] = useState<Solicitacao[]>([]);
 
-  const [atividadesRecentes, setAtividadesRecentes] = useState<AtividadeRecente[]>([
-    {
-      id: '1',
-      tipo: 'contrato',
-      acao: 'assinado',
-      descricao: 'Contrato CONT-2024-001 assinado',
-      userNome: 'João Silva',
-      userRole: 'cliente',
-      dataAcao: '2024-12-18T10:30:00'
-    },
-    {
-      id: '2',
-      tipo: 'proposta',
-      acao: 'aceita',
-      descricao: 'Proposta PROP-2024-003 aceita',
-      userNome: 'Maria Santos',
-      userRole: 'cliente',
-      dataAcao: '2024-12-18T09:15:00'
-    }
-  ]);
+  const [atividadesRecentes, setAtividadesRecentes] = useState<AtividadeRecente[]>([]);
 
   const [filtroSolicitacoes, setFiltroSolicitacoes] = useState('todas');
 

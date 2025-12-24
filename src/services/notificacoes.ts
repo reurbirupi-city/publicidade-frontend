@@ -46,7 +46,7 @@ export interface Notificacao {
   destinatarioId: string; // 'admin' para admin ou UID do cliente
   remetenteNome?: string;
   referenciaId?: string; // ID do projeto, solicitação, etc.
-  referenciaTipo?: 'projeto' | 'solicitacao' | 'contrato' | 'proposta';
+  referenciaTipo?: 'projeto' | 'solicitacao' | 'contrato' | 'proposta' | 'sistema';
   lida: boolean;
   criadaEm: string;
   lidaEm?: string;
@@ -509,6 +509,55 @@ export const notificarProjetoCriado = async (
     link: '/portal',
     icone: '🚀',
     prioridade: 'alta'
+  });
+};
+
+/**
+ * Notifica sobre evento na agenda
+ */
+export const notificarEventoAgenda = async (
+  destinatarioId: string,
+  tituloEvento: string,
+  horario: string,
+  eventoId: string
+): Promise<void> => {
+  await criarNotificacao({
+    tipo: 'lembrete_prazo',
+    titulo: '📅 Lembrete de Evento',
+    mensagem: `O evento "${tituloEvento}" está agendado para ${horario}`,
+    destinatarioTipo: 'admin',
+    destinatarioId: destinatarioId,
+    referenciaId: eventoId,
+    referenciaTipo: 'sistema',
+    link: '/agenda',
+    icone: '📅',
+    prioridade: 'alta'
+  });
+};
+
+/**
+ * Notifica sobre nova transação financeira
+ */
+export const notificarNovaTransacao = async (
+  destinatarioId: string,
+  descricao: string,
+  valor: number,
+  tipo: 'receita' | 'despesa'
+): Promise<void> => {
+  const icone = tipo === 'receita' ? '💰' : '💸';
+  const titulo = tipo === 'receita' ? 'Nova Receita' : 'Nova Despesa';
+  
+  await criarNotificacao({
+    tipo: tipo === 'receita' ? 'pagamento_recebido' : 'sistema',
+    titulo: `${icone} ${titulo}`,
+    mensagem: `${descricao}: R$ ${valor.toLocaleString('pt-BR')}`,
+    destinatarioTipo: 'admin',
+    destinatarioId: destinatarioId,
+    referenciaId: 'financeiro',
+    referenciaTipo: 'sistema',
+    link: '/financeiro',
+    icone: icone,
+    prioridade: 'normal'
   });
 };
 

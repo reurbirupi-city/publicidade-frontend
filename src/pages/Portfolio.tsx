@@ -23,11 +23,16 @@ import {
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
 import { TutorialOverlay } from '../components/TutorialOverlay';
+import Sidebar from '../components/Sidebar';
 import ModalVisualizarPortfolio from '../components/ModalVisualizarPortfolio';
 import ModalAdicionarPortfolio from '../components/ModalAdicionarPortfolio';
 import ModalEditarPortfolio from '../components/ModalEditarPortfolio';
 import ModalDeletarPortfolio from '../components/ModalDeletarPortfolio';
 import { getProjetos, getClientes } from '../services/dataIntegration';
+import { db } from '../services/firebase';
+import { collection, addDoc, onSnapshot, query, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { useAuth } from '../contexts/AuthContext';
+import { isWebmaster } from '../services/adminService';
 
 // ============================================================================
 // INTERFACES E TIPOS
@@ -67,6 +72,8 @@ interface ItemPortfolio {
 const Portfolio: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+  const userIsWebmaster = user?.email ? isWebmaster(user.email) : false;
   
   // Verifica se está vindo do portal do cliente
   const isClientView = location.state?.fromClient === true;
@@ -92,199 +99,44 @@ const Portfolio: React.FC = () => {
   };
 
   // ============================================================================
-  // DADOS MOCK INICIAIS
+  // ESTADO INICIAL
   // ============================================================================
 
-  const PORTFOLIO_MOCK: ItemPortfolio[] = [
-    {
-      id: 'PORT-001',
-      projetoId: 'PROJ-2025-001',
-      clienteId: '1',
-      clienteNome: 'Maria Silva',
-      clienteEmpresa: 'Tech Innovations',
-      titulo: 'Campanha Digital Q1 - Tech Innovations',
-      descricao: 'Campanha completa de marketing digital para lançamento de produto tech com foco em geração Z. Incluiu identidade visual, estratégia de conteúdo para Instagram, TikTok e LinkedIn, produção de 50+ artes e 12 vídeos.',
-      categoria: 'social',
-      autorizadoPublicacao: true,
-      imagemCapa: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&h=600&fit=crop',
-      imagensGaleria: [
-        'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=800&h=600&fit=crop'
-      ],
-      tags: ['Social Media', 'Marketing Digital', 'Branding', 'Conteúdo Visual'],
-      destaque: true,
-      dataFinalizacao: '2025-12-15',
-      resultados: {
-        alcance: 250000,
-        engajamento: 15000,
-        conversao: 8.5,
-        roi: '450%'
-      },
-      testemunho: {
-        texto: 'O trabalho superou todas as expectativas! A campanha gerou resultados incríveis e nossa marca ganhou visibilidade que jamais imaginamos.',
-        autor: 'Maria Silva',
-        cargo: 'CEO Tech Innovations'
-      },
-      criadoEm: '2025-12-15T10:00:00'
-    },
-    {
-      id: 'PORT-002',
-      projetoId: 'PROJ-2025-002',
-      clienteId: '2',
-      clienteNome: 'João Santos',
-      clienteEmpresa: 'Tech Solutions',
-      titulo: 'Rebranding Tech Solutions - Identidade Visual Completa',
-      descricao: 'Redesign total da marca incluindo novo logo, paleta de cores, tipografia, manual de marca e aplicações em diversos materiais digitais e impressos.',
-      categoria: 'branding',
-      autorizadoPublicacao: true,
-      imagemCapa: 'https://images.unsplash.com/photo-1558655146-364adaf1fcc9?w=800&h=600&fit=crop',
-      imagensGaleria: [
-        'https://images.unsplash.com/photo-1558655146-364adaf1fcc9?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1558655146-d09347e92766?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1611224885990-ab7363d1f2a8?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1626785774625-ddcddc3445e9?w=800&h=600&fit=crop'
-      ],
-      tags: ['Branding', 'Identidade Visual', 'Logo Design', 'Manual de Marca'],
-      destaque: true,
-      dataFinalizacao: '2025-12-10',
-      resultados: {
-        alcance: 50000,
-        engajamento: 3500,
-        roi: '320%'
-      },
-      testemunho: {
-        texto: 'A nova identidade visual elevou nossa marca a outro patamar. Recebemos elogios de todos os stakeholders!',
-        autor: 'João Santos',
-        cargo: 'Diretor Tech Solutions'
-      },
-      criadoEm: '2025-12-10T14:00:00'
-    },
-    {
-      id: 'PORT-003',
-      projetoId: 'PROJ-2025-003',
-      clienteId: '3',
-      clienteNome: 'Ana Costa',
-      clienteEmpresa: 'Costa Marketing',
-      titulo: 'Website Institucional Costa Marketing',
-      descricao: 'Desenvolvimento de website responsivo moderno com CMS, integração com redes sociais, formulários de contato e área de blog.',
-      categoria: 'web',
-      autorizadoPublicacao: true,
-      imagemCapa: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=600&fit=crop',
-      imagensGaleria: [
-        'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1547658719-da2b51169166?w=800&h=600&fit=crop'
-      ],
-      tags: ['Web Design', 'Desenvolvimento', 'Responsivo', 'UX/UI'],
-      destaque: false,
-      dataFinalizacao: '2025-11-30',
-      resultados: {
-        alcance: 15000,
-        conversao: 12.3,
-        roi: '280%'
-      },
-      criadoEm: '2025-11-30T16:00:00'
-    },
-    {
-      id: 'PORT-004',
-      projetoId: 'PROJ-2025-004',
-      clienteId: '1',
-      clienteNome: 'Maria Silva',
-      clienteEmpresa: 'Tech Innovations',
-      titulo: 'E-commerce Moda Primavera/Verão',
-      descricao: 'Plataforma completa de e-commerce com sistema de pagamento, gestão de estoque, painel administrativo e integração com marketplaces.',
-      categoria: 'web',
-      autorizadoPublicacao: true,
-      imagemCapa: 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=800&h=600&fit=crop',
-      imagensGaleria: [
-        'https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=600&fit=crop'
-      ],
-      tags: ['E-commerce', 'Desenvolvimento', 'UX/UI', 'Pagamentos'],
-      destaque: true,
-      dataFinalizacao: '2025-12-05',
-      resultados: {
-        alcance: 80000,
-        conversao: 18.7,
-        roi: '520%'
-      },
-      testemunho: {
-        texto: 'A plataforma superou nossas expectativas! As vendas online cresceram 400% no primeiro mês.',
-        autor: 'Maria Silva',
-        cargo: 'CEO Tech Innovations'
-      },
-      criadoEm: '2025-12-05T11:00:00'
-    },
-    {
-      id: 'PORT-005',
-      projetoId: 'PROJ-2025-005',
-      clienteId: '2',
-      clienteNome: 'João Santos',
-      clienteEmpresa: 'Tech Solutions',
-      titulo: 'Campanha de Lançamento Produto Tech',
-      descricao: 'Estratégia completa de marketing para lançamento incluindo teaser, vídeos promocionais, landing page e ativações em redes sociais.',
-      categoria: 'marketing',
-      autorizadoPublicacao: true,
-      imagemCapa: 'https://images.unsplash.com/photo-1551650975-87deedd944c3?w=800&h=600&fit=crop',
-      imagensGaleria: [
-        'https://images.unsplash.com/photo-1551650975-87deedd944c3?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1553484771-371a605b060b?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1504868584819-f8e8b4b6d7e3?w=800&h=600&fit=crop'
-      ],
-      tags: ['Marketing', 'Lançamento', 'Vídeo', 'Landing Page'],
-      destaque: false,
-      dataFinalizacao: '2025-11-25',
-      resultados: {
-        alcance: 180000,
-        engajamento: 22000,
-        conversao: 14.2,
-        roi: '380%'
-      },
-      criadoEm: '2025-11-25T09:00:00'
-    },
-    {
-      id: 'PORT-006',
-      projetoId: 'PROJ-2025-006',
-      clienteId: '3',
-      clienteNome: 'Ana Costa',
-      clienteEmpresa: 'Costa Marketing',
-      titulo: 'Design System para Aplicativo Mobile',
-      descricao: 'Criação de design system completo com componentes, guia de estilo, iconografia e protótipos interativos para aplicativo iOS e Android.',
-      categoria: 'design',
-      autorizadoPublicacao: true,
-      imagemCapa: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=800&h=600&fit=crop',
-      imagensGaleria: [
-        'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=800&h=600&fit=crop'
-      ],
-      tags: ['Design System', 'UI/UX', 'Mobile', 'Protótipo'],
-      destaque: false,
-      dataFinalizacao: '2025-11-20',
-      resultados: {
-        alcance: 25000,
-        engajamento: 1800,
-        roi: '240%'
-      },
-      criadoEm: '2025-11-20T13:00:00'
-    }
-  ];
+  const [portfolio, setPortfolio] = useState<ItemPortfolio[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [portfolio, setPortfolio] = useState<ItemPortfolio[]>(() => {
-    const storageKey = 'portfolio_v1';
-    const stored = localStorage.getItem(storageKey);
-    if (stored) {
-      console.log('✅ Portfolio: Carregado do localStorage');
-      return JSON.parse(stored);
-    }
-    console.log('📦 Portfolio: Usando dados mock iniciais');
-    localStorage.setItem(storageKey, JSON.stringify(PORTFOLIO_MOCK));
-    return PORTFOLIO_MOCK;
-  });
+  // Listener em tempo real para portfólio do Firestore
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    setLoading(true);
+    const portfolioRef = collection(db, 'portfolio');
+    
+    // Se for webmaster, vê tudo. Se não, vê apenas os seus.
+    const q = userIsWebmaster 
+      ? query(portfolioRef)
+      : query(portfolioRef, where('adminId', '==', user.uid));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as ItemPortfolio[];
+      
+      setPortfolio(docs);
+      setLoading(false);
+      
+      // Sincronizar com localStorage para cache
+      localStorage.setItem('portfolio_v1', JSON.stringify(docs));
+    }, (error) => {
+      console.error('Erro ao escutar portfólio:', error);
+      const stored = localStorage.getItem('portfolio_v1');
+      if (stored) setPortfolio(JSON.parse(stored));
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid, userIsWebmaster]);
 
   // Salva no localStorage quando portfolio mudar
   useEffect(() => {
@@ -323,12 +175,14 @@ const Portfolio: React.FC = () => {
     setItemSelecionado(null);
   };
 
-  const handleEditarItem = () => {
+  const handleEditarItem = (item?: ItemPortfolio) => {
+    if (item) setItemSelecionado(item);
     setModalVisualizarOpen(false);
     setModalEditarOpen(true);
   };
 
-  const handleDeletarItem = () => {
+  const handleDeletarItem = (item?: ItemPortfolio) => {
+    if (item) setItemSelecionado(item);
     setModalVisualizarOpen(false);
     setModalDeletarOpen(true);
   };
@@ -347,77 +201,66 @@ const Portfolio: React.FC = () => {
     };
   };
 
-  const handleSalvarEdicao = (itemEditado: any) => {
+  const handleSalvarEdicao = async (itemEditado: any) => {
+    if (!itemSelecionado) return;
+
     // Converte o formato do modal para o formato do Portfolio
-    const itemAtualizado: ItemPortfolio = {
+    const itemAtualizado: any = {
       ...itemEditado,
       categoria: itemEditado.categoria as CategoriaPortfolio,
-      resultados: {
-        alcance: itemEditado.alcance ? Number(itemEditado.alcance.replace(/\D/g, '')) : undefined,
-        engajamento: itemEditado.engajamento ? Number(itemEditado.engajamento.replace('%', '')) : undefined,
-        conversao: itemEditado.conversao ? Number(itemEditado.conversao.replace('%', '')) : undefined,
-        roi: itemEditado.roi
-      },
-      testemunho: itemEditado.testemunhoTexto ? {
-        texto: itemEditado.testemunhoTexto,
-        autor: itemEditado.testemunhoAutor || '',
-        cargo: itemEditado.testemunhoCargo || ''
-      } : undefined
+      atualizadoEm: new Date().toISOString()
     };
 
-    setPortfolio(portfolio.map(item => 
-      item.id === itemAtualizado.id ? itemAtualizado : item
-    ));
-    localStorage.setItem('portfolio_v1', JSON.stringify(
-      portfolio.map(item => item.id === itemAtualizado.id ? itemAtualizado : item)
-    ));
-    setModalEditarOpen(false);
-    setItemSelecionado(null);
+    try {
+      await updateDoc(doc(db, 'portfolio', itemSelecionado.id), itemAtualizado);
+      setModalEditarOpen(false);
+      setItemSelecionado(null);
+    } catch (error) {
+      console.error('Erro ao editar item do portfólio no Firestore:', error);
+      setPortfolio(portfolio.map(item => 
+        item.id === itemSelecionado.id ? { ...item, ...itemAtualizado } : item
+      ));
+      setModalEditarOpen(false);
+      setItemSelecionado(null);
+    }
   };
 
-  const handleConfirmarDelecao = () => {
-    if (itemSelecionado) {
+  const handleConfirmarDelecao = async () => {
+    if (!itemSelecionado) return;
+
+    try {
+      await deleteDoc(doc(db, 'portfolio', itemSelecionado.id));
+      setModalDeletarOpen(false);
+      setItemSelecionado(null);
+    } catch (error) {
+      console.error('Erro ao deletar item do portfólio no Firestore:', error);
       setPortfolio(portfolio.filter(item => item.id !== itemSelecionado.id));
-      localStorage.setItem('portfolio_v1', JSON.stringify(
-        portfolio.filter(item => item.id !== itemSelecionado.id)
-      ));
       setModalDeletarOpen(false);
       setItemSelecionado(null);
     }
   };
 
-  const handleAdicionarItem = (novoItem: any) => {
-    const itemCompleto: ItemPortfolio = {
-      id: `PORT-${String(portfolio.length + 1).padStart(3, '0')}`,
-      projetoId: `PROJ-2025-${String(portfolio.length + 1).padStart(3, '0')}`,
-      clienteId: String(portfolio.length + 1),
-      clienteNome: novoItem.clienteNome,
-      clienteEmpresa: novoItem.clienteEmpresa,
-      titulo: novoItem.titulo,
-      descricao: novoItem.descricao,
-      categoria: novoItem.categoria,
-      autorizadoPublicacao: novoItem.autorizadoPublicacao,
-      imagemCapa: novoItem.imagemCapa,
-      imagensGaleria: novoItem.imagensGaleria,
-      tags: novoItem.tags,
-      destaque: novoItem.destaque,
-      dataFinalizacao: novoItem.dataFinalizacao,
-      resultados: novoItem.alcance || novoItem.engajamento ? {
-        alcance: novoItem.alcance ? parseInt(novoItem.alcance) : undefined,
-        engajamento: novoItem.engajamento ? parseInt(novoItem.engajamento) : undefined,
-        conversao: novoItem.conversao ? parseFloat(novoItem.conversao) : undefined,
-        roi: novoItem.roi || undefined
-      } : undefined,
-      testemunho: novoItem.testemunhoTexto ? {
-        texto: novoItem.testemunhoTexto,
-        autor: novoItem.testemunhoAutor || novoItem.clienteNome,
-        cargo: novoItem.testemunhoCargo || 'Cliente'
-      } : undefined,
+  const handleAdicionarItem = async (novoItem: any) => {
+    const itemData = {
+      ...novoItem,
+      adminId: user?.uid,
       criadoEm: new Date().toISOString()
     };
 
-    setPortfolio([itemCompleto, ...portfolio]);
-    console.log('✅ Item adicionado ao portfolio:', itemCompleto.id);
+    try {
+      const docRef = await addDoc(collection(db, 'portfolio'), itemData);
+      console.log('✅ Item de portfólio criado no Firestore:', docRef.id);
+      setModalAdicionarOpen(false);
+    } catch (error) {
+      console.error('Erro ao adicionar item ao portfólio no Firestore:', error);
+      // Fallback local
+      const item: ItemPortfolio = {
+        ...itemData,
+        id: `PF-${Date.now()}`
+      } as ItemPortfolio;
+      setPortfolio([...portfolio, item]);
+      setModalAdicionarOpen(false);
+    }
   };
 
   // ============================================================================
@@ -469,18 +312,25 @@ const Portfolio: React.FC = () => {
   // ============================================================================
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50 dark:from-gray-900 dark:via-purple-950 dark:to-gray-900 transition-colors duration-500">
+    <div className="flex min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50 dark:from-gray-900 dark:via-purple-950 dark:to-gray-900 transition-colors duration-500">
+      {/* Sidebar de Navegação - Apenas se não for visualização de cliente */}
+      {!isClientView && <Sidebar />}
+      
+      {/* Conteúdo Principal */}
+      <main className={`flex-1 min-h-screen ${!isClientView ? 'lg:ml-0' : ''}`}>
       {/* Header */}
       <div className="backdrop-blur-xl bg-white/80 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <button
-                onClick={handleVoltar}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              </button>
+              {isClientView && (
+                <button
+                  onClick={handleVoltar}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                </button>
+              )}
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
                   Portfolio Criativo
@@ -966,6 +816,7 @@ const Portfolio: React.FC = () => {
           <TutorialOverlay page="portfolio" />
         </>
       )}
+      </main>
     </div>
   );
 };

@@ -22,6 +22,7 @@ import {
   FileSignature,
   ShoppingCart
 } from 'lucide-react';
+import Sidebar from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
 import { TutorialOverlay } from '../components/TutorialOverlay';
@@ -31,9 +32,10 @@ import ModalGerarProposta from '../components/ModalGerarProposta';
 import ModalContratoAssinatura from '../components/ModalContratoAssinatura';
 import ModalFinalizarServico from '../components/ModalFinalizarServico';
 import { db } from '../services/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { isWebmaster, getAdminByEmail } from '../services/adminService';
+import { notificarNovoCliente } from '../services/notificacoes';
 
 // Tipos auxiliares para o módulo de clientes
 interface ServicoContratado {
@@ -89,6 +91,7 @@ interface Cliente {
   dataContato: string;
   observacoes: string;
   rating: number;
+  adminId?: string;
   
   // Novos campos - Dados cadastrais expandidos
   tipoPessoa?: 'fisica' | 'juridica';
@@ -142,12 +145,6 @@ const CRM: React.FC = () => {
   const [cotacaoObservacoes, setCotacaoObservacoes] = useState('');
   const [valorTotalCotacao, setValorTotalCotacao] = useState({ total: 0, umaVez: 0, recorrente: 0 });
   const [servicoParaFinalizar, setServicoParaFinalizar] = useState<ServicoContratado | null>(null);
-  
-  /* Dados mock comentados - sistema agora usa apenas clientes reais
-  const CLIENTES_MOCK: Cliente[] = [
-    ... dados mockados removidos ...
-  ];
-  */
   
   // Estado carregado do localStorage - inicia vazio se não houver dados
   const [clientes, setClientes] = useState<Cliente[]>(() => {
@@ -334,26 +331,71 @@ const CRM: React.FC = () => {
     setShowDeleteConfirm(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedCliente) {
-      setClientes(clientes.filter(c => c.id !== selectedCliente.id));
-      setShowDeleteConfirm(false);
-      setSelectedCliente(null);
+      try {
+        await deleteDoc(doc(db, 'clientes', selectedCliente.id));
+        setClientes(clientes.filter(c => c.id !== selectedCliente.id));
+        setShowDeleteConfirm(false);
+        setSelectedCliente(null);
+      } catch (error) {
+        console.error('Erro ao deletar cliente:', error);
+        // Fallback local
+        setClientes(clientes.filter(c => c.id !== selectedCliente.id));
+        setShowDeleteConfirm(false);
+        setSelectedCliente(null);
+      }
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (modalMode === 'create') {
+      const id = Date.now().toString();
       const newCliente: Cliente = {
         ...formData as Cliente,
-        id: Date.now().toString(),
-        dataContato: new Date().toISOString().split('T')[0]
+        id,
+        dataContato: new Date().toISOString().split('T')[0],
+        adminId: user?.uid // Vincular ao admin que criou
       };
-      setClientes([...clientes, newCliente]);
+
+      try {
+        await setDoc(doc(db, 'clientes', id), {
+          ...newCliente,
+          syncedAt: new Date().toISOString()
+        });
+        
+        // Notificar
+        await notificarNovoCliente(
+          newCliente.nome, 
+          newCliente.empresa, 
+          newCliente.email, 
+          newCliente.id, 
+          user?.uid
+        );
+        
+        setClientes([...clientes, newCliente]);
+      } catch (error) {
+        console.error('Erro ao salvar cliente no Firestore:', error);
+        setClientes([...clientes, newCliente]);
+      }
     } else if (modalMode === 'edit' && selectedCliente) {
-      setClientes(clientes.map(c => 
-        c.id === selectedCliente.id ? { ...formData as Cliente, id: c.id } : c
-      ));
+      const updatedCliente = { ...formData as Cliente, id: selectedCliente.id };
+      
+      try {
+        await setDoc(doc(db, 'clientes', selectedCliente.id), {
+          ...updatedCliente,
+          syncedAt: new Date().toISOString()
+        });
+        
+        setClientes(clientes.map(c => 
+          c.id === selectedCliente.id ? updatedCliente : c
+        ));
+      } catch (error) {
+        console.error('Erro ao atualizar cliente no Firestore:', error);
+        setClientes(clientes.map(c => 
+          c.id === selectedCliente.id ? updatedCliente : c
+        ));
+      }
     }
     setShowModal(false);
     setSelectedCliente(null);
@@ -522,42 +564,41 @@ const CRM: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-300">
-      {/* Background Effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30 dark:from-gray-950 dark:via-blue-950/30 dark:to-purple-950/30 transition-colors duration-500"></div>
-      </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-300 flex">
+      {/* Sidebar */}
+      <Sidebar />
 
-      {/* Header */}
-      <header className="relative z-10 backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border-b border-gray-200 dark:border-gray-800 sticky top-0">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">CRM</h1>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Gestão de Clientes</p>
+      {/* Main Content */}
+      <main className="flex-1 min-h-screen lg:ml-0">
+        {/* Background Effects */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30 dark:from-gray-950 dark:via-blue-950/30 dark:to-purple-950/30 transition-colors duration-500"></div>
+        </div>
+
+        {/* Header */}
+        <header className="relative z-10 backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border-b border-gray-200 dark:border-gray-800 sticky top-0">
+          <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4 ml-14 lg:ml-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                    <Users className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">CRM</h1>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Gestão de Clientes</p>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <NotificacoesBell />
-              <ThemeToggle />
+              <div className="flex items-center gap-3">
+                <NotificacoesBell />
+                <ThemeToggle />
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 py-8">
+        <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 py-8">
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {stats.map((stat, index) => (
@@ -1241,6 +1282,7 @@ const CRM: React.FC = () => {
 
       {/* Tutorial Overlay */}
       <TutorialOverlay page="crm" />
+      </main>
     </div>
   );
 };

@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Calendar,
   Clock,
   Plus,
-  ArrowLeft,
   ChevronLeft,
   ChevronRight,
   Bell,
@@ -17,31 +16,61 @@ import {
   Users,
   Briefcase,
   Zap,
-  CheckCircle2
+  CheckCircle2,
+  DollarSign,
+  TrendingUp,
+  Rocket,
+  Flame,
+  Coffee,
+  Sun,
+  Moon,
+  Sunset,
+  Star,
+  Award,
+  BarChart3,
+  ArrowUpRight,
+  MessageSquare,
+  FileText,
+  Play,
+  Pause,
+  RefreshCw,
+  Sparkles,
+  Timer,
+  Activity,
+  Eye,
+  ExternalLink,
+  Settings,
+  Crown,
+  Link2,
+  Copy,
+  Check
 } from 'lucide-react';
+import Sidebar from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
+import ModalGestaoAdmins from '../components/ModalGestaoAdmins';
 import { TutorialOverlay } from '../components/TutorialOverlay';
+import ModalCriarEvento, { NovoEvento } from '../components/ModalCriarEvento';
+import { useAuth } from '../contexts/AuthContext';
+import { getProjetos, getClientes, getSystemStats, getEventos, saveEventos } from '../services/dataIntegration';
+import { isWebmaster, getAdminByEmail, Admin } from '../services/adminService';
+import { useNotificacoes } from '../contexts/NotificacoesContext';
+import { notificarEventoAgenda } from '../services/notificacoes';
+import { db } from '../services/firebase';
+import { collection, addDoc, onSnapshot, query, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+
+// ============================================================================
+// INTERFACES
+// ============================================================================
 
 interface RecorrenciaEvento {
   ativa: boolean;
   tipo: 'diaria' | 'semanal' | 'mensal';
-  intervalo: number; // a cada X dias/semanas/meses
-  diasSemana?: number[]; // 0=Domingo, 1=Segunda, ..., 6=Sábado
-  diaDoMes?: number; // dia específico do mês (1-31)
-  dataFim?: string; // data limite da recorrência
-  ocorrencias?: number; // ou número de ocorrências
-}
-
-interface EventoTemplate {
-  id: string;
-  nome: string;
-  descricao: string;
-  tipo: 'reuniao' | 'deadline' | 'foco' | 'ligacao' | 'outro';
-  duracaoMinutos: number;
-  cor: string;
-  checklist?: string[];
-  materiaisNecessarios?: string[];
+  intervalo: number;
+  diasSemana?: number[];
+  diaDoMes?: number;
+  dataFim?: string;
+  ocorrencias?: number;
 }
 
 interface Evento {
@@ -63,18 +92,130 @@ interface Evento {
   concluido: boolean;
   alertaMinutos?: number;
   recorrencia?: RecorrenciaEvento;
-  eventoRecorrentePaiId?: string; // ID do evento original que gera recorrências
-  templateId?: string; // ID do template usado para criar este evento
+  eventoRecorrentePaiId?: string;
+  templateId?: string;
+  adminId?: string;
 }
+
+interface ProjetoIntegrado {
+  id: string;
+  titulo: string;
+  clienteNome: string;
+  clienteEmpresa: string;
+  progresso: number;
+  prazoEstimado: string;
+  status: string;
+  prioridade: string;
+  valorContratado: number;
+}
+
+interface TransacaoPendente {
+  id: string;
+  descricao: string;
+  valor: number;
+  dataVencimento: string;
+  clienteNome?: string;
+  status: string;
+  tipo: 'receita' | 'despesa';
+}
+
+// ============================================================================
+// COMPONENTE PRINCIPAL - COMMAND CENTER
+// ============================================================================
 
 const Agenda: React.FC = () => {
   const navigate = useNavigate();
-  const [viewMode, setViewMode] = useState<'dia' | 'semana' | 'mes'>('semana');
+  const { user } = useAuth();
+  const { notificacoes } = useNotificacoes();
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<'dia' | 'semana' | 'mes'>('dia');
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'view' | 'create' | 'edit'>('view');
   const [selectedEvento, setSelectedEvento] = useState<Evento | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [activeWidget, setActiveWidget] = useState<string | null>(null);
+  const [focusMode, setFocusMode] = useState(false);
+  const [focusTimer, setFocusTimer] = useState(0);
+  const [isFocusRunning, setIsFocusRunning] = useState(false);
+
+  // Estados para Gestão de Admins e Convites
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showGestaoAdmins, setShowGestaoAdmins] = useState(false);
+  const [adminData, setAdminData] = useState<Admin | null>(null);
+  const [linkCopiado, setLinkCopiado] = useState(false);
+  const [linkAdminCopiado, setLinkAdminCopiado] = useState(false);
+  const settingsRef = React.useRef<HTMLDivElement>(null);
+  const userIsWebmaster = user?.email ? isWebmaster(user.email) : false;
+
+  // Eventos - Carregados do Firestore com fallback para localStorage
+  const [eventos, setEventos] = useState<Evento[]>([]);
+  const [loadingEventos, setLoadingEventos] = useState(true);
+
+  // Listener em tempo real para eventos do Firestore
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    setLoadingEventos(true);
+    const eventosRef = collection(db, 'eventos');
+    
+    // Se for webmaster, vê tudo. Se não, vê apenas os seus.
+    const q = userIsWebmaster 
+      ? query(eventosRef)
+      : query(eventosRef, where('adminId', '==', user.uid));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Evento[];
+      
+      setEventos(docs);
+      setLoadingEventos(false);
+      
+      // Sincronizar com localStorage para offline/cache
+      saveEventos(docs);
+    }, (error) => {
+      console.error('Erro ao escutar eventos:', error);
+      // Fallback para localStorage em caso de erro
+      const saved = localStorage.getItem('agendaEventos');
+      if (saved) setEventos(JSON.parse(saved));
+      setLoadingEventos(false);
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid, userIsWebmaster]);
+
+  // Transações pendentes - Carregadas do localStorage
+  const [transacoesPendentes, setTransacoesPendentes] = useState<TransacaoPendente[]>(() => {
+    const saved = localStorage.getItem('financeiro_v1');
+    if (saved) {
+      const allTransacoes = JSON.parse(saved);
+      return allTransacoes
+        .filter((t: any) => t.status === 'pendente')
+        .map((t: any) => ({
+          id: t.id,
+          descricao: t.descricao,
+          valor: t.valor,
+          dataVencimento: t.dataVencimento,
+          clienteNome: t.clienteNome,
+          status: t.status,
+          tipo: t.tipo
+        }));
+    }
+    return [];
+  });
+
+  // Data integration
+  const projetosBase = getProjetos();
+  const projetos: ProjetoIntegrado[] = projetosBase.map(p => ({
+    ...p,
+    progresso: (p as any).progresso || 0,
+    prazoEstimado: (p as any).prazoEstimado || p.dataInicio,
+    prioridade: (p as any).prioridade || 'media'
+  }));
+  const clientes = getClientes();
+  const systemStats = getSystemStats();
 
   // Função auxiliar para converter Date para string sem problema de fuso horário
   const dateToLocalString = (date: Date): string => {
@@ -84,1242 +225,819 @@ const Agenda: React.FC = () => {
     return `${ano}-${mes}-${dia}`;
   };
 
-  const [eventos, setEventos] = useState<Evento[]>([
-    {
-      id: '1',
-      titulo: 'Reunião com Cliente - Silva & Associados',
-      descricao: 'Apresentação da campanha digital Q1 2025',
-      data: '2025-12-15',
-      horaInicio: '09:00',
-      horaFim: '10:30',
-      tipo: 'reuniao',
-      prioridade: 'alta',
-      cliente: 'Maria Silva',
-      projeto: 'Campanha Digital Q1',
-      projetoId: 'PROJ-2025-001',
-      etapaProjeto: 'briefing',
-      local: 'Zoom',
-      participantes: ['Maria Silva', 'João Designer'],
-      cor: 'blue',
-      concluido: false,
-      alertaMinutos: 15
-    },
-    {
-      id: '2',
-      titulo: 'Bloco de Foco - Design',
-      descricao: 'Desenvolvimento de artes para Instagram\n\nChecklist:\n- [ ] Apresentar portfólio\n- [ ] Entender objetivo do projeto\n- [ ] Definir público-alvo',
-      data: '2025-12-15',
-      horaInicio: '14:00',
-      horaFim: '17:00',
-      tipo: 'foco',
-      prioridade: 'alta',
-      projeto: 'Social Media - Tech Solutions',
-      projetoId: 'PROJ-2025-002',
-      etapaProjeto: 'criacao',
-      cor: 'purple',
-      concluido: false,
-      alertaMinutos: 5,
-      templateId: 'temp-3'
-    },
-    {
-      id: '3',
-      titulo: 'Deadline - Entrega Proposta',
-      descricao: 'Proposta comercial Costa Marketing',
-      data: '2025-12-15',
-      horaInicio: '18:00',
-      horaFim: '18:30',
-      tipo: 'deadline',
-      prioridade: 'alta',
-      cliente: 'Ana Costa',
-      projeto: 'Proposta Q1',
-      projetoId: 'PROJ-2025-003',
-      etapaProjeto: 'aprovacao',
-      cor: 'red',
-      concluido: false,
-      alertaMinutos: 30
-    },
-    {
-      id: '4',
-      titulo: 'Stand-up Diário - Equipe',
-      descricao: 'Reunião rápida de alinhamento diário com a equipe',
-      data: '2025-12-16',
-      horaInicio: '09:00',
-      horaFim: '09:15',
-      tipo: 'reuniao',
-      prioridade: 'alta',
-      participantes: ['Equipe completa'],
-      local: 'Sala de Reuniões',
-      cor: 'blue',
-      concluido: false,
-      alertaMinutos: 5,
-      recorrencia: {
-        ativa: true,
-        tipo: 'semanal',
-        intervalo: 1,
-        diasSemana: [1, 2, 3, 4, 5], // Seg-Sex
-        ocorrencias: 20
+  // Carregar dados do admin logado
+  useEffect(() => {
+    const carregarAdmin = async () => {
+      if (user?.email) {
+        const admin = await getAdminByEmail(user.email);
+        setAdminData(admin);
       }
-    },
-    {
-      id: '5',
-      titulo: 'Review Semanal de Projetos',
-      descricao: 'Revisão de status de todos os projetos em andamento',
-      data: '2025-12-16',
-      horaInicio: '16:00',
-      horaFim: '17:00',
-      tipo: 'reuniao',
-      prioridade: 'media',
-      participantes: ['Equipe Gestão'],
-      local: 'Zoom',
-      cor: 'purple',
-      concluido: false,
-      alertaMinutos: 15,
-      recorrencia: {
-        ativa: true,
-        tipo: 'semanal',
-        intervalo: 1,
-        diasSemana: [5], // Sexta-feira
-        dataFim: '2025-12-31'
+    };
+    carregarAdmin();
+  }, [user]);
+
+  // Fechar menu ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setShowSettingsMenu(false);
       }
-    },
-    {
-      id: '6',
-      titulo: 'Relatório Mensal de Performance',
-      descricao: 'Compilar e apresentar métricas do mês',
-      data: '2025-12-17',
-      horaInicio: '14:00',
-      horaFim: '15:30',
-      tipo: 'foco',
-      prioridade: 'alta',
-      cor: 'orange',
-      concluido: false,
-      alertaMinutos: 60,
-      recorrencia: {
-        ativa: true,
-        tipo: 'mensal',
-        intervalo: 1,
-        diaDoMes: 1,
-        ocorrencias: 12
-      }
-    }
-  ]);
-
-  // Templates de eventos pré-configurados
-  const [templates] = useState<EventoTemplate[]>([
-    {
-      id: 'temp-1',
-      nome: 'Briefing com Cliente',
-      descricao: 'Reunião inicial para entender necessidades e expectativas',
-      tipo: 'reuniao',
-      duracaoMinutos: 60,
-      cor: 'blue',
-      checklist: [
-        'Apresentar portfólio',
-        'Entender objetivo do projeto',
-        'Definir público-alvo',
-        'Estabelecer orçamento',
-        'Alinhar prazos'
-      ],
-      materiaisNecessarios: ['Apresentação comercial', 'Contrato', 'Proposta de valor']
-    },
-    {
-      id: 'temp-2',
-      nome: 'Apresentação de Proposta',
-      descricao: 'Apresentação formal da proposta comercial',
-      tipo: 'reuniao',
-      duracaoMinutos: 90,
-      cor: 'purple',
-      checklist: [
-        'Revisar proposta',
-        'Preparar apresentação',
-        'Projeção de custos',
-        'Timeline do projeto',
-        'Termos e condições'
-      ],
-      materiaisNecessarios: ['Proposta comercial', 'Cronograma', 'Portfólio similar']
-    },
-    {
-      id: 'temp-3',
-      nome: 'Bloco de Criação',
-      descricao: 'Tempo dedicado à criação e desenvolvimento',
-      tipo: 'foco',
-      duracaoMinutos: 180,
-      cor: 'purple',
-      checklist: [
-        'Revisar briefing',
-        'Pesquisar referências',
-        'Desenvolver conceito',
-        'Criar protótipo',
-        'Preparar apresentação'
-      ],
-      materiaisNecessarios: ['Briefing aprovado', 'Referências visuais', 'Assets do cliente']
-    },
-    {
-      id: 'temp-4',
-      nome: 'Aprovação de Material',
-      descricao: 'Reunião para aprovação final do material criado',
-      tipo: 'reuniao',
-      duracaoMinutos: 45,
-      cor: 'green',
-      checklist: [
-        'Apresentar versão final',
-        'Coletar feedback',
-        'Ajustes finais',
-        'Aprovação formal',
-        'Definir entrega'
-      ],
-      materiaisNecessarios: ['Material finalizado', 'Mockups', 'Termo de aprovação']
-    },
-    {
-      id: 'temp-5',
-      nome: 'Planejamento de Publicação',
-      descricao: 'Organizar calendário de publicações sociais',
-      tipo: 'foco',
-      duracaoMinutos: 120,
-      cor: 'pink',
-      checklist: [
-        'Definir datas',
-        'Escolher conteúdos',
-        'Escrever copies',
-        'Agendar posts',
-        'Configurar métricas'
-      ],
-      materiaisNecessarios: ['Calendário editorial', 'Banco de conteúdos', 'Ferramentas de agendamento']
-    }
-  ]);
-
-  const [showTemplateModal, setShowTemplateModal] = useState(false);
-
-  // Função para gerar eventos recorrentes
-  const gerarEventosRecorrentes = (eventoBase: Evento): Evento[] => {
-    if (!eventoBase.recorrencia || !eventoBase.recorrencia.ativa) {
-      return [eventoBase];
-    }
-
-    const eventos: Evento[] = [eventoBase];
-    const recorrencia = eventoBase.recorrencia;
-    const dataInicio = new Date(eventoBase.data);
-    let dataAtual = new Date(dataInicio);
-    let contador = 0;
-
-    // Limite máximo de 100 ocorrências para evitar loops infinitos
-    const maxOcorrencias = recorrencia.ocorrencias || 100;
-    const dataLimite = recorrencia.dataFim ? new Date(recorrencia.dataFim) : new Date(dataInicio.getFullYear() + 2, 11, 31);
-
-    while (contador < maxOcorrencias) {
-      // Calcular próxima data baseado no tipo de recorrência
-      switch (recorrencia.tipo) {
-        case 'diaria':
-          dataAtual.setDate(dataAtual.getDate() + recorrencia.intervalo);
-          break;
-        case 'semanal':
-          dataAtual.setDate(dataAtual.getDate() + (7 * recorrencia.intervalo));
-          // Se tem dias específicos da semana, ajustar
-          if (recorrencia.diasSemana && recorrencia.diasSemana.length > 0) {
-            // Implementação simplificada - pode ser expandida
-            const diaAtual = dataAtual.getDay();
-            if (!recorrencia.diasSemana.includes(diaAtual)) {
-              continue;
-            }
-          }
-          break;
-        case 'mensal':
-          dataAtual.setMonth(dataAtual.getMonth() + recorrencia.intervalo);
-          // Se tem dia específico do mês, ajustar
-          if (recorrencia.diaDoMes) {
-            dataAtual.setDate(recorrencia.diaDoMes);
-          }
-          break;
-      }
-
-      // Verificar se passou da data limite
-      if (dataAtual > dataLimite) {
-        break;
-      }
-
-      // Criar novo evento recorrente
-      const novoEvento: Evento = {
-        ...eventoBase,
-        id: `${eventoBase.id}-rec-${contador + 1}`,
-        data: dateToLocalString(dataAtual),
-        eventoRecorrentePaiId: eventoBase.id,
-        concluido: false
-      };
-
-      eventos.push(novoEvento);
-      contador++;
-    }
-
-    return eventos;
-  };
-
-  // Função para criar evento a partir de template
-  const criarEventoDeTemplate = (template: EventoTemplate, data: string, horaInicio: string) => {
-    const duracaoHoras = Math.floor(template.duracaoMinutos / 60);
-    const duracaoMinutos = template.duracaoMinutos % 60;
-    
-    const [hora, minuto] = horaInicio.split(':').map(Number);
-    const horaFim = `${String(hora + duracaoHoras).padStart(2, '0')}:${String(minuto + duracaoMinutos).padStart(2, '0')}`;
-
-    const novoEvento: Evento = {
-      id: Date.now().toString(),
-      titulo: template.nome,
-      descricao: template.descricao + '\n\nChecklist:\n' + (template.checklist?.map(item => `- [ ] ${item}`).join('\n') || ''),
-      data,
-      horaInicio,
-      horaFim,
-      tipo: template.tipo,
-      prioridade: 'media',
-      cor: template.cor,
-      concluido: false,
-      alertaMinutos: 15,
-      templateId: template.id
     };
 
-    return novoEvento;
+    if (showSettingsMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showSettingsMenu]);
+
+  // Atualizar relógio a cada segundo
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Focus Timer
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isFocusRunning && focusTimer > 0) {
+      interval = setInterval(() => {
+        setFocusTimer(prev => prev - 1);
+      }, 1000);
+    } else if (focusTimer === 0 && isFocusRunning) {
+      setIsFocusRunning(false);
+    }
+    return () => clearInterval(interval);
+  }, [isFocusRunning, focusTimer]);
+
+  // Calcular período do dia
+  const getPeriodoDia = () => {
+    const hora = currentTime.getHours();
+    if (hora >= 5 && hora < 12) return { label: 'Bom dia', icon: Sun, gradient: 'from-amber-400 to-orange-500' };
+    if (hora >= 12 && hora < 18) return { label: 'Boa tarde', icon: Sunset, gradient: 'from-orange-400 to-red-500' };
+    return { label: 'Boa noite', icon: Moon, gradient: 'from-indigo-500 to-purple-600' };
   };
 
-  const [formData, setFormData] = useState<Partial<Evento>>({
-    titulo: '',
-    descricao: '',
-    data: dateToLocalString(new Date()),
-    horaInicio: '09:00',
-    horaFim: '10:00',
-    tipo: 'reuniao',
-    prioridade: 'media',
-    cor: 'blue',
-    concluido: false,
-    alertaMinutos: 15
-  });
+  const periodo = getPeriodoDia();
 
-  const tiposEvento = [
-    { value: 'reuniao', label: 'Reunião', icon: Users, color: 'blue' },
-    { value: 'deadline', label: 'Deadline', icon: AlertCircle, color: 'red' },
-    { value: 'foco', label: 'Bloco de Foco', icon: Target, color: 'purple' },
-    { value: 'ligacao', label: 'Ligação', icon: Clock, color: 'green' },
-    { value: 'outro', label: 'Outro', icon: Calendar, color: 'gray' }
-  ];
+  // Eventos do dia atual
+  const eventosHoje = useMemo(() => {
+    const hoje = dateToLocalString(currentDate);
+    return eventos.filter(e => e.data === hoje).sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
+  }, [eventos, currentDate]);
 
-  const cores = [
-    { value: 'blue', label: 'Azul', class: 'bg-blue-500' },
-    { value: 'purple', label: 'Roxo', class: 'bg-purple-500' },
-    { value: 'red', label: 'Vermelho', class: 'bg-red-500' },
-    { value: 'green', label: 'Verde', class: 'bg-green-500' },
-    { value: 'yellow', label: 'Amarelo', class: 'bg-yellow-500' },
-    { value: 'pink', label: 'Rosa', class: 'bg-pink-500' },
-    { value: 'orange', label: 'Laranja', class: 'bg-orange-500' }
-  ];
+  // Próximo evento
+  const proximoEvento = useMemo(() => {
+    const agora = currentTime.getHours() * 60 + currentTime.getMinutes();
+    return eventosHoje.find(e => {
+      const [hora, minuto] = e.horaInicio.split(':').map(Number);
+      return hora * 60 + minuto > agora && !e.concluido;
+    });
+  }, [eventosHoje, currentTime]);
 
+  // Tempo até próximo evento
+  const tempoAteProximo = useMemo(() => {
+    if (!proximoEvento) return null;
+    const [hora, minuto] = proximoEvento.horaInicio.split(':').map(Number);
+    const eventoMinutos = hora * 60 + minuto;
+    const agoraMinutos = currentTime.getHours() * 60 + currentTime.getMinutes();
+    const diff = eventoMinutos - agoraMinutos;
+    if (diff <= 0) return null;
+    const horas = Math.floor(diff / 60);
+    const mins = diff % 60;
+    return horas > 0 ? `${horas}h ${mins}min` : `${mins} min`;
+  }, [proximoEvento, currentTime]);
+
+  // Progresso do dia
+  const progressoDia = useMemo(() => {
+    const total = eventosHoje.length;
+    const concluidos = eventosHoje.filter(e => e.concluido).length;
+    return total > 0 ? Math.round((concluidos / total) * 100) : 0;
+  }, [eventosHoje]);
+
+  // Cores dos eventos
   const getEventosCor = (cor: string) => {
     const colorMap: { [key: string]: string } = {
-      blue: 'border-blue-500 bg-blue-50 dark:bg-blue-900/20',
-      purple: 'border-purple-500 bg-purple-50 dark:bg-purple-900/20',
-      red: 'border-red-500 bg-red-50 dark:bg-red-900/20',
-      green: 'border-green-500 bg-green-50 dark:bg-green-900/20',
-      yellow: 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20',
-      pink: 'border-pink-500 bg-pink-50 dark:bg-pink-900/20',
-      orange: 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
+      blue: 'border-blue-500 bg-blue-500/10',
+      purple: 'border-purple-500 bg-purple-500/10',
+      red: 'border-red-500 bg-red-500/10',
+      green: 'border-green-500 bg-green-500/10',
+      yellow: 'border-yellow-500 bg-yellow-500/10',
+      pink: 'border-pink-500 bg-pink-500/10',
+      orange: 'border-orange-500 bg-orange-500/10'
     };
     return colorMap[cor] || colorMap.blue;
   };
 
-  const getPrioridadeCor = (prioridade: string) => {
-    switch (prioridade) {
-      case 'alta': return 'text-red-600 dark:text-red-400';
-      case 'media': return 'text-yellow-600 dark:text-yellow-400';
-      case 'baixa': return 'text-green-600 dark:text-green-400';
-      default: return 'text-gray-600 dark:text-gray-400';
+  const getEventoGradient = (cor: string) => {
+    const gradients: { [key: string]: string } = {
+      blue: 'from-blue-500 to-cyan-500',
+      purple: 'from-purple-500 to-pink-500',
+      red: 'from-red-500 to-orange-500',
+      green: 'from-green-500 to-emerald-500',
+      yellow: 'from-yellow-500 to-amber-500',
+      pink: 'from-pink-500 to-rose-500',
+      orange: 'from-orange-500 to-red-500'
+    };
+    return gradients[cor] || gradients.blue;
+  };
+
+  const getTipoIcon = (tipo: string) => {
+    const icons: { [key: string]: React.ComponentType<{ className?: string }> } = {
+      reuniao: Users,
+      deadline: AlertCircle,
+      foco: Target,
+      ligacao: MessageSquare,
+      outro: Calendar
+    };
+    return icons[tipo] || Calendar;
+  };
+
+  const toggleConcluido = async (id: string) => {
+    const evento = eventos.find(e => e.id === id);
+    if (!evento) return;
+
+    try {
+      await updateDoc(doc(db, 'eventos', id), {
+        concluido: !evento.concluido
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar evento:', error);
+      // Fallback local se falhar Firestore
+      setEventos(eventos.map(e => 
+        e.id === id ? { ...e, concluido: !e.concluido } : e
+      ));
     }
   };
 
-  const getEventosData = (data: Date) => {
-    // Usar função auxiliar para evitar problema de fuso horário
-    const dataStr = dateToLocalString(data);
-    return eventos.filter(e => e.data === dataStr).sort((a, b) => 
-      a.horaInicio.localeCompare(b.horaInicio)
-    );
+  // Função para criar novo evento a partir do modal
+  const handleCriarEvento = async (novoEvento: NovoEvento) => {
+    const eventoData = {
+      ...novoEvento,
+      cliente: novoEvento.clienteId ? clientes.find(c => c.id === novoEvento.clienteId)?.nome : undefined,
+      projeto: novoEvento.projetoId ? projetos.find(p => p.id === novoEvento.projetoId)?.titulo : undefined,
+      cor: novoEvento.cor || getCorByTipo(novoEvento.tipo),
+      concluido: false,
+      adminId: user?.uid, // Individualização
+      criadoEm: new Date().toISOString()
+    };
+
+    try {
+      const docRef = await addDoc(collection(db, 'eventos'), eventoData);
+      console.log('✅ Evento criado no Firestore:', docRef.id);
+      
+      // Notificar sobre o novo evento
+      if (user?.uid) {
+        await notificarEventoAgenda(
+          user.uid,
+          novoEvento.titulo,
+          `${novoEvento.data} às ${novoEvento.horaInicio}`,
+          docRef.id
+        );
+      }
+      
+      setShowModal(false);
+    } catch (error) {
+      console.error('Erro ao criar evento no Firestore:', error);
+      // Fallback local
+      const evento: Evento = {
+        id: `EVT-${Date.now()}`,
+        ...eventoData
+      } as Evento;
+      setEventos([...eventos, evento]);
+      setShowModal(false);
+    }
+  };
+
+  // Função auxiliar para obter cor por tipo
+  const getCorByTipo = (tipo: Evento['tipo']): string => {
+    const cores: Record<Evento['tipo'], string> = {
+      reuniao: 'from-blue-500 to-indigo-600',
+      deadline: 'from-red-500 to-pink-600',
+      foco: 'from-purple-500 to-violet-600',
+      ligacao: 'from-green-500 to-emerald-600',
+      outro: 'from-orange-500 to-amber-600'
+    };
+    return cores[tipo] || 'from-gray-500 to-gray-600';
   };
 
   const formatarData = (data: Date) => {
     return data.toLocaleDateString('pt-BR', { 
       weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+      day: 'numeric', 
+      month: 'long'
     });
   };
 
   const navegarData = (direcao: 'prev' | 'next') => {
     const novaData = new Date(currentDate);
-    if (viewMode === 'dia') {
-      novaData.setDate(novaData.getDate() + (direcao === 'next' ? 1 : -1));
-    } else if (viewMode === 'semana') {
-      novaData.setDate(novaData.getDate() + (direcao === 'next' ? 7 : -7));
-    } else {
-      novaData.setMonth(novaData.getMonth() + (direcao === 'next' ? 1 : -1));
-    }
+    novaData.setDate(novaData.getDate() + (direcao === 'next' ? 1 : -1));
     setCurrentDate(novaData);
   };
 
-  const getSemanaDias = () => {
-    const dias = [];
-    const inicio = new Date(currentDate);
-    inicio.setDate(inicio.getDate() - inicio.getDay());
-    
-    for (let i = 0; i < 7; i++) {
-      const dia = new Date(inicio);
-      dia.setDate(dia.getDate() + i);
-      dias.push(dia);
-    }
-    return dias;
+  const startFocusTimer = (minutos: number) => {
+    setFocusTimer(minutos * 60);
+    setIsFocusRunning(true);
+    setFocusMode(true);
   };
 
-  const handleCreate = () => {
-    setModalMode('create');
-    setFormData({
-      titulo: '',
-      descricao: '',
-      data: dateToLocalString(currentDate),
-      horaInicio: '09:00',
-      horaFim: '10:00',
-      tipo: 'reuniao',
-      prioridade: 'media',
-      cor: 'blue',
-      concluido: false,
-      alertaMinutos: 15
-    });
-    setShowModal(true);
+  const formatFocusTimer = () => {
+    const mins = Math.floor(focusTimer / 60);
+    const secs = focusTimer % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
-  const handleEdit = (evento: Evento) => {
-    setModalMode('edit');
-    setSelectedEvento(evento);
-    setFormData(evento);
-    setShowModal(true);
-  };
-
-  const handleView = (evento: Evento) => {
-    setModalMode('view');
-    setSelectedEvento(evento);
-    setShowModal(true);
-  };
-
-  const handleDelete = (evento: Evento) => {
-    setSelectedEvento(evento);
-    setShowDeleteConfirm(true);
-  };
-
-  const confirmDelete = () => {
-    if (selectedEvento) {
-      setEventos(eventos.filter(e => e.id !== selectedEvento.id));
-      setShowDeleteConfirm(false);
-      setSelectedEvento(null);
-    }
-  };
-
-  const handleSave = () => {
-    if (modalMode === 'create') {
-      const novoEvento: Evento = {
-        ...formData as Evento,
-        id: Date.now().toString()
-      };
-      
-      // Se tem recorrência ativa, gerar eventos recorrentes
-      if (novoEvento.recorrencia?.ativa) {
-        const eventosRecorrentes = gerarEventosRecorrentes(novoEvento);
-        setEventos([...eventos, ...eventosRecorrentes]);
-      } else {
-        setEventos([...eventos, novoEvento]);
-      }
-    } else if (modalMode === 'edit' && selectedEvento) {
-      setEventos(eventos.map(e => 
-        e.id === selectedEvento.id ? { ...formData as Evento, id: e.id } : e
-      ));
-    }
-    setShowModal(false);
-    setSelectedEvento(null);
-  };
-
-  const toggleConcluido = (id: string) => {
-    setEventos(eventos.map(e => 
-      e.id === id ? { ...e, concluido: !e.concluido } : e
-    ));
-  };
-
-  const stats = [
-    {
-      label: 'Hoje',
-      value: getEventosData(new Date()).length.toString(),
-      icon: Calendar,
-      color: 'from-blue-500 to-cyan-500'
-    },
-    {
-      label: 'Esta Semana',
-      value: eventos.filter(e => {
-        const eventDate = new Date(e.data);
-        const weekDays = getSemanaDias();
-        return eventDate >= weekDays[0] && eventDate <= weekDays[6];
-      }).length.toString(),
-      icon: Clock,
-      color: 'from-purple-500 to-pink-500'
-    },
-    {
-      label: 'Pendentes',
-      value: eventos.filter(e => !e.concluido).length.toString(),
-      icon: AlertCircle,
-      color: 'from-orange-500 to-red-500'
-    },
-    {
-      label: 'Concluídos',
-      value: eventos.filter(e => e.concluido).length.toString(),
-      icon: CheckCircle2,
-      color: 'from-green-500 to-emerald-500'
-    }
-  ];
+  // ============================================================================
+  // RENDER
+  // ============================================================================
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-300">
-      {/* Background Effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-orange-50/30 to-red-50/30 dark:from-gray-950 dark:via-orange-950/30 dark:to-red-950/30 transition-colors duration-500"></div>
-      </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-300 flex">
+      {/* Sidebar */}
+      <Sidebar />
 
-      {/* Header */}
-      <header className="relative z-10 backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border-b border-gray-200 dark:border-gray-800 sticky top-0">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-                  <Calendar className="w-6 h-6 text-white" />
+      {/* Main Content */}
+      <main className="flex-1 min-h-screen lg:ml-0">
+        {/* Animated Background */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-orange-50/30 to-red-50/30 dark:from-gray-950 dark:via-orange-950/20 dark:to-red-950/20 transition-colors duration-500" />
+          <div className="absolute top-20 right-20 w-96 h-96 bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-20 left-20 w-64 h-64 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        </div>
+
+        {/* Header */}
+        <header className="relative z-10 backdrop-blur-xl bg-white/80 dark:bg-gray-900/80 border-b border-gray-200/50 dark:border-gray-800/50 sticky top-0">
+          <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              {/* Greeting Section */}
+              <div className="flex items-center gap-4 ml-14 lg:ml-0">
+                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${periodo.gradient} flex items-center justify-center shadow-lg`}>
+                  <periodo.icon className="w-7 h-7 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Agenda</h1>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Gestão do Tempo</p>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {periodo.label}, <span className="bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">Profissional</span>
+                    </h1>
+                    <Sparkles className="w-5 h-5 text-orange-500 animate-pulse" />
+                  </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">
+                    {formatarData(currentDate)}
+                  </p>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <NotificacoesBell />
-              <ThemeToggle />
-            </div>
-          </div>
-        </div>
-      </header>
 
-      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {stats.map((stat, index) => (
-            <div key={index} className="relative group">
-              <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 border-l-4 border-l-orange-500 dark:border-l-amber-500 rounded-xl p-4 transition-all hover:scale-105">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{stat.label}</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{stat.value}</p>
-                  </div>
-                  <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${stat.color} flex items-center justify-center`}>
-                    <stat.icon className="w-6 h-6 text-white" />
-                  </div>
+              {/* Live Clock */}
+              <div className="hidden md:flex items-baseline gap-1">
+                <div className="text-2xl font-mono font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent tabular-nums">
+                  {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+                  :{String(currentTime.getSeconds()).padStart(2, '0')}
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
 
-        {/* Toolbar */}
-        <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 rounded-xl p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => navegarData('prev')}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <div className="min-w-[250px] text-center">
-                <h2 className="font-bold text-gray-900 dark:text-white capitalize">
-                  {formatarData(currentDate)}
-                </h2>
-              </div>
-              <button
-                onClick={() => navegarData('next')}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setCurrentDate(new Date())}
-                className="px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors text-sm font-medium"
-              >
-                Hoje
-              </button>
-            </div>
-
-            <div className="flex gap-2">
-              <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+              {/* Actions */}
+              <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setViewMode('dia')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    viewMode === 'dia'
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  onClick={() => setFocusMode(!focusMode)}
+                  className={`p-3 rounded-xl transition-all ${
+                    focusMode 
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/30' 
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                   }`}
+                  title="Modo Foco"
                 >
-                  Dia
-                </button>
-                <button
-                  onClick={() => setViewMode('semana')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    viewMode === 'semana'
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  Semana
-                </button>
-                <button
-                  onClick={() => setViewMode('mes')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    viewMode === 'mes'
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  Mês
-                </button>
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowTemplateModal(true)}
-                  className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 dark:from-purple-500 dark:to-pink-500 dark:hover:from-purple-400 dark:hover:to-pink-400 text-white rounded-lg transition-all hover:scale-105 font-semibold"
-                >
-                  <Zap className="w-5 h-5" />
-                  Usar Template
+                  <Target className="w-5 h-5" />
                 </button>
                 
-                <button
-                  onClick={handleCreate}
-                  className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white rounded-lg transition-all hover:scale-105 font-semibold"
-                >
-                  <Plus className="w-5 h-5" />
-                  Novo Evento
-                </button>
+                <NotificacoesBell />
+                <ThemeToggle />
+
+                {/* Settings Dropdown */}
+                <div className="relative z-[60]" ref={settingsRef}>
+                  <button 
+                    onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+                    className={`p-3 rounded-xl transition-all ${
+                      showSettingsMenu 
+                        ? 'bg-orange-100 dark:bg-orange-900/50 text-orange-600' 
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    }`}
+                    title="Configurações e Convites"
+                  >
+                    <Settings className={`w-5 h-5 transition-transform ${showSettingsMenu ? 'rotate-90' : ''}`} />
+                  </button>
+
+                  {showSettingsMenu && (
+                    <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 py-2 z-[70] animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+                        <p className="text-sm font-bold text-gray-900 dark:text-white">Configurações</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
+                      </div>
+
+                      {/* Gestão de Admins - Webmaster */}
+                      {userIsWebmaster && (
+                        <button
+                          onClick={() => {
+                            setShowSettingsMenu(false);
+                            setShowGestaoAdmins(true);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-orange-50 dark:hover:bg-orange-900/30 transition-colors text-left"
+                        >
+                          <div className="p-2 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg shadow-lg shadow-orange-500/20">
+                            <Crown className="w-4 h-4 text-white" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-gray-900 dark:text-white">Gestão de Admins</p>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400">Cadastrar e gerenciar equipe</p>
+                          </div>
+                        </button>
+                      )}
+
+                      {/* Link para Clientes */}
+                      {adminData?.codigoConvite && (
+                        <div className="mx-4 my-2 p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-100 dark:border-blue-800/50">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Link2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                            <span className="text-[10px] font-black text-blue-700 dark:text-blue-300 uppercase tracking-wider">Link para Clientes</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const link = `${window.location.origin}/register?ref=${adminData.codigoConvite}`;
+                              navigator.clipboard.writeText(link);
+                              setLinkCopiado(true);
+                              setTimeout(() => setLinkCopiado(false), 2000);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[11px] font-bold py-2 px-3 rounded-lg border border-blue-200 dark:border-blue-800 transition-all shadow-sm"
+                          >
+                            {linkCopiado ? (
+                              <><Check className="w-3.5 h-3.5" /> Copiado!</>
+                            ) : (
+                              <><Copy className="w-3.5 h-3.5" /> Copiar Link de Cadastro</>
+                            )}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Link para Novos Admins - Webmaster */}
+                      {userIsWebmaster && adminData?.codigoConvite && (
+                        <div className="mx-4 my-2 p-3 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl border border-amber-100 dark:border-amber-800/50">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Crown className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                            <span className="text-[10px] font-black text-amber-700 dark:text-amber-300 uppercase tracking-wider">Convite para Admins</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const link = `${window.location.origin}/register?ref=${adminData.codigoConvite}&role=admin`;
+                              navigator.clipboard.writeText(link);
+                              setLinkAdminCopiado(true);
+                              setTimeout(() => setLinkAdminCopiado(false), 2000);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 hover:bg-amber-50 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[11px] font-bold py-2 px-3 rounded-lg border border-amber-200 dark:border-amber-800 transition-all shadow-sm"
+                          >
+                            {linkAdminCopiado ? (
+                              <><Check className="w-3.5 h-3.5" /> Copiado!</>
+                            ) : (
+                              <><Copy className="w-3.5 h-3.5" /> Copiar Link Admin</>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* Vista Dia */}
-        {viewMode === 'dia' && (
-          <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
-            <div className="space-y-3">
-              {getEventosData(currentDate).length === 0 ? (
-                <div className="text-center py-12">
-                  <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500 dark:text-gray-400">Nenhum evento para hoje</p>
+        {/* Content */}
+        <div className="relative z-10 max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {/* Focus Mode Overlay */}
+          {focusMode && (
+            <div className="mb-6 p-6 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white relative overflow-hidden">
+              <div className="absolute inset-0 bg-black/10" />
+              <div className="relative flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
+                    <Target className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Modo Foco Ativo</h2>
+                    <p className="text-white/80">Concentre-se no que importa</p>
+                  </div>
                 </div>
-              ) : (
-                getEventosData(currentDate).map((evento) => (
-                  <div
-                    key={evento.id}
-                    className={`border-l-4 ${getEventosCor(evento.cor)} rounded-lg p-4 transition-all hover:shadow-lg cursor-pointer ${
-                      evento.concluido ? 'opacity-60' : ''
-                    }`}
-                    onClick={() => handleView(evento)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleConcluido(evento.id);
-                            }}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                              evento.concluido
-                                ? 'bg-green-500 border-green-500'
-                                : 'border-gray-300 dark:border-gray-600 hover:border-green-500'
-                            }`}
-                          >
-                            {evento.concluido && <CheckCircle2 className="w-4 h-4 text-white" />}
-                          </button>
-                          <h3 className={`font-bold text-gray-900 dark:text-white ${
-                            evento.concluido ? 'line-through' : ''
-                          }`}>
-                            {evento.titulo}
-                          </h3>
-                          <span className={`text-xs px-2 py-1 rounded ${getPrioridadeCor(evento.prioridade)} bg-current/10`}>
-                            {evento.prioridade}
-                          </span>
+
+                <div className="flex items-center gap-4">
+                  {focusTimer > 0 ? (
+                    <div className="flex items-center gap-3">
+                      <div className="text-5xl font-mono font-bold">{formatFocusTimer()}</div>
+                      <button
+                        onClick={() => setIsFocusRunning(!isFocusRunning)}
+                        className="p-3 rounded-xl bg-white/20 hover:bg-white/30 transition-colors"
+                      >
+                        {isFocusRunning ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
+                      </button>
+                      <button
+                        onClick={() => { setFocusTimer(0); setIsFocusRunning(false); }}
+                        className="p-3 rounded-xl bg-white/20 hover:bg-white/30 transition-colors"
+                      >
+                        <RefreshCw className="w-6 h-6" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      {[25, 45, 60].map(mins => (
+                        <button
+                          key={mins}
+                          onClick={() => startFocusTimer(mins)}
+                          className="px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 transition-colors font-semibold"
+                        >
+                          {mins} min
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => { setFocusMode(false); setFocusTimer(0); setIsFocusRunning(false); }}
+                  className="p-2 rounded-lg hover:bg-white/20 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Main Grid */}
+          <div className="grid grid-cols-12 gap-6">
+            {/* Left Column - Timeline */}
+            <div className="col-span-12 lg:col-span-8 space-y-6">
+              {/* Day Progress Card */}
+              <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => navegarData('prev')}
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white capitalize">
+                      {formatarData(currentDate)}
+                    </h2>
+                    <button
+                      onClick={() => navegarData('next')}
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                    {dateToLocalString(currentDate) !== dateToLocalString(new Date()) && (
+                      <button
+                        onClick={() => setCurrentDate(new Date())}
+                        className="px-3 py-1 text-sm font-medium text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
+                      >
+                        Hoje
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    {/* Progress Ring */}
+                    <div className="relative w-16 h-16">
+                      <svg className="w-16 h-16 transform -rotate-90">
+                        <circle
+                          className="text-gray-200 dark:text-gray-800"
+                          strokeWidth="4"
+                          stroke="currentColor"
+                          fill="transparent"
+                          r="28"
+                          cx="32"
+                          cy="32"
+                        />
+                        <circle
+                          className="text-orange-500"
+                          strokeWidth="4"
+                          strokeDasharray={28 * 2 * Math.PI}
+                          strokeDashoffset={28 * 2 * Math.PI * (1 - progressoDia / 100)}
+                          strokeLinecap="round"
+                          stroke="currentColor"
+                          fill="transparent"
+                          r="28"
+                          cx="32"
+                          cy="32"
+                        />
+                      </svg>
+                      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold">
+                        {progressoDia}%
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => { setModalMode('create'); setShowModal(true); }}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white rounded-xl transition-all hover:scale-105 font-semibold shadow-lg shadow-orange-500/30"
+                    >
+                      <Plus className="w-5 h-5" />
+                      <span className="hidden sm:inline">Novo Evento</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Next Event Banner */}
+                {proximoEvento && tempoAteProximo && (
+                  <div className={`mb-6 p-4 rounded-xl bg-gradient-to-r ${getEventoGradient(proximoEvento.cor)} relative overflow-hidden`}>
+                    <div className="absolute inset-0 bg-black/10" />
+                    <div className="relative flex items-center justify-between text-white flex-wrap gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                          <Timer className="w-6 h-6" />
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 ml-8">
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            {evento.horaInicio} - {evento.horaFim}
-                          </div>
-                          {evento.cliente && (
-                            <div className="flex items-center gap-1">
-                              <Users className="w-4 h-4" />
-                              {evento.cliente}
-                            </div>
-                          )}
-                          {evento.alertaMinutos && (
-                            <div className="flex items-center gap-1">
-                              <Bell className="w-4 h-4" />
-                              {evento.alertaMinutos} min antes
-                            </div>
-                          )}
-                          {evento.recorrencia?.ativa && (
-                            <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
-                              <Clock className="w-4 h-4" />
-                              Recorrente
-                            </div>
-                          )}
-                          {evento.projetoId && (
-                            <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                              <Briefcase className="w-4 h-4" />
-                              Projeto
-                            </div>
-                          )}
+                        <div>
+                          <p className="text-sm text-white/80">Próximo compromisso em</p>
+                          <p className="text-xl font-bold">{tempoAteProximo}</p>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEdit(evento);
-                          }}
-                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(evento);
-                          }}
-                          className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                      <div className="text-right">
+                        <p className="font-semibold">{proximoEvento.titulo}</p>
+                        <p className="text-sm text-white/80">{proximoEvento.horaInicio} - {proximoEvento.horaFim}</p>
                       </div>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
+                )}
 
-        {/* Vista Semana */}
-        {viewMode === 'semana' && (
-          <div className="grid grid-cols-7 gap-2">
-            {getSemanaDias().map((dia, index) => {
-              const eventosdia = getEventosData(dia);
-              const isToday = dia.toDateString() === new Date().toDateString();
-              
-              return (
-                <div
-                  key={index}
-                  className={`backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border ${
-                    isToday ? 'border-orange-500 dark:border-amber-500 border-2' : 'border-gray-200 dark:border-gray-800'
-                  } rounded-xl p-3 min-h-[200px]`}
-                >
-                  <div className="text-center mb-3">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">
-                      {dia.toLocaleDateString('pt-BR', { weekday: 'short' })}
-                    </p>
-                    <p className={`text-lg font-bold ${
-                      isToday ? 'text-orange-600 dark:text-amber-400' : 'text-gray-900 dark:text-white'
-                    }`}>
-                      {dia.getDate()}
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    {eventosdia.map((evento) => (
-                      <div
-                        key={evento.id}
-                        onClick={() => handleView(evento)}
-                        className={`text-xs p-2 rounded border-l-2 ${getEventosCor(evento.cor)} cursor-pointer hover:shadow transition-all ${
-                          evento.concluido ? 'opacity-60' : ''
-                        }`}
+                {/* Timeline */}
+                <div className="space-y-3">
+                  {eventosHoje.length === 0 ? (
+                    <div className="text-center py-16">
+                      <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-orange-500/20 to-red-500/20 flex items-center justify-center">
+                        <Coffee className="w-10 h-10 text-orange-500" />
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Dia livre!</h3>
+                      <p className="text-gray-500 dark:text-gray-400 mb-4">
+                        Nenhum compromisso agendado. Que tal planejar algo?
+                      </p>
+                      <button
+                        onClick={() => { setModalMode('create'); setShowModal(true); }}
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-xl font-semibold hover:scale-105 transition-transform"
                       >
-                        <p className={`font-semibold text-gray-900 dark:text-white truncate ${
-                          evento.concluido ? 'line-through' : ''
-                        }`}>
-                          {evento.titulo}
+                        <Plus className="w-5 h-5" />
+                        Criar primeiro evento
+                      </button>
+                    </div>
+                  ) : (
+                    eventosHoje.map((evento) => {
+                      const TipoIcon = getTipoIcon(evento.tipo);
+                      
+                      return (
+                        <div
+                          key={evento.id}
+                          className={`group relative flex gap-4 p-4 rounded-xl border-l-4 ${getEventosCor(evento.cor)} backdrop-blur transition-all hover:scale-[1.02] cursor-pointer ${
+                            evento.concluido ? 'opacity-60' : ''
+                          }`}
+                          onClick={() => { setSelectedEvento(evento); setModalMode('view'); setShowModal(true); }}
+                        >
+                          {/* Time Column */}
+                          <div className="flex-shrink-0 w-20 text-center">
+                            <div className="text-lg font-bold text-gray-900 dark:text-white">{evento.horaInicio}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{evento.horaFim}</div>
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <div className={`p-1.5 rounded-lg bg-gradient-to-r ${getEventoGradient(evento.cor)}`}>
+                                    <TipoIcon className="w-4 h-4 text-white" />
+                                  </div>
+                                  <h3 className={`font-semibold text-gray-900 dark:text-white truncate ${
+                                    evento.concluido ? 'line-through' : ''
+                                  }`}>
+                                    {evento.titulo}
+                                  </h3>
+                                  {evento.prioridade === 'alta' && (
+                                    <Flame className="w-4 h-4 text-red-500 animate-pulse" />
+                                  )}
+                                </div>
+
+                                <div className="flex flex-wrap gap-2 text-xs">
+                                  {evento.cliente && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                      <Users className="w-3 h-3" />
+                                      {evento.cliente}
+                                    </span>
+                                  )}
+                                  {evento.projeto && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                                      <Briefcase className="w-3 h-3" />
+                                      {evento.projeto}
+                                    </span>
+                                  )}
+                                  {evento.local && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/10 text-green-600 dark:text-green-400">
+                                      <ExternalLink className="w-3 h-3" />
+                                      {evento.local}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Actions */}
+                              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); toggleConcluido(evento.id); }}
+                                  className={`p-2 rounded-lg transition-colors ${
+                                    evento.concluido 
+                                      ? 'bg-green-500 text-white' 
+                                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-green-500 hover:text-white'
+                                  }`}
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Widgets */}
+            <div className="col-span-12 lg:col-span-4 space-y-6">
+              {/* Quick Stats */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-4 hover:scale-105 transition-transform cursor-pointer" onClick={() => navigate('/projetos')}>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                      <Briefcase className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{systemStats.projetosAtivos || projetos.filter(p => p.status === 'em_andamento').length || 0}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Projetos Ativos</div>
+                </div>
+
+                <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-4 hover:scale-105 transition-transform cursor-pointer" onClick={() => navigate('/financeiro')}>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
+                      <DollarSign className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                    R${((systemStats.valorTotalContratos || 0) / 1000).toFixed(0)}k
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Contratos</div>
+                </div>
+
+                <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-4 hover:scale-105 transition-transform cursor-pointer" onClick={() => navigate('/crm')}>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                      <Users className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{systemStats.clientesAtivos || clientes.length || 0}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Clientes</div>
+                </div>
+
+                <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
+                      <Calendar className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{eventosHoje.length}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Eventos Hoje</div>
+                </div>
+              </div>
+
+              {/* Pending Payments */}
+              <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-green-500" />
+                    A Receber
+                  </h3>
+                  <button
+                    onClick={() => navigate('/financeiro')}
+                    className="text-sm text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1"
+                  >
+                    Ver tudo
+                    <ArrowUpRight className="w-3 h-3" />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {transacoesPendentes.slice(0, 3).map(transacao => (
+                    <div
+                      key={transacao.id}
+                      className="flex items-center justify-between p-3 rounded-xl bg-green-500/10 border border-green-500/20 hover:scale-[1.02] transition-transform cursor-pointer"
+                      onClick={() => navigate('/financeiro')}
+                    >
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white text-sm">{transacao.descricao}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{transacao.clienteNome}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-green-600 dark:text-green-400">
+                          R$ {transacao.valor.toLocaleString('pt-BR')}
                         </p>
-                        <p className="text-gray-600 dark:text-gray-400">
-                          {evento.horaInicio}
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {new Date(transacao.dataVencimento).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                         </p>
                       </div>
-                    ))}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-gray-200/50 dark:border-gray-800/50">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Total Pendente</span>
+                    <span className="text-xl font-bold text-green-600 dark:text-green-400">
+                      R$ {transacoesPendentes.reduce((sum, t) => sum + t.valor, 0).toLocaleString('pt-BR')}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Vista Mês */}
-        {viewMode === 'mes' && (
-          <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
-            <div className="text-center py-12">
-              <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500 dark:text-gray-400">Vista mensal em desenvolvimento</p>
-              <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">
-                Use as vistas de Dia ou Semana para visualizar seus eventos
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Modal Create/Edit */}
-      {showModal && modalMode !== 'view' && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-800">
-            <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-6 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {modalMode === 'create' ? 'Novo Evento' : 'Editar Evento'}
-              </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Título *
-                </label>
-                <input
-                  type="text"
-                  value={formData.titulo}
-                  onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                  placeholder="Nome do evento"
-                />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Descrição
-                </label>
-                <textarea
-                  value={formData.descricao}
-                  onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                  rows={3}
-                  className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white resize-none"
-                  placeholder="Detalhes do evento..."
-                />
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Data *
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.data}
-                    onChange={(e) => setFormData({ ...formData, data: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Início *
-                  </label>
-                  <input
-                    type="time"
-                    value={formData.horaInicio}
-                    onChange={(e) => setFormData({ ...formData, horaInicio: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Fim *
-                  </label>
-                  <input
-                    type="time"
-                    value={formData.horaFim}
-                    onChange={(e) => setFormData({ ...formData, horaFim: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Tipo
-                  </label>
-                  <select
-                    value={formData.tipo}
-                    onChange={(e) => setFormData({ ...formData, tipo: e.target.value as any })}
-                    className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
+              {/* Active Projects */}
+              <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Briefcase className="w-5 h-5 text-purple-500" />
+                    Projetos Ativos
+                  </h3>
+                  <button
+                    onClick={() => navigate('/projetos')}
+                    className="text-sm text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1"
                   >
-                    {tiposEvento.map((tipo) => (
-                      <option key={tipo.value} value={tipo.value}>
-                        {tipo.label}
-                      </option>
-                    ))}
-                  </select>
+                    Ver tudo
+                    <ArrowUpRight className="w-3 h-3" />
+                  </button>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Prioridade
-                  </label>
-                  <select
-                    value={formData.prioridade}
-                    onChange={(e) => setFormData({ ...formData, prioridade: e.target.value as any })}
-                    className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                  >
-                    <option value="baixa">Baixa</option>
-                    <option value="media">Média</option>
-                    <option value="alta">Alta</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Cor
-                </label>
-                <div className="flex gap-2">
-                  {cores.map((cor) => (
-                    <button
-                      key={cor.value}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, cor: cor.value })}
-                      className={`w-10 h-10 rounded-lg ${cor.class} ${
-                        formData.cor === cor.value ? 'ring-2 ring-offset-2 ring-gray-900 dark:ring-white' : ''
-                      }`}
-                      title={cor.label}
-                    />
+                <div className="space-y-3">
+                  {(projetos.length > 0 ? projetos.slice(0, 3) : [
+                    { id: '1', titulo: 'Campanha Digital Q1', clienteEmpresa: 'Silva & Associados', progresso: 45, prioridade: 'alta' },
+                    { id: '2', titulo: 'Rebranding Tech Solutions', clienteEmpresa: 'Tech Solutions', progresso: 90, prioridade: 'media' },
+                  ]).map((projeto: any) => (
+                    <div
+                      key={projeto.id}
+                      className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 cursor-pointer hover:scale-[1.02] transition-transform"
+                      onClick={() => navigate('/projetos')}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-medium text-gray-900 dark:text-white text-sm truncate">{projeto.titulo}</p>
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                          projeto.prioridade === 'alta' || projeto.prioridade === 'urgente'
+                            ? 'bg-red-500/20 text-red-600 dark:text-red-400'
+                            : 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
+                        }`}>
+                          {projeto.prioridade}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{projeto.clienteEmpresa}</p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all"
+                            style={{ width: `${projeto.progresso}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-bold text-gray-600 dark:text-gray-400">{projeto.progresso}%</span>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Alerta (minutos antes)
-                </label>
-                <select
-                  value={formData.alertaMinutos || 0}
-                  onChange={(e) => setFormData({ ...formData, alertaMinutos: parseInt(e.target.value) })}
-                  className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                >
-                  <option value="0">Sem alerta</option>
-                  <option value="5">5 minutos</option>
-                  <option value="10">10 minutos</option>
-                  <option value="15">15 minutos</option>
-                  <option value="30">30 minutos</option>
-                  <option value="60">1 hora</option>
-                </select>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Cliente
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.cliente || ''}
-                    onChange={(e) => setFormData({ ...formData, cliente: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                    placeholder="Nome do cliente"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Projeto
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.projeto || ''}
-                    onChange={(e) => setFormData({ ...formData, projeto: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                    placeholder="Nome do projeto"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Local
-                </label>
-                <input
-                  type="text"
-                  value={formData.local || ''}
-                  onChange={(e) => setFormData({ ...formData, local: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                  placeholder="Local ou link da reunião"
-                />
-              </div>
-
-              {/* Integração com Projetos */}
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                  <Briefcase className="w-5 h-5" />
-                  Integração com Projetos
-                </h3>
+              {/* Motivational Card */}
+              <div className="backdrop-blur-xl bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl p-6 text-white relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
                 
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      ID do Projeto
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.projetoId || ''}
-                      onChange={(e) => setFormData({ ...formData, projetoId: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                      placeholder="ID do projeto vinculado"
-                    />
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Rocket className="w-6 h-6" />
+                    <span className="font-bold">Dica do Dia</span>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Etapa do Projeto
-                    </label>
-                    <select
-                      value={formData.etapaProjeto || ''}
-                      onChange={(e) => setFormData({ ...formData, etapaProjeto: e.target.value as any })}
-                      className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                    >
-                      <option value="">Nenhuma etapa</option>
-                      <option value="briefing">Briefing</option>
-                      <option value="criacao">Criação</option>
-                      <option value="revisao">Revisão</option>
-                      <option value="ajustes">Ajustes</option>
-                      <option value="aprovacao">Aprovação</option>
-                      <option value="entrega">Entrega</option>
-                    </select>
+                  <p className="text-sm text-white/90 mb-4">
+                    "A produtividade não é sobre fazer mais coisas, mas sobre fazer as coisas certas."
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Star className="w-4 h-4 text-yellow-300 fill-yellow-300" />
+                    <Star className="w-4 h-4 text-yellow-300 fill-yellow-300" />
+                    <Star className="w-4 h-4 text-yellow-300 fill-yellow-300" />
+                    <Star className="w-4 h-4 text-yellow-300 fill-yellow-300" />
+                    <Star className="w-4 h-4 text-yellow-300 fill-yellow-300" />
                   </div>
                 </div>
-
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  💡 Vincule este evento a um projeto e etapa específica para sincronização automática
-                </p>
-              </div>
-
-              {/* Recorrência */}
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                    <Clock className="w-5 h-5" />
-                    Recorrência
-                  </h3>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.recorrencia?.ativa || false}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        recorrencia: {
-                          ativa: e.target.checked,
-                          tipo: 'semanal',
-                          intervalo: 1
-                        }
-                      })}
-                      className="w-5 h-5 text-orange-600 dark:text-amber-500 rounded focus:ring-2 focus:ring-orange-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Ativar recorrência
-                    </span>
-                  </label>
-                </div>
-
-                {formData.recorrencia?.ativa && (
-                  <div className="space-y-4 pl-4 border-l-4 border-orange-500 dark:border-amber-500">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Tipo de Recorrência
-                        </label>
-                        <select
-                          value={formData.recorrencia?.tipo || 'semanal'}
-                          onChange={(e) => setFormData({
-                            ...formData,
-                            recorrencia: {
-                              ...formData.recorrencia!,
-                              tipo: e.target.value as any
-                            }
-                          })}
-                          className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                        >
-                          <option value="diaria">Diária</option>
-                          <option value="semanal">Semanal</option>
-                          <option value="mensal">Mensal</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Intervalo
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="99"
-                          value={formData.recorrencia?.intervalo || 1}
-                          onChange={(e) => setFormData({
-                            ...formData,
-                            recorrencia: {
-                              ...formData.recorrencia!,
-                              intervalo: parseInt(e.target.value) || 1
-                            }
-                          })}
-                          className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                        />
-                      </div>
-                    </div>
-
-                    {formData.recorrencia?.tipo === 'semanal' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Dias da Semana
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                          {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((dia, index) => (
-                            <button
-                              key={index}
-                              type="button"
-                              onClick={() => {
-                                const diasAtual = formData.recorrencia?.diasSemana || [];
-                                const novos = diasAtual.includes(index)
-                                  ? diasAtual.filter(d => d !== index)
-                                  : [...diasAtual, index];
-                                setFormData({
-                                  ...formData,
-                                  recorrencia: {
-                                    ...formData.recorrencia!,
-                                    diasSemana: novos
-                                  }
-                                });
-                              }}
-                              className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                                formData.recorrencia?.diasSemana?.includes(index)
-                                  ? 'bg-orange-600 dark:bg-amber-500 text-white'
-                                  : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700'
-                              }`}
-                            >
-                              {dia}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {formData.recorrencia?.tipo === 'mensal' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Dia do Mês
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="31"
-                          value={formData.recorrencia?.diaDoMes || 1}
-                          onChange={(e) => setFormData({
-                            ...formData,
-                            recorrencia: {
-                              ...formData.recorrencia!,
-                              diaDoMes: parseInt(e.target.value) || 1
-                            }
-                          })}
-                          className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                          placeholder="Dia do mês (1-31)"
-                        />
-                      </div>
-                    )}
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Data Fim (opcional)
-                        </label>
-                        <input
-                          type="date"
-                          value={formData.recorrencia?.dataFim || ''}
-                          onChange={(e) => setFormData({
-                            ...formData,
-                            recorrencia: {
-                              ...formData.recorrencia!,
-                              dataFim: e.target.value
-                            }
-                          })}
-                          className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Ou Nº de Ocorrências
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="100"
-                          value={formData.recorrencia?.ocorrencias || ''}
-                          onChange={(e) => setFormData({
-                            ...formData,
-                            recorrencia: {
-                              ...formData.recorrencia!,
-                              ocorrencias: parseInt(e.target.value) || undefined
-                            }
-                          })}
-                          className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 text-gray-900 dark:text-white"
-                          placeholder="Número de vezes"
-                        />
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      🔄 Este evento se repetirá automaticamente conforme configuração
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 px-6 py-3 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-lg transition-colors font-semibold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSave}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white rounded-lg transition-all hover:scale-105 font-semibold"
-                >
-                  <Save className="w-5 h-5" />
-                  Salvar
-                </button>
               </div>
             </div>
           </div>
         </div>
-      )}
+      </main>
 
       {/* Modal View */}
       {showModal && modalMode === 'view' && selectedEvento && (
@@ -1335,165 +1053,108 @@ const Agenda: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div className="flex items-center gap-3 mb-4">
+            <div className="p-6 space-y-6">
+              <div className="flex items-center gap-4">
                 <button
                   onClick={() => toggleConcluido(selectedEvento.id)}
-                  className={`w-8 h-8 rounded border-2 flex items-center justify-center transition-colors ${
+                  className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
                     selectedEvento.concluido
-                      ? 'bg-green-500 border-green-500'
-                      : 'border-gray-300 dark:border-gray-600 hover:border-green-500'
+                      ? 'bg-green-500 text-white'
+                      : 'border-2 border-gray-300 dark:border-gray-600 hover:border-green-500'
                   }`}
                 >
-                  {selectedEvento.concluido && <CheckCircle2 className="w-6 h-6 text-white" />}
+                  {selectedEvento.concluido && <CheckCircle2 className="w-6 h-6" />}
                 </button>
                 <div>
                   <h3 className={`text-2xl font-bold text-gray-900 dark:text-white ${
-                    selectedEvento.concluido ? 'line-through' : ''
+                    selectedEvento.concluido ? 'line-through opacity-60' : ''
                   }`}>
                     {selectedEvento.titulo}
                   </h3>
-                  <span className={`text-sm px-2 py-1 rounded ${getPrioridadeCor(selectedEvento.prioridade)} bg-current/10`}>
-                    Prioridade {selectedEvento.prioridade}
-                  </span>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r ${getEventoGradient(selectedEvento.cor)} text-white`}>
+                      {selectedEvento.tipo}
+                    </span>
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      selectedEvento.prioridade === 'alta' 
+                        ? 'bg-red-500/20 text-red-600 dark:text-red-400' 
+                        : 'bg-gray-500/20 text-gray-600 dark:text-gray-400'
+                    }`}>
+                      {selectedEvento.prioridade}
+                    </span>
+                  </div>
                 </div>
               </div>
 
               {selectedEvento.descricao && (
-                <div>
-                  <label className="text-sm text-gray-500 dark:text-gray-400">Descrição</label>
-                  <p className="text-gray-900 dark:text-white">{selectedEvento.descricao}</p>
+                <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                  <p className="text-gray-700 dark:text-gray-300">{selectedEvento.descricao}</p>
                 </div>
               )}
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm text-gray-500 dark:text-gray-400">Data</label>
-                  <p className="text-gray-900 dark:text-white">
-                    {new Date(selectedEvento.data).toLocaleDateString('pt-BR', { 
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500 dark:text-gray-400">Horário</label>
-                  <p className="text-gray-900 dark:text-white">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                  <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
+                    <Clock className="w-4 h-4" />
+                    <span className="text-sm font-medium">Horário</span>
+                  </div>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">
                     {selectedEvento.horaInicio} - {selectedEvento.horaFim}
                   </p>
                 </div>
-                {selectedEvento.cliente && (
-                  <div>
-                    <label className="text-sm text-gray-500 dark:text-gray-400">Cliente</label>
-                    <p className="text-gray-900 dark:text-white">{selectedEvento.cliente}</p>
+
+                <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                  <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 mb-1">
+                    <Calendar className="w-4 h-4" />
+                    <span className="text-sm font-medium">Data</span>
                   </div>
-                )}
-                {selectedEvento.projeto && (
-                  <div>
-                    <label className="text-sm text-gray-500 dark:text-gray-400">Projeto</label>
-                    <p className="text-gray-900 dark:text-white">{selectedEvento.projeto}</p>
-                  </div>
-                )}
-                {selectedEvento.local && (
-                  <div>
-                    <label className="text-sm text-gray-500 dark:text-gray-400">Local</label>
-                    <p className="text-gray-900 dark:text-white">{selectedEvento.local}</p>
-                  </div>
-                )}
-                {selectedEvento.alertaMinutos && (
-                  <div>
-                    <label className="text-sm text-gray-500 dark:text-gray-400">Alerta</label>
-                    <p className="text-gray-900 dark:text-white">{selectedEvento.alertaMinutos} minutos antes</p>
-                  </div>
-                )}
-                {selectedEvento.projetoId && (
-                  <div className="md:col-span-2">
-                    <label className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                      <Briefcase className="w-4 h-4" />
-                      Integração com Projeto
-                    </label>
-                    <div className="mt-1 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-500">
-                      <p className="text-sm text-gray-900 dark:text-white">
-                        <strong>Projeto ID:</strong> {selectedEvento.projetoId}
-                      </p>
-                      {selectedEvento.etapaProjeto && (
-                        <p className="text-sm text-gray-900 dark:text-white mt-1">
-                          <strong>Etapa:</strong> {selectedEvento.etapaProjeto.charAt(0).toUpperCase() + selectedEvento.etapaProjeto.slice(1)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {selectedEvento.recorrencia?.ativa && (
-                  <div className="md:col-span-2">
-                    <label className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      Recorrência
-                    </label>
-                    <div className="mt-1 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border-l-4 border-purple-500">
-                      <p className="text-sm text-gray-900 dark:text-white">
-                        <strong>Tipo:</strong> {selectedEvento.recorrencia.tipo.charAt(0).toUpperCase() + selectedEvento.recorrencia.tipo.slice(1)}
-                        {' '}• <strong>Intervalo:</strong> a cada {selectedEvento.recorrencia.intervalo} {
-                          selectedEvento.recorrencia.tipo === 'diaria' ? 'dia(s)' :
-                          selectedEvento.recorrencia.tipo === 'semanal' ? 'semana(s)' :
-                          'mês(es)'
-                        }
-                      </p>
-                      {selectedEvento.recorrencia.diasSemana && selectedEvento.recorrencia.diasSemana.length > 0 && (
-                        <p className="text-sm text-gray-900 dark:text-white mt-1">
-                          <strong>Dias:</strong> {selectedEvento.recorrencia.diasSemana.map(d => 
-                            ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d]
-                          ).join(', ')}
-                        </p>
-                      )}
-                      {selectedEvento.recorrencia.dataFim && (
-                        <p className="text-sm text-gray-900 dark:text-white mt-1">
-                          <strong>Até:</strong> {new Date(selectedEvento.recorrencia.dataFim).toLocaleDateString('pt-BR')}
-                        </p>
-                      )}
-                      {selectedEvento.recorrencia.ocorrencias && (
-                        <p className="text-sm text-gray-900 dark:text-white mt-1">
-                          <strong>Ocorrências:</strong> {selectedEvento.recorrencia.ocorrencias}x
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {selectedEvento.templateId && (
-                  <div className="md:col-span-2">
-                    <label className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                      <Zap className="w-4 h-4" />
-                      Criado a partir de template
-                    </label>
-                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
-                      {templates.find(t => t.id === selectedEvento.templateId)?.nome || 'Template'}
-                    </p>
-                  </div>
-                )}
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">
+                    {new Date(selectedEvento.data).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })}
+                  </p>
+                </div>
               </div>
+
+              {(selectedEvento.cliente || selectedEvento.projeto) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {selectedEvento.cliente && (
+                    <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+                      <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-1">
+                        <Users className="w-4 h-4" />
+                        <span className="text-sm font-medium">Cliente</span>
+                      </div>
+                      <p className="font-bold text-gray-900 dark:text-white">{selectedEvento.cliente}</p>
+                    </div>
+                  )}
+
+                  {selectedEvento.projeto && (
+                    <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20">
+                      <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400 mb-1">
+                        <Briefcase className="w-4 h-4" />
+                        <span className="text-sm font-medium">Projeto</span>
+                      </div>
+                      <p className="font-bold text-gray-900 dark:text-white">{selectedEvento.projeto}</p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <button
-                  onClick={() => {
-                    setShowModal(false);
-                    handleEdit(selectedEvento);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-lg transition-colors font-semibold"
+                  onClick={() => setShowModal(false)}
+                  className="flex-1 px-6 py-3 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-xl transition-colors font-semibold"
                 >
-                  <Edit className="w-5 h-5" />
-                  Editar
+                  Fechar
                 </button>
                 <button
-                  onClick={() => {
-                    setShowModal(false);
-                    handleDelete(selectedEvento);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors font-semibold"
+                  onClick={() => { toggleConcluido(selectedEvento.id); setShowModal(false); }}
+                  className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl transition-all font-semibold ${
+                    selectedEvento.concluido
+                      ? 'bg-orange-600 hover:bg-orange-500 text-white'
+                      : 'bg-green-600 hover:bg-green-500 text-white'
+                  }`}
                 >
-                  <Trash2 className="w-5 h-5" />
-                  Excluir
+                  <CheckCircle2 className="w-5 h-5" />
+                  {selectedEvento.concluido ? 'Reabrir' : 'Concluir'}
                 </button>
               </div>
             </div>
@@ -1501,151 +1162,21 @@ const Agenda: React.FC = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && selectedEvento && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full p-6 border border-gray-200 dark:border-gray-800">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Trash2 className="w-8 h-8 text-red-600 dark:text-red-400" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                Excluir Evento?
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                Tem certeza que deseja excluir <strong>{selectedEvento.titulo}</strong>? Esta ação não pode ser desfeita.
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  setSelectedEvento(null);
-                }}
-                className="flex-1 px-6 py-3 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-lg transition-colors font-semibold"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors font-semibold"
-              >
-                Excluir
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal Create - Novo Modal com Templates Inteligentes */}
+      <ModalCriarEvento
+        isOpen={showModal && modalMode === 'create'}
+        onClose={() => setShowModal(false)}
+        onSave={handleCriarEvento}
+        dataInicial={dateToLocalString(currentDate)}
+      />
 
-      {/* Modal de Templates */}
-      {showTemplateModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-800">
-            <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-6 flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  Escolha um Template
-                </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Crie eventos rapidamente com configurações pré-definidas
-                </p>
-              </div>
-              <button
-                onClick={() => setShowTemplateModal(false)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
+      {/* Modal Gestão de Admins */}
+      <ModalGestaoAdmins 
+        isOpen={showGestaoAdmins} 
+        onClose={() => setShowGestaoAdmins(false)} 
+      />
 
-            <div className="p-6 grid md:grid-cols-2 gap-4">
-              {templates.map((template) => {
-                const TipoIcon = tiposEvento.find(t => t.value === template.tipo)?.icon || Calendar;
-                const corClass = cores.find(c => c.value === template.cor)?.class || 'bg-blue-500';
-                
-                return (
-                  <div
-                    key={template.id}
-                    onClick={() => {
-                      const novoEvento = criarEventoDeTemplate(
-                        template,
-                        dateToLocalString(currentDate),
-                        '09:00'
-                      );
-                      setFormData(novoEvento);
-                      setShowTemplateModal(false);
-                      setModalMode('create');
-                      setShowModal(true);
-                    }}
-                    className="group cursor-pointer backdrop-blur-xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-400 rounded-xl p-6 transition-all hover:scale-105 hover:shadow-xl"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className={`p-3 ${corClass} rounded-lg`}>
-                        <TipoIcon className="w-6 h-6 text-white" />
-                      </div>
-                      
-                      <div className="flex-1">
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
-                          {template.nome}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                          {template.descricao}
-                        </p>
-                        
-                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-500 mb-3">
-                          <Clock className="w-4 h-4" />
-                          {template.duracaoMinutos} minutos
-                        </div>
-
-                        {template.checklist && template.checklist.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Checklist ({template.checklist.length} itens)
-                            </p>
-                            <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-                              {template.checklist.slice(0, 3).map((item, idx) => (
-                                <li key={idx} className="flex items-start gap-1">
-                                  <span className="text-purple-500">•</span>
-                                  {item}
-                                </li>
-                              ))}
-                              {template.checklist.length > 3 && (
-                                <li className="text-purple-500 font-medium">
-                                  +{template.checklist.length - 3} mais...
-                                </li>
-                              )}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                        {tiposEvento.find(t => t.value === template.tipo)?.label}
-                      </span>
-                      <span className="text-xs font-bold text-purple-600 dark:text-purple-400 group-hover:translate-x-1 transition-transform">
-                        Usar template →
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="sticky bottom-0 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 p-4 flex justify-center">
-              <button
-                onClick={() => setShowTemplateModal(false)}
-                className="px-6 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-              >n                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tutorial Overlay */}
+      {/* Tutorial */}
       <TutorialOverlay page="agenda" />
     </div>
   );

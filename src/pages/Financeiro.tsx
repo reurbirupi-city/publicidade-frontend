@@ -27,11 +27,17 @@ import {
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
 import { TutorialOverlay } from '../components/TutorialOverlay';
+import Sidebar from '../components/Sidebar';
 import ModalCriarTransacao from '../components/ModalCriarTransacao';
 import ModalVisualizarTransacao from '../components/ModalVisualizarTransacao';
 import ModalEditarTransacao from '../components/ModalEditarTransacao';
 import ModalDeletarTransacao from '../components/ModalDeletarTransacao';
 import { getClientes, getProjetos } from '../services/dataIntegration';
+import { db } from '../services/firebase';
+import { collection, addDoc, onSnapshot, query, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { useAuth } from '../contexts/AuthContext';
+import { isWebmaster } from '../services/adminService';
+import { notificarNovaTransacao } from '../services/notificacoes';
 
 // ============================================================================
 // INTERFACES E TIPOS
@@ -75,6 +81,8 @@ interface Parcela {
 
 const Financeiro: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const userIsWebmaster = user?.email ? isWebmaster(user.email) : false;
   const [viewMode, setViewMode] = useState<'dashboard' | 'receitas' | 'despesas' | 'fluxo' | 'relatorios'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<StatusPagamento | 'todos'>('todos');
@@ -92,235 +100,112 @@ const Financeiro: React.FC = () => {
   const clientes = getClientes();
   const projetos = getProjetos();
 
-  // ============================================================================
-  // DADOS MOCK INICIAIS
-  // ============================================================================
+  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const TRANSACOES_MOCK: Transacao[] = [
-    // RECEITAS
-    {
-      id: 'REC-001',
-      tipo: 'receita',
-      descricao: 'Projeto Identidade Visual Tech Innovations',
-      valor: 15000,
-      categoria: 'projeto',
-      status: 'pago',
-      dataVencimento: '2025-12-10',
-      dataPagamento: '2025-12-08',
-      formaPagamento: 'pix',
-      clienteId: '1',
-      clienteNome: 'Maria Silva',
-      projetoId: 'PROJ-2025-001',
-      projetoTitulo: 'Identidade Visual Completa',
-      recorrente: false,
-      criadoEm: '2025-11-20T10:00:00',
-      atualizadoEm: '2025-12-08T14:30:00'
-    },
-    {
-      id: 'REC-002',
-      tipo: 'receita',
-      descricao: 'Parcela 1/3 - E-commerce Moda Primavera',
-      valor: 15000,
-      categoria: 'projeto',
-      status: 'pago',
-      dataVencimento: '2025-11-05',
-      dataPagamento: '2025-11-05',
-      formaPagamento: 'transferencia',
-      clienteId: '1',
-      clienteNome: 'Maria Silva',
-      projetoId: 'PROJ-2025-004',
-      projetoTitulo: 'E-commerce Moda Primavera/Verão',
-      recorrente: false,
-      criadoEm: '2025-11-01T09:00:00',
-      atualizadoEm: '2025-11-05T10:15:00'
-    },
-    {
-      id: 'REC-003',
-      tipo: 'receita',
-      descricao: 'Parcela 2/3 - E-commerce Moda Primavera',
-      valor: 15000,
-      categoria: 'projeto',
-      status: 'pendente',
-      dataVencimento: '2025-12-20',
-      clienteId: '1',
-      clienteNome: 'Maria Silva',
-      projetoId: 'PROJ-2025-004',
-      projetoTitulo: 'E-commerce Moda Primavera/Verão',
-      recorrente: false,
-      criadoEm: '2025-11-01T09:00:00',
-      atualizadoEm: '2025-11-01T09:00:00'
-    },
-    {
-      id: 'REC-004',
-      tipo: 'receita',
-      descricao: 'Consultoria Digital - Dezembro',
-      valor: 5000,
-      categoria: 'consultoria',
-      status: 'pago',
-      dataVencimento: '2025-12-01',
-      dataPagamento: '2025-12-01',
-      formaPagamento: 'pix',
-      clienteId: '3',
-      clienteNome: 'Ana Costa',
-      recorrente: true,
-      criadoEm: '2025-12-01T08:00:00',
-      atualizadoEm: '2025-12-01T11:00:00'
-    },
-    {
-      id: 'REC-005',
-      tipo: 'receita',
-      descricao: 'Gestão de Redes Sociais - Dezembro',
-      valor: 3500,
-      categoria: 'mensalidade',
-      status: 'pendente',
-      dataVencimento: '2025-12-25',
-      clienteId: '2',
-      clienteNome: 'João Santos',
-      recorrente: true,
-      criadoEm: '2025-12-01T08:00:00',
-      atualizadoEm: '2025-12-01T08:00:00'
-    },
-    {
-      id: 'REC-006',
-      tipo: 'receita',
-      descricao: 'Parcela 1/2 - Website Costa Marketing',
-      valor: 9000,
-      categoria: 'projeto',
-      status: 'pendente',
-      dataVencimento: '2025-12-30',
-      clienteId: '3',
-      clienteNome: 'Ana Costa',
-      projetoId: 'PROJ-2025-003',
-      projetoTitulo: 'Website Institucional Costa Marketing',
-      recorrente: false,
-      criadoEm: '2025-12-14T10:00:00',
-      atualizadoEm: '2025-12-14T10:00:00'
-    },
+  // Listener em tempo real para transações do Firestore
+  useEffect(() => {
+    if (!user?.uid) return;
 
-    // DESPESAS
-    {
-      id: 'DESP-001',
-      tipo: 'despesa',
-      descricao: 'Adobe Creative Cloud - Time Completo',
-      valor: 850,
-      categoria: 'ferramentas',
-      status: 'pago',
-      dataVencimento: '2025-12-05',
-      dataPagamento: '2025-12-05',
-      formaPagamento: 'cartao_credito',
-      recorrente: true,
-      criadoEm: '2025-12-01T08:00:00',
-      atualizadoEm: '2025-12-05T09:00:00'
-    },
-    {
-      id: 'DESP-002',
-      tipo: 'despesa',
-      descricao: 'Freelancer Designer - Projeto Tech Innovations',
-      valor: 3500,
-      categoria: 'equipe',
-      status: 'pago',
-      dataVencimento: '2025-12-10',
-      dataPagamento: '2025-12-10',
-      formaPagamento: 'pix',
-      recorrente: false,
-      observacoes: 'Camila Designer - 40h trabalhadas',
-      criadoEm: '2025-11-20T10:00:00',
-      atualizadoEm: '2025-12-10T15:00:00'
-    },
-    {
-      id: 'DESP-003',
-      tipo: 'despesa',
-      descricao: 'Google Workspace + Drive Storage',
-      valor: 350,
-      categoria: 'ferramentas',
-      status: 'pago',
-      dataVencimento: '2025-12-08',
-      dataPagamento: '2025-12-08',
-      formaPagamento: 'cartao_credito',
-      recorrente: true,
-      criadoEm: '2025-12-01T08:00:00',
-      atualizadoEm: '2025-12-08T10:00:00'
-    },
-    {
-      id: 'DESP-004',
-      tipo: 'despesa',
-      descricao: 'Anúncios Facebook/Instagram - Campanha Dezembro',
-      valor: 2500,
-      categoria: 'marketing',
-      status: 'pago',
-      dataVencimento: '2025-12-12',
-      dataPagamento: '2025-12-11',
-      formaPagamento: 'cartao_credito',
-      recorrente: false,
-      criadoEm: '2025-12-01T09:00:00',
-      atualizadoEm: '2025-12-11T16:00:00'
-    },
-    {
-      id: 'DESP-005',
-      tipo: 'despesa',
-      descricao: 'AWS Hosting + CDN',
-      valor: 450,
-      categoria: 'infraestrutura',
-      status: 'pendente',
-      dataVencimento: '2025-12-20',
-      recorrente: true,
-      criadoEm: '2025-12-01T08:00:00',
-      atualizadoEm: '2025-12-01T08:00:00'
-    },
-    {
-      id: 'DESP-006',
-      tipo: 'despesa',
-      descricao: 'ISS + Impostos Municipais - Dezembro',
-      valor: 1850,
-      categoria: 'impostos',
-      status: 'pendente',
-      dataVencimento: '2025-12-28',
-      recorrente: true,
-      criadoEm: '2025-12-01T08:00:00',
-      atualizadoEm: '2025-12-01T08:00:00'
-    },
-    {
-      id: 'DESP-007',
-      tipo: 'despesa',
-      descricao: 'Fotógrafo Profissional - Sessão E-commerce',
-      valor: 1200,
-      categoria: 'equipe',
-      status: 'pago',
-      dataVencimento: '2025-12-14',
-      dataPagamento: '2025-12-14',
-      formaPagamento: 'pix',
-      recorrente: false,
-      observacoes: 'Pedro Fotógrafo - 100 fotos produto',
-      criadoEm: '2025-12-08T10:00:00',
-      atualizadoEm: '2025-12-14T17:00:00'
-    },
-    {
-      id: 'DESP-008',
-      tipo: 'despesa',
-      descricao: 'Figma Professional Plan',
-      valor: 240,
-      categoria: 'ferramentas',
-      status: 'pago',
-      dataVencimento: '2025-12-03',
-      dataPagamento: '2025-12-03',
-      formaPagamento: 'cartao_credito',
-      recorrente: true,
-      criadoEm: '2025-12-01T08:00:00',
-      atualizadoEm: '2025-12-03T09:00:00'
+    setLoading(true);
+    const transacoesRef = collection(db, 'transacoes');
+    
+    // Se for webmaster, vê tudo. Se não, vê apenas as suas.
+    const q = userIsWebmaster 
+      ? query(transacoesRef)
+      : query(transacoesRef, where('adminId', '==', user.uid));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Transacao[];
+      
+      setTransacoes(docs);
+      setLoading(false);
+      
+      // Sincronizar com localStorage para cache
+      localStorage.setItem('financeiro_v1', JSON.stringify(docs));
+    }, (error) => {
+      console.error('Erro ao escutar transações:', error);
+      const stored = localStorage.getItem('financeiro_v1');
+      if (stored) setTransacoes(JSON.parse(stored));
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid, userIsWebmaster]);
+
+  // Handlers de Modais
+  const handleCriarTransacao = async (novaTransacao: any) => {
+    const transacaoData = {
+      ...novaTransacao,
+      adminId: user?.uid,
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
+    };
+
+    try {
+      const docRef = await addDoc(collection(db, 'transacoes'), transacaoData);
+      console.log('✅ Transação criada no Firestore:', docRef.id);
+      
+      // Notificar
+      if (user?.uid) {
+        await notificarNovaTransacao(
+          user.uid,
+          novaTransacao.descricao,
+          novaTransacao.valor,
+          novaTransacao.tipo
+        );
+      }
+      
+      setModalCriar(false);
+    } catch (error) {
+      console.error('Erro ao criar transação no Firestore:', error);
+      // Fallback local
+      const transacao: Transacao = {
+        id: `TR-${Date.now()}`,
+        ...transacaoData
+      } as Transacao;
+      setTransacoes([...transacoes, transacao]);
+      setModalCriar(false);
     }
-  ];
+  };
 
-  const [transacoes, setTransacoes] = useState<Transacao[]>(() => {
-    const storageKey = 'financeiro_v1';
-    const stored = localStorage.getItem(storageKey);
-    if (stored) {
-      console.log('✅ Financeiro: Carregado do localStorage');
-      return JSON.parse(stored);
+  const handleEditarTransacao = async (transacaoEditada: any) => {
+    if (!transacaoSelecionada) return;
+
+    try {
+      await updateDoc(doc(db, 'transacoes', transacaoSelecionada.id), {
+        ...transacaoEditada,
+        atualizadoEm: new Date().toISOString()
+      });
+      setModalEditar(false);
+      setTransacaoSelecionada(null);
+    } catch (error) {
+      console.error('Erro ao editar transação no Firestore:', error);
+      setTransacoes(transacoes.map(t => 
+        t.id === transacaoSelecionada.id ? { ...t, ...transacaoEditada } : t
+      ));
+      setModalEditar(false);
+      setTransacaoSelecionada(null);
     }
-    console.log('📦 Financeiro: Usando dados mock iniciais');
-    localStorage.setItem(storageKey, JSON.stringify(TRANSACOES_MOCK));
-    return TRANSACOES_MOCK;
-  });
+  };
+
+  const handleDeletarTransacao = async () => {
+    if (!transacaoSelecionada) return;
+
+    try {
+      await deleteDoc(doc(db, 'transacoes', transacaoSelecionada.id));
+      setModalDeletar(false);
+      setTransacaoSelecionada(null);
+    } catch (error) {
+      console.error('Erro ao deletar transação no Firestore:', error);
+      setTransacoes(transacoes.filter(t => t.id !== transacaoSelecionada.id));
+      setModalDeletar(false);
+      setTransacaoSelecionada(null);
+    }
+  };
 
   // Salva no localStorage quando transações mudar
   useEffect(() => {
@@ -332,20 +217,9 @@ const Financeiro: React.FC = () => {
   // HANDLERS DOS MODAIS
   // ============================================================================
 
-  const handleCriarTransacao = (novaTransacao: Transacao) => {
-    setTransacoes(prev => [...prev, novaTransacao]);
-    console.log('✅ Transação criada:', novaTransacao.id);
-  };
-
   const handleVisualizarTransacao = (transacao: Transacao) => {
     setTransacaoSelecionada(transacao);
     setModalVisualizar(true);
-  };
-
-  const handleEditarTransacao = (transacao: Transacao) => {
-    setTransacaoSelecionada(transacao);
-    setModalVisualizar(false);
-    setModalEditar(true);
   };
 
   const handleSalvarEdicao = (transacaoAtualizada: Transacao) => {
@@ -355,7 +229,7 @@ const Financeiro: React.FC = () => {
     console.log('✅ Transação atualizada:', transacaoAtualizada.id);
   };
 
-  const handleDeletarTransacao = (transacao: Transacao) => {
+  const handleDeletarTransacaoModal = (transacao: Transacao) => {
     setTransacaoSelecionada(transacao);
     setModalVisualizar(false);
     setModalDeletar(true);
@@ -495,18 +369,17 @@ const Financeiro: React.FC = () => {
   // ============================================================================
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 transition-colors duration-500">
+    <div className="flex min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 transition-colors duration-500">
+      {/* Sidebar de Navegação */}
+      <Sidebar />
+      
+      {/* Conteúdo Principal */}
+      <main className="flex-1 min-h-screen lg:ml-0">
       {/* Header */}
       <div className="backdrop-blur-xl bg-white/80 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              </button>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-400 dark:to-teal-400 bg-clip-text text-transparent">
                   Gestão Financeira
@@ -879,6 +752,7 @@ const Financeiro: React.FC = () => {
 
       {/* Tutorial Overlay */}
       <TutorialOverlay page="financeiro" />
+      </main>
     </div>
   );
 };

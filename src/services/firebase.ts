@@ -6,13 +6,13 @@ import { getAnalytics } from 'firebase/analytics';
 
 // Configuração do Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyCQmrD3-ZnwrOHecDxi4q8DljA9bbkq1hE",
-  authDomain: "inspiracao-e5a54.firebaseapp.com",
-  projectId: "inspiracao-e5a54",
-  storageBucket: "inspiracao-e5a54.firebasestorage.app",
-  messagingSenderId: "392020602156",
-  appId: "1:392020602156:web:9669411d3dffed72225089",
-  measurementId: "G-VG9E54NZ6W"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCQmrD3-ZnwrOHecDxi4q8DljA9bbkq1hE",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "inspiracao-e5a54.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "inspiracao-e5a54",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "inspiracao-e5a54.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "392020602156",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:392020602156:web:9669411d3dffed72225089",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-VG9E54NZ6W"
 };
 
 // Inicializar Firebase
