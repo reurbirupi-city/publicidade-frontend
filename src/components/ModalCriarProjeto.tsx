@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Save, X } from 'lucide-react';
+import { Save, Sparkles, X } from 'lucide-react';
 import Modal from './Modal';
 import { ClienteSelector } from './DataSelectors';
 import { getClienteById, createProjetoWithSync, atualizarStatusCliente } from '../services/dataIntegration';
+import api from '../services/api';
 
 interface Projeto {
   id: string;
@@ -56,6 +57,9 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGerandoDescricaoIA, setIsGerandoDescricaoIA] = useState(false);
+  const [isAjustandoDescricaoIA, setIsAjustandoDescricaoIA] = useState(false);
+  const [instrucoesDescricaoIA, setInstrucoesDescricaoIA] = useState('');
 
   const categorias = [
     'Marketing Digital',
@@ -149,6 +153,68 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
     // Limpa erro do campo alterado
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const handleGerarDescricaoIA = async () => {
+    if (!formData.titulo.trim()) {
+      alert('Preencha o título do projeto antes de gerar a descrição com IA.');
+      return;
+    }
+
+    setIsGerandoDescricaoIA(true);
+    try {
+      const cliente = formData.clienteId ? getClienteById(formData.clienteId) : null;
+
+      const response = await api.post('/ia/projetos/descricao/gerar', {
+        titulo: formData.titulo,
+        clienteNome: cliente?.nome,
+        clienteEmpresa: cliente?.empresa,
+        categoria: formData.categoria,
+        servicosContratados: formData.servicosContratados,
+        prazoEstimado: formData.prazoEstimado,
+        instrucoes: instrucoesDescricaoIA || undefined,
+      });
+
+      const descricao = response.data?.descricao;
+      if (descricao) {
+        setFormData(prev => ({ ...prev, descricao }));
+      }
+    } catch (error: any) {
+      console.error('Erro ao gerar descrição do projeto com IA:', error);
+      alert(error?.response?.data?.error || 'Erro ao gerar descrição com IA.');
+    } finally {
+      setIsGerandoDescricaoIA(false);
+    }
+  };
+
+  const handleAjustarDescricaoIA = async () => {
+    if (!formData.descricao.trim()) {
+      alert('Escreva uma descrição antes de ajustar com IA.');
+      return;
+    }
+
+    setIsAjustandoDescricaoIA(true);
+    try {
+      const cliente = formData.clienteId ? getClienteById(formData.clienteId) : null;
+
+      const response = await api.post('/ia/projetos/descricao/ajustar', {
+        titulo: formData.titulo,
+        clienteEmpresa: cliente?.empresa,
+        categoria: formData.categoria,
+        descricao: formData.descricao,
+        instrucoes: instrucoesDescricaoIA || undefined,
+      });
+
+      const descricao = response.data?.descricao;
+      if (descricao) {
+        setFormData(prev => ({ ...prev, descricao }));
+      }
+    } catch (error: any) {
+      console.error('Erro ao ajustar descrição do projeto com IA:', error);
+      alert(error?.response?.data?.error || 'Erro ao ajustar descrição com IA.');
+    } finally {
+      setIsAjustandoDescricaoIA(false);
     }
   };
 
@@ -327,9 +393,33 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
 
         {/* Descrição */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Descrição
-          </label>
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Descrição
+            </label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleGerarDescricaoIA}
+                disabled={isGerandoDescricaoIA || isSubmitting}
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white rounded-lg text-xs font-semibold"
+                title="Gerar descrição com IA"
+              >
+                <Sparkles className="w-4 h-4" />
+                {isGerandoDescricaoIA ? 'Gerando…' : 'Gerar com IA'}
+              </button>
+              <button
+                type="button"
+                onClick={handleAjustarDescricaoIA}
+                disabled={isAjustandoDescricaoIA || isSubmitting}
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 disabled:bg-purple-100 text-purple-700 rounded-lg text-xs font-semibold border border-purple-200"
+                title="Ajustar descrição com IA"
+              >
+                <Sparkles className="w-4 h-4" />
+                {isAjustandoDescricaoIA ? 'Ajustando…' : 'Ajustar com IA'}
+              </button>
+            </div>
+          </div>
           <textarea
             name="descricao"
             value={formData.descricao}
@@ -337,6 +427,13 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
             rows={3}
             placeholder="Descreva o escopo e objetivos do projeto..."
             className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 outline-none text-gray-900 dark:text-white resize-none"
+          />
+          <input
+            type="text"
+            value={instrucoesDescricaoIA}
+            onChange={(e) => setInstrucoesDescricaoIA(e.target.value)}
+            placeholder="Instruções para IA (opcional). Ex: tom profissional, foco em entregáveis..."
+            className="mt-2 w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
           />
         </div>
 
