@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Save, X } from 'lucide-react';
+import { Save, Sparkles, X } from 'lucide-react';
 import Modal from './Modal';
 import { ClienteSelector, ProjetoSelector } from './DataSelectors';
 import { getClienteById, getProjetoById } from '../services/dataIntegration';
+import api from '../services/api';
 
 type RedeSocial = 'instagram' | 'facebook' | 'linkedin' | 'twitter' | 'youtube' | 'tiktok';
 type StatusConteudo = 'planejado' | 'em_criacao' | 'aprovado' | 'publicado' | 'cancelado';
@@ -66,6 +67,9 @@ const ModalEditarConteudo: React.FC<ModalEditarConteudoProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [clienteAlterado, setClienteAlterado] = useState(false);
+  const [iaInstrucoes, setIaInstrucoes] = useState('');
+  const [isGerandoDescricaoIA, setIsGerandoDescricaoIA] = useState(false);
+  const [isAjustandoDescricaoIA, setIsAjustandoDescricaoIA] = useState(false);
 
   useEffect(() => {
     if (conteudo && isOpen) {
@@ -221,6 +225,76 @@ const ModalEditarConteudo: React.FC<ModalEditarConteudoProps> = ({
     }
   };
 
+  const handleGerarDescricaoIA = async () => {
+    if (!conteudo) return;
+    if (isSubmitting || isGerandoDescricaoIA || isAjustandoDescricaoIA) return;
+
+    const assunto = formData.titulo.trim();
+    if (!assunto) {
+      setErrors(prev => ({ ...prev, titulo: 'Informe o título para gerar a descrição com IA' }));
+      return;
+    }
+
+    try {
+      setIsGerandoDescricaoIA(true);
+
+      const cliente = formData.clienteId ? getClienteById(formData.clienteId) : null;
+      const response = await api.post('/ia/social-media/descricao/gerar', {
+        titulo: assunto,
+        clienteNome: cliente?.nome,
+        clienteEmpresa: cliente?.empresa,
+        redeSocial: formData.redeSocial,
+        tipoConteudo: formData.tipoConteudo,
+      });
+
+      const descricaoGerada = response?.data?.descricao;
+      if (typeof descricaoGerada === 'string' && descricaoGerada.trim()) {
+        setFormData(prev => ({ ...prev, descricao: descricaoGerada.trim() }));
+      } else {
+        alert('A IA não retornou uma descrição válida. Tente novamente.');
+      }
+    } catch (error) {
+      console.error('Erro ao gerar descrição com IA:', error);
+      alert('Erro ao gerar descrição com IA. Tente novamente.');
+    } finally {
+      setIsGerandoDescricaoIA(false);
+    }
+  };
+
+  const handleAjustarDescricaoIA = async () => {
+    if (!conteudo) return;
+    if (isSubmitting || isGerandoDescricaoIA || isAjustandoDescricaoIA) return;
+
+    const texto = formData.descricao.trim();
+    if (!texto) {
+      alert('Escreva uma descrição antes de ajustar com IA.');
+      return;
+    }
+
+    try {
+      setIsAjustandoDescricaoIA(true);
+
+      const response = await api.post('/ia/social-media/descricao/ajustar', {
+        descricao: texto,
+        instrucoes: iaInstrucoes.trim() || undefined,
+        redeSocial: formData.redeSocial,
+        tipoConteudo: formData.tipoConteudo,
+      });
+
+      const descricaoAjustada = response?.data?.descricao;
+      if (typeof descricaoAjustada === 'string' && descricaoAjustada.trim()) {
+        setFormData(prev => ({ ...prev, descricao: descricaoAjustada.trim() }));
+      } else {
+        alert('A IA não retornou uma descrição válida. Tente novamente.');
+      }
+    } catch (error) {
+      console.error('Erro ao ajustar descrição com IA:', error);
+      alert('Erro ao ajustar descrição com IA. Tente novamente.');
+    } finally {
+      setIsAjustandoDescricaoIA(false);
+    }
+  };
+
   if (!conteudo) return null;
 
   return (
@@ -283,6 +357,35 @@ const ModalEditarConteudo: React.FC<ModalEditarConteudoProps> = ({
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Descrição
           </label>
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              type="button"
+              onClick={handleGerarDescricaoIA}
+              disabled={isSubmitting || isGerandoDescricaoIA || isAjustandoDescricaoIA}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white hover:opacity-90 disabled:opacity-50"
+              title="Gerar descrição/brief com IA"
+            >
+              <Sparkles className="w-4 h-4" />
+              {isGerandoDescricaoIA ? 'Gerando…' : 'Gerar com IA'}
+            </button>
+            <button
+              type="button"
+              onClick={handleAjustarDescricaoIA}
+              disabled={isSubmitting || isGerandoDescricaoIA || isAjustandoDescricaoIA}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+              title="Corrigir e ajustar o texto com IA"
+            >
+              <Sparkles className="w-4 h-4" />
+              {isAjustandoDescricaoIA ? 'Ajustando…' : 'Ajustar com IA'}
+            </button>
+          </div>
+          <input
+            type="text"
+            value={iaInstrucoes}
+            onChange={(e) => setIaInstrucoes(e.target.value)}
+            placeholder="Instruções para IA (opcional). Ex: mais direto, tom informal, incluir CTA"
+            className="w-full mb-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
+          />
           <textarea
             name="descricao"
             value={formData.descricao}
