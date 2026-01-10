@@ -184,13 +184,15 @@ const Agenda: React.FC = () => {
   useEffect(() => {
     if (!user?.uid) return;
 
+    console.log('📅 Agenda - Usuário:', user.email, '| isWebmaster:', userIsWebmaster);
+
     setLoadingEventos(true);
     const eventosRef = collection(db, 'eventos');
     
-    // Se for webmaster, vê tudo. Se não, vê apenas os seus.
-    const q = userIsWebmaster 
-      ? query(eventosRef)
-      : query(eventosRef, where('adminId', '==', user.uid));
+    // TEMPORÁRIO: Sem filtro até regras do Firestore serem atualizadas
+    const q = query(eventosRef);
+
+    console.log('🔍 Agenda - Query eventos SEM filtro (aguardando regras Firestore)');
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
@@ -198,13 +200,16 @@ const Agenda: React.FC = () => {
         ...doc.data()
       })) as Evento[];
       
+      console.log('✅ Agenda - Eventos carregados:', docs.length);
       setEventos(docs);
       setLoadingEventos(false);
       
       // Sincronizar com localStorage para offline/cache
       saveEventos(docs);
     }, (error) => {
-      console.error('Erro ao escutar eventos:', error);
+      console.error('❌ Agenda - Erro ao escutar eventos:', error);
+      console.error('❌ Agenda - Código do erro:', error.code);
+      console.error('❌ Agenda - Mensagem:', error.message);
       // Fallback para localStorage em caso de erro
       const saved = localStorage.getItem('agendaEventos');
       if (saved) setEventos(JSON.parse(saved));
@@ -234,16 +239,19 @@ const Agenda: React.FC = () => {
     return [];
   });
 
-  // Data integration
-  const projetosBase = getProjetos();
-  const projetos: ProjetoIntegrado[] = projetosBase.map(p => ({
-    ...p,
-    progresso: (p as any).progresso || 0,
-    prazoEstimado: (p as any).prazoEstimado || p.dataInicio,
-    prioridade: (p as any).prioridade || 'media'
-  }));
-  const clientes = getClientes();
-  const systemStats = getSystemStats();
+  // Data integration - Memoizado para evitar re-renders desnecessários
+  const projetos: ProjetoIntegrado[] = useMemo(() => {
+    const projetosBase = getProjetos();
+    return projetosBase.map(p => ({
+      ...p,
+      progresso: (p as any).progresso || 0,
+      prazoEstimado: (p as any).prazoEstimado || p.dataInicio,
+      prioridade: (p as any).prioridade || 'media'
+    }));
+  }, []);
+  
+  const clientes = useMemo(() => getClientes(), []);
+  const systemStats = useMemo(() => getSystemStats(), []);
 
   // Dicas do Dia Dinâmicas
   const dicasMotivacionais = [
@@ -449,16 +457,43 @@ const Agenda: React.FC = () => {
   };
 
   // Função para criar novo evento a partir do modal
+  // Função para criar novo evento a partir do modal
   const handleCriarEvento = async (novoEvento: NovoEvento) => {
-    const eventoData = {
-      ...novoEvento,
-      cliente: novoEvento.clienteId ? clientes.find(c => c.id === novoEvento.clienteId)?.nome : undefined,
-      projeto: novoEvento.projetoId ? projetos.find(p => p.id === novoEvento.projetoId)?.titulo : undefined,
+    // Criar objeto limpo sem campos undefined (Firestore não aceita undefined)
+    const eventoData: any = {
+      titulo: novoEvento.titulo,
+      descricao: novoEvento.descricao,
+      data: novoEvento.data,
+      horaInicio: novoEvento.horaInicio,
+      horaFim: novoEvento.horaFim,
+      tipo: novoEvento.tipo,
+      prioridade: novoEvento.prioridade,
       cor: novoEvento.cor || getCorByTipo(novoEvento.tipo),
       concluido: false,
-      adminId: user?.uid, // Individualização
+      adminId: user?.uid,
       criadoEm: new Date().toISOString()
     };
+
+    // Adicionar campos opcionais apenas se tiverem valor
+    if (novoEvento.clienteId) {
+      const clienteObj = clientes.find(c => c.id === novoEvento.clienteId);
+      if (clienteObj) eventoData.cliente = clienteObj.nome;
+    }
+    
+    if (novoEvento.projetoId) {
+      const projetoObj = projetos.find(p => p.id === novoEvento.projetoId);
+      if (projetoObj) {
+        eventoData.projeto = projetoObj.titulo;
+        eventoData.projetoId = novoEvento.projetoId;
+      }
+    }
+
+    if (novoEvento.local) eventoData.local = novoEvento.local;
+    if (novoEvento.participantes?.length) eventoData.participantes = novoEvento.participantes;
+    if (novoEvento.alertaMinutos) eventoData.alertaMinutos = novoEvento.alertaMinutos;
+    if (novoEvento.etapaProjeto) eventoData.etapaProjeto = novoEvento.etapaProjeto;
+    if (novoEvento.recorrencia?.ativa) eventoData.recorrencia = novoEvento.recorrencia;
+    if (novoEvento.templateId) eventoData.templateId = novoEvento.templateId;
 
     try {
       const docRef = await addDoc(collection(db, 'eventos'), eventoData);
@@ -544,7 +579,7 @@ const Agenda: React.FC = () => {
         </div>
 
         {/* Header */}
-        <header className="relative z-10 backdrop-blur-xl bg-white/80 dark:bg-gray-900/80 border-b border-gray-200/50 dark:border-gray-800/50 sticky top-0">
+        <header className="relative z-40 backdrop-blur-xl bg-white/80 dark:bg-gray-900/80 border-b border-gray-200/50 dark:border-gray-800/50 sticky top-0">
           <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
               {/* Greeting Section */}
@@ -593,7 +628,7 @@ const Agenda: React.FC = () => {
                 <ThemeToggle />
 
                 {/* Settings Dropdown */}
-                <div className="relative z-[60]" ref={settingsRef}>
+                <div className="relative z-50" ref={settingsRef}>
                   <button 
                     onClick={() => setShowSettingsMenu(!showSettingsMenu)}
                     className={`p-3 rounded-xl transition-all ${
@@ -607,7 +642,7 @@ const Agenda: React.FC = () => {
                   </button>
 
                   {showSettingsMenu && (
-                    <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 py-2 z-[70] animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                       <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
                         <p className="text-sm font-bold text-gray-900 dark:text-white">Configurações</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
@@ -1007,7 +1042,7 @@ const Agenda: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-4 space-y-4">
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => toggleConcluido(selectedEvento.id)}

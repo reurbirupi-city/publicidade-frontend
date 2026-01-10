@@ -574,7 +574,7 @@ const ModalCriarEvento: React.FC<ModalCriarEventoProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden border border-gray-200 dark:border-gray-800 shadow-2xl flex flex-col">
+      <div className="bg-white dark:bg-gray-900 rounded-xl w-full max-w-3xl max-h-[95vh] overflow-hidden border border-gray-200 dark:border-gray-800 shadow-xl flex flex-col">
         
         {/* ============================================================ */}
         {/* HEADER */}

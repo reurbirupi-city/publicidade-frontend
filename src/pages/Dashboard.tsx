@@ -553,32 +553,30 @@ const Dashboard: React.FC = () => {
         </div>
       </header>
 
-      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 py-8">
+      <div className="relative z-10 max-w-[1600px] mx-auto px-3 sm:px-4 lg:px-6 py-4">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-black mb-2">
+        <div className="mb-4">
+          <h2 className="text-xl sm:text-2xl font-bold mb-1">
             <span className="bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 bg-clip-text text-transparent">
               Bem-vindo de volta! 👋
             </span>
           </h2>
-          <p className="text-gray-600 dark:text-gray-400">Aqui está um resumo do seu dia</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Aqui está um resumo do seu dia</p>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
           {stats.map((stat, index) => (
             <div
               key={index}
               className="relative group cursor-pointer"
             >
-              <div className="absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity blur-xl" 
-                   style={{ background: `linear-gradient(135deg, ${stat.gradient})` }}></div>
-              <div className="relative backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 border-l-4 border-l-purple-500 dark:border-l-amber-500 rounded-xl p-6 transition-all hover:scale-105 hover:shadow-2xl hover:border-l-purple-600 dark:hover:border-l-amber-400 hover:shadow-purple-500/20 dark:hover:shadow-amber-500/20">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-lg`}>
-                    <stat.icon className="w-6 h-6 text-white" />
+              <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 border-l-4 border-l-purple-500 dark:border-l-amber-500 rounded-lg p-4 transition-all hover:scale-105 hover:shadow-lg">
+                <div className="flex items-start justify-between mb-3">
+                  <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-md`}>
+                    <stat.icon className="w-5 h-5 text-white" />
                   </div>
-                  <span className={`text-sm font-semibold ${
+                  <span className={`text-xs font-semibold ${
                     stat.changeType === 'positive' ? 'text-green-500' : 
                     stat.changeType === 'negative' ? 'text-red-500' : 
                     'text-gray-500'
@@ -586,49 +584,47 @@ const Dashboard: React.FC = () => {
                     {stat.change}
                   </span>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{stat.value}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{stat.label}</p>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-0.5">{stat.value}</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{stat.label}</p>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid lg:grid-cols-3 gap-4">
           {/* Modules Grid */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Módulos</h3>
-              <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg transition-all hover:scale-105">
-                <Plus className="w-4 h-4" />
-                <span className="text-sm font-medium">Novo</span>
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Módulos</h3>
+              <button className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg transition-all text-sm font-medium">
+                <Plus className="w-3.5 h-3.5" />
+                Novo
               </button>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 gap-3">
               {modules.map((module, index) => (
                 <div
                   key={index}
                   onClick={() => navigate(module.path)}
                   className="relative group cursor-pointer"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity blur-xl" 
-                       style={{ background: `linear-gradient(135deg, ${module.gradient})` }}></div>
-                  <div className="relative backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 border-l-4 border-l-blue-500 dark:border-l-amber-500 rounded-lg p-6 transition-all hover:scale-105 hover:shadow-2xl hover:border-l-blue-600 dark:hover:border-l-amber-400 hover:shadow-blue-500/20 dark:hover:shadow-amber-500/20">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${module.gradient} flex items-center justify-center shadow-lg`}>
-                        <module.icon className="w-6 h-6 text-white" />
+                  <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 border-l-4 border-l-blue-500 dark:border-l-amber-500 rounded-lg p-4 transition-all hover:scale-105 hover:shadow-lg">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${module.gradient} flex items-center justify-center shadow-md`}>
+                        <module.icon className="w-5 h-5 text-white" />
                       </div>
-                      <div className={`w-2 h-2 rounded-full ${
+                      <div className={`w-1.5 h-1.5 rounded-full ${
                         module.status === 'active' ? 'bg-green-500 animate-pulse' :
                         module.status === 'warning' ? 'bg-yellow-500 animate-pulse' :
                         'bg-gray-400'
                       }`}></div>
                     </div>
-                    <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-1">{module.title}</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{module.description}</p>
+                    <h4 className="text-base font-bold text-gray-900 dark:text-white mb-1">{module.title}</h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{module.description}</p>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-purple-600 dark:text-amber-400">{module.count}</span>
-                      <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-purple-500 dark:group-hover:text-amber-400 transition-colors" />
+                      <span className="text-xs font-semibold text-purple-600 dark:text-amber-400">{module.count}</span>
+                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-purple-500 dark:group-hover:text-amber-400 transition-colors" />
                     </div>
                   </div>
                 </div>
@@ -637,26 +633,26 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Activity Feed */}
-            <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 border-t-4 border-t-pink-500 dark:border-t-amber-500 rounded-xl p-6 transition-all hover:border-t-pink-600 dark:hover:border-t-amber-400">
-              <div className="flex items-center gap-2 mb-4">
-                <Activity className="w-5 h-5 text-pink-500 dark:text-amber-400" />
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Atividades Recentes</h3>
+            <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 border-t-4 border-t-pink-500 dark:border-t-amber-500 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Activity className="w-4 h-4 text-pink-500 dark:text-amber-400" />
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Atividades Recentes</h3>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {activities.map((activity) => (
-                  <div key={activity.id} className="flex gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                  <div key={activity.id} className="flex gap-2.5 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
                       activity.type === 'success' ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
                       activity.type === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' :
                       'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                     }`}>
-                      <activity.icon className="w-4 h-4" />
+                      <activity.icon className="w-3.5 h-3.5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">{activity.message}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{activity.time}</p>
+                      <p className="text-xs text-gray-700 dark:text-gray-300 font-medium line-clamp-2">{activity.message}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">{activity.time}</p>
                     </div>
                   </div>
                 ))}
@@ -664,39 +660,39 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Quick Tips */}
-            <div className="backdrop-blur-xl bg-gradient-to-br from-purple-500/10 to-blue-500/10 dark:from-amber-500/10 dark:to-orange-500/10 border border-purple-200 dark:border-gray-800 border-t-4 border-t-purple-500 dark:border-t-amber-500 rounded-xl p-6 transition-all hover:border-t-purple-600 dark:hover:border-t-amber-400">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="w-5 h-5 text-purple-500 dark:text-amber-400" />
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Dicas Rápidas</h3>
+            <div className="backdrop-blur-xl bg-gradient-to-br from-purple-500/10 to-blue-500/10 dark:from-amber-500/10 dark:to-orange-500/10 border border-purple-200 dark:border-gray-800 border-t-4 border-t-purple-500 dark:border-t-amber-500 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="w-4 h-4 text-purple-500 dark:text-amber-400" />
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Dicas Rápidas</h3>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {tips.map((tip, index) => (
                   <div key={index} className="flex items-start gap-2">
-                    <Target className="w-4 h-4 text-purple-500 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-600 dark:text-gray-300">{tip}</p>
+                    <Target className="w-3.5 h-3.5 text-purple-500 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-gray-600 dark:text-gray-300">{tip}</p>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* System Status */}
-            <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 border-t-4 border-t-green-500 dark:border-t-amber-500 rounded-xl p-6 transition-all hover:border-t-green-600 dark:hover:border-t-amber-400">
-              <div className="flex items-center gap-2 mb-4">
-                <BarChart3 className="w-5 h-5 text-green-500 dark:text-amber-400" />
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Status do Sistema</h3>
+            <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 border-t-4 border-t-green-500 dark:border-t-amber-500 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <BarChart3 className="w-4 h-4 text-green-500 dark:text-amber-400" />
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Status do Sistema</h3>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">API Status</span>
-                  <span className="flex items-center gap-2 text-green-500 text-sm font-semibold">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-gray-600 dark:text-gray-400">API Status</span>
+                  <span className="flex items-center gap-1.5 text-green-500 text-xs font-semibold">
+                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
                     Online
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Database</span>
-                  <span className="flex items-center gap-2 text-green-500 text-sm font-semibold">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-gray-600 dark:text-gray-400">Database</span>
+                  <span className="flex items-center gap-1.5 text-green-500 text-xs font-semibold">
+                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
                     Conectado
                   </span>
                 </div>

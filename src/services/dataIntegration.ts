@@ -70,16 +70,13 @@ const STORAGE_KEYS = {
 export const getClientes = (): ClienteBase[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.CLIENTES);
-    console.log('🔍 getClientes - localStorage raw:', raw);
     if (raw) {
       const clientes = JSON.parse(raw);
-      console.log('✅ getClientes - Parsed:', clientes.length, 'clientes');
       return clientes;
     }
   } catch (err) {
     console.error('❌ Erro ao carregar clientes:', err);
   }
-  console.log('⚠️ getClientes - Retornando array vazio');
   return [];
 };
 
@@ -418,14 +415,11 @@ export const validateProjetoExists = (projetoId: string): boolean => {
  */
 export const getClientesDropdown = () => {
   const clientes = getClientes();
-  console.log('📋 getClientesDropdown - Total:', clientes.length);
-  const dropdown = clientes.map(c => ({
+  return clientes.map(c => ({
     value: c.id,
     label: `${c.nome} - ${c.empresa}`,
     cliente: c
   }));
-  console.log('📋 getClientesDropdown - Dropdown:', dropdown);
-  return dropdown;
 };
 
 // ============================================================================

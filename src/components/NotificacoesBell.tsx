@@ -106,7 +106,7 @@ const NotificacoesBell: React.FC = () => {
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative z-50" ref={dropdownRef}>
       {/* Botão do Sino */}
       <button
         onClick={() => setIsOpen(!isOpen)}
@@ -125,7 +125,7 @@ const NotificacoesBell: React.FC = () => {
 
       {/* Dropdown de Notificações */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-96 max-h-[500px] overflow-hidden bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-[9999]">
+        <div className="absolute right-0 mt-2 w-96 max-h-[500px] overflow-hidden bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-600 to-indigo-600">
             <div className="flex items-center gap-2">

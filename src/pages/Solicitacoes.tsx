@@ -33,6 +33,7 @@ import { TutorialOverlay } from '../components/TutorialOverlay';
 import ChatWhatsAppAdmin from '../components/ChatWhatsAppAdmin';
 import { getClientes, getProjetos, saveProjetos, atualizarStatusCliente } from '../services/dataIntegration';
 import Sidebar from '../components/Sidebar';
+import api from '../services/api';
 
 // Função para baixar contrato assinado do Firestore
 const baixarContratoAssinado = async (solicitacaoId: string) => {
@@ -87,7 +88,51 @@ const Solicitacoes: React.FC = () => {
     descricao: '',
     prazo: ''
   });
+  const [gerandoPropostaIA, setGerandoPropostaIA] = useState(false);
   const [resposta, setResposta] = useState('');
+
+  const handleGerarPropostaIA = async () => {
+    if (!selectedSolicitacao) return;
+    if (!selectedSolicitacao.clienteId) {
+      alert('Esta solicitação não possui clienteId vinculado. Não é possível gerar proposta com IA.');
+      return;
+    }
+
+    try {
+      setGerandoPropostaIA(true);
+
+      const response = await api.post('/ia/propostas/gerar', {
+        solicitacaoId: selectedSolicitacao.id,
+        clienteId: selectedSolicitacao.clienteId,
+        detalhes: {
+          descricao: selectedSolicitacao.descricao || selectedSolicitacao.titulo || '',
+          tipoServico: selectedSolicitacao.tipoServico || selectedSolicitacao.tipo || selectedSolicitacao.categoria || '',
+          objetivo: selectedSolicitacao.objetivo || '',
+          publico: selectedSolicitacao.publico || '',
+          prazoEstimado: selectedSolicitacao.prazoEstimado || selectedSolicitacao.prazo || 30,
+          complexidade: selectedSolicitacao.complexidade || 'media',
+          escopo: selectedSolicitacao.escopo || 'completo'
+        }
+      });
+
+      const proposta = response.data?.proposta;
+      if (!proposta) {
+        throw new Error('Resposta inválida do servidor (proposta ausente).');
+      }
+
+      setPropostaData((prev) => ({
+        ...prev,
+        descricao: proposta.descricao || prev.descricao,
+        prazo: proposta.prazoEntrega ? String(proposta.prazoEntrega) : prev.prazo
+      }));
+    } catch (error: any) {
+      console.error('❌ Erro ao gerar proposta com IA:', error);
+      const msg = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Erro desconhecido';
+      alert(`Erro ao gerar proposta com IA: ${msg}`);
+    } finally {
+      setGerandoPropostaIA(false);
+    }
+  };
 
   useEffect(() => {
     const carregarSolicitacoes = async () => {
@@ -778,15 +823,26 @@ const Solicitacoes: React.FC = () => {
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                 Criar Proposta
               </h2>
-              <button
-                onClick={() => {
-                  setShowPropostaModal(false);
-                  setPropostaData({ valor: '', descricao: '', prazo: '' });
-                }}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-              >
-                <X className="w-6 h-6" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleGerarPropostaIA}
+                  disabled={gerandoPropostaIA}
+                  className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg font-medium transition-colors"
+                  title="Gerar descrição e prazo com IA"
+                >
+                  {gerandoPropostaIA ? <Loader className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                  Gerar com IA
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPropostaModal(false);
+                    setPropostaData({ valor: '', descricao: '', prazo: '' });
+                  }}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4 mb-6">

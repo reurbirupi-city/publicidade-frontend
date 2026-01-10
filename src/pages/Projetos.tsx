@@ -1126,7 +1126,7 @@ const Projetos: React.FC = () => {
             </div>
 
             {/* Body */}
-            <div className="p-6 space-y-4">
+            <div className="p-4 space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   O que foi realizado? *

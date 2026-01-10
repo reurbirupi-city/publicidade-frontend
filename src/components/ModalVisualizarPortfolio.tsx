@@ -127,7 +127,7 @@ const ModalVisualizarPortfolio: React.FC<ModalVisualizarPortfolioProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header com Gradiente */}
         <div className={`bg-gradient-to-r ${categoriaInfo.gradient} p-6 text-white`}>
           <div className="flex items-start justify-between mb-4">

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, X } from 'lucide-react';
 import Modal from './Modal';
 import { ClienteSelector, ProjetoSelector } from './DataSelectors';
-import { getClienteById } from '../services/dataIntegration';
+import { getClienteById, getProjetoById } from '../services/dataIntegration';
 
 type RedeSocial = 'instagram' | 'facebook' | 'linkedin' | 'twitter' | 'youtube' | 'tiktok';
 type StatusConteudo = 'planejado' | 'em_criacao' | 'aprovado' | 'publicado' | 'cancelado';
@@ -176,6 +176,15 @@ const ModalEditarConteudo: React.FC<ModalEditarConteudoProps> = ({
         return;
       }
 
+      // Buscar título do projeto se houver
+      let projetoTitulo: string | undefined = undefined;
+      if (formData.projetoId) {
+        const projeto = getProjetoById(formData.projetoId);
+        if (projeto) {
+          projetoTitulo = projeto.titulo;
+        }
+      }
+
       const conteudoAtualizado: ConteudoSocial = {
         ...conteudo,
         titulo: formData.titulo.trim(),
@@ -184,6 +193,7 @@ const ModalEditarConteudo: React.FC<ModalEditarConteudoProps> = ({
         clienteNome: cliente.nome,
         clienteEmpresa: cliente.empresa,
         projetoId: formData.projetoId || undefined,
+        projetoTitulo: projetoTitulo,
         redeSocial: formData.redeSocial,
         tipoConteudo: formData.tipoConteudo,
         dataPublicacao: formData.dataPublicacao,

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Save, X } from 'lucide-react';
 import Modal from './Modal';
 import { ClienteSelector, ProjetoSelector } from './DataSelectors';
-import { getClienteById } from '../services/dataIntegration';
+import { getClienteById, getProjetoById } from '../services/dataIntegration';
 
 interface ConteudoSocial {
   id: string;
@@ -134,6 +134,15 @@ const ModalCriarConteudo: React.FC<ModalCriarConteudoProps> = ({
         return;
       }
 
+      // Buscar título do projeto se houver
+      let projetoTitulo: string | undefined = undefined;
+      if (formData.projetoId) {
+        const projeto = getProjetoById(formData.projetoId);
+        if (projeto) {
+          projetoTitulo = projeto.titulo;
+        }
+      }
+
       const hoje = new Date();
       const conteudoId = `SM-${Date.now()}`;
 
@@ -145,6 +154,7 @@ const ModalCriarConteudo: React.FC<ModalCriarConteudoProps> = ({
         clienteNome: cliente.nome,
         clienteEmpresa: cliente.empresa,
         projetoId: formData.projetoId || undefined,
+        projetoTitulo: projetoTitulo,
         redeSocial: formData.redeSocial,
         tipoConteudo: formData.tipoConteudo,
         dataPublicacao: formData.dataPublicacao,

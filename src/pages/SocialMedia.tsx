@@ -9,6 +9,7 @@ import {
   Linkedin,
   Twitter,
   Youtube,
+  X,
   Search,
   Clock,
   CheckCircle,
@@ -18,7 +19,12 @@ import {
   BarChart3,
   ChevronLeft,
   ChevronRight,
-  Hash
+  Hash,
+  CalendarPlus,
+  Info,
+  Sparkles,
+  Target,
+  CalendarCheck
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
@@ -65,6 +71,7 @@ interface ConteudoSocial {
   aprovadoPor?: string;
   aprovadoEm?: string;
   publicadoEm?: string;
+  eventoVinculadoId?: string; // ID do evento na agenda
   metricas?: {
     alcance?: number;
     engajamento?: number;
@@ -97,6 +104,8 @@ const SocialMedia: React.FC = () => {
   useEffect(() => {
     if (!user?.uid) return;
 
+    console.log('📱 Social Media - Usuário:', user.email, '| isWebmaster:', userIsWebmaster);
+
     setLoading(true);
     const conteudosRef = collection(db, 'social_media');
     
@@ -105,19 +114,24 @@ const SocialMedia: React.FC = () => {
       ? query(conteudosRef)
       : query(conteudosRef, where('adminId', '==', user.uid));
 
+    console.log('🔍 Social Media - Iniciando listener', userIsWebmaster ? 'SEM filtro (webmaster)' : 'COM filtro adminId');
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as ConteudoSocial[];
       
+      console.log('✅ Social Media - Conteúdos carregados:', docs.length);
       setConteudos(docs);
       setLoading(false);
       
       // Sincronizar com localStorage para cache
       localStorage.setItem('social_media_v1', JSON.stringify(docs));
     }, (error) => {
-      console.error('Erro ao escutar conteúdos social media:', error);
+      console.error('❌ Social Media - Erro ao escutar conteúdos:', error);
+      console.error('❌ Social Media - Código:', error.code);
+      console.error('❌ Social Media - Mensagem:', error.message);
       const stored = localStorage.getItem('social_media_v1');
       if (stored) setConteudos(JSON.parse(stored));
       setLoading(false);
@@ -144,6 +158,8 @@ const SocialMedia: React.FC = () => {
   const [modalEditarOpen, setModalEditarOpen] = useState(false);
   const [modalDeletarOpen, setModalDeletarOpen] = useState(false);
   const [conteudoSelecionado, setConteudoSelecionado] = useState<ConteudoSocial | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   // ============================================================================
   // HANDLERS DOS MODAIS
@@ -154,19 +170,42 @@ const SocialMedia: React.FC = () => {
   };
 
   const handleConteudoCriado = async (novoConteudo: ConteudoSocial) => {
-    const conteudoData = {
-      ...novoConteudo,
+    // Criar objeto base apenas com campos obrigatórios
+    const conteudoData: any = {
+      titulo: novoConteudo.titulo,
+      descricao: novoConteudo.descricao,
+      clienteId: novoConteudo.clienteId,
+      clienteNome: novoConteudo.clienteNome,
+      clienteEmpresa: novoConteudo.clienteEmpresa,
+      redeSocial: novoConteudo.redeSocial,
+      tipoConteudo: novoConteudo.tipoConteudo,
+      dataPublicacao: novoConteudo.dataPublicacao,
+      status: novoConteudo.status,
       adminId: user?.uid,
       criadoEm: new Date().toISOString(),
       atualizadoEm: new Date().toISOString()
     };
+
+    // Adicionar campos opcionais apenas se tiverem valor
+    if (novoConteudo.projetoId) conteudoData.projetoId = novoConteudo.projetoId;
+    if (novoConteudo.projetoTitulo) conteudoData.projetoTitulo = novoConteudo.projetoTitulo;
+    if (novoConteudo.horaPublicacao) conteudoData.horaPublicacao = novoConteudo.horaPublicacao;
+    if (novoConteudo.copy) conteudoData.copy = novoConteudo.copy;
+    if (novoConteudo.hashtags?.length) conteudoData.hashtags = novoConteudo.hashtags;
+    if (novoConteudo.urlImagem) conteudoData.urlImagem = novoConteudo.urlImagem;
+    if (novoConteudo.urlVideo) conteudoData.urlVideo = novoConteudo.urlVideo;
+    if (novoConteudo.linkExterno) conteudoData.linkExterno = novoConteudo.linkExterno;
+    if (novoConteudo.observacoes) conteudoData.observacoes = novoConteudo.observacoes;
+
+    console.log('💾 Tentando salvar conteúdo:', conteudoData);
 
     try {
       const docRef = await addDoc(collection(db, 'social_media'), conteudoData);
       console.log('✅ Conteúdo criado no Firestore:', docRef.id);
       setModalCriarOpen(false);
     } catch (error) {
-      console.error('Erro ao criar conteúdo no Firestore:', error);
+      console.error('❌ Erro ao criar conteúdo no Firestore:', error);
+      console.error('❌ Detalhes do erro:', error);
       // Fallback local
       const conteudo: ConteudoSocial = {
         ...conteudoData,
@@ -189,25 +228,39 @@ const SocialMedia: React.FC = () => {
   };
 
   const handleConteudoAtualizado = async (conteudoAtualizado: ConteudoSocial) => {
-    setConteudos(prev => prev.map(c => 
-      c.id === conteudoAtualizado.id ? conteudoAtualizado : c
-    ));
     console.log('✅ Conteúdo atualizado:', conteudoAtualizado.id);
 
+    // Criar objeto limpo removendo campos undefined
+    const updateData: any = {
+      titulo: conteudoAtualizado.titulo,
+      descricao: conteudoAtualizado.descricao,
+      clienteId: conteudoAtualizado.clienteId,
+      clienteNome: conteudoAtualizado.clienteNome,
+      clienteEmpresa: conteudoAtualizado.clienteEmpresa,
+      redeSocial: conteudoAtualizado.redeSocial,
+      tipoConteudo: conteudoAtualizado.tipoConteudo,
+      dataPublicacao: conteudoAtualizado.dataPublicacao,
+      status: conteudoAtualizado.status,
+      atualizadoEm: new Date().toISOString()
+    };
+
+    // Adicionar campos opcionais apenas se tiverem valor
+    if (conteudoAtualizado.projetoId) updateData.projetoId = conteudoAtualizado.projetoId;
+    if (conteudoAtualizado.projetoTitulo) updateData.projetoTitulo = conteudoAtualizado.projetoTitulo;
+    if (conteudoAtualizado.horaPublicacao) updateData.horaPublicacao = conteudoAtualizado.horaPublicacao;
+    if (conteudoAtualizado.copy) updateData.copy = conteudoAtualizado.copy;
+    if (conteudoAtualizado.hashtags?.length) updateData.hashtags = conteudoAtualizado.hashtags;
+    if (conteudoAtualizado.urlImagem) updateData.urlImagem = conteudoAtualizado.urlImagem;
+    if (conteudoAtualizado.urlVideo) updateData.urlVideo = conteudoAtualizado.urlVideo;
+    if (conteudoAtualizado.linkExterno) updateData.linkExterno = conteudoAtualizado.linkExterno;
+    if (conteudoAtualizado.observacoes) updateData.observacoes = conteudoAtualizado.observacoes;
+
     try {
-      await updateDoc(doc(db, 'social_media', conteudoAtualizado.id), {
-        ...conteudoAtualizado,
-        atualizadoEm: new Date().toISOString()
-      });
+      await updateDoc(doc(db, 'social_media', conteudoAtualizado.id), updateData);
       setModalEditarOpen(false);
       setConteudoSelecionado(null);
     } catch (error) {
       console.error('Erro ao editar conteúdo no Firestore:', error);
-      if (conteudoSelecionado) {
-        setConteudos(conteudos.map(c => 
-          c.id === conteudoSelecionado.id ? { ...c, ...conteudoAtualizado } : c
-        ));
-      }
       setModalEditarOpen(false);
       setConteudoSelecionado(null);
     }
@@ -223,14 +276,82 @@ const SocialMedia: React.FC = () => {
     if (!conteudoSelecionado) return;
 
     try {
+      // Se tem evento vinculado, deletar também
+      if (conteudoSelecionado.eventoVinculadoId) {
+        console.log('🗑️ Deletando evento vinculado:', conteudoSelecionado.eventoVinculadoId);
+        try {
+          await deleteDoc(doc(db, 'eventos', conteudoSelecionado.eventoVinculadoId));
+          console.log('✅ Evento vinculado deletado com sucesso');
+        } catch (errorEvento) {
+          console.warn('⚠️ Erro ao deletar evento vinculado (pode já ter sido deletado):', errorEvento);
+        }
+      }
+
+      // Deletar o conteúdo
       await deleteDoc(doc(db, 'social_media', conteudoSelecionado.id));
+      console.log('✅ Conteúdo social media deletado com sucesso');
       setModalDeletarOpen(false);
       setConteudoSelecionado(null);
     } catch (error) {
-      console.error('Erro ao deletar conteúdo no Firestore:', error);
+      console.error('❌ Erro ao deletar conteúdo no Firestore:', error);
       setConteudos(conteudos.filter(c => c.id !== conteudoSelecionado.id));
       setModalDeletarOpen(false);
       setConteudoSelecionado(null);
+    }
+  };
+
+  // Função para criar compromisso na agenda a partir do conteúdo
+  const handleCriarCompromisso = async (conteudo: ConteudoSocial) => {
+    try {
+      // Calcular horários baseado no horário de publicação
+      const [hora, minuto] = (conteudo.horaPublicacao || '10:00').split(':');
+      const horaFim = String(parseInt(hora) + 1).padStart(2, '0');
+      
+      // Criar objeto limpo sem undefined
+      const eventoData: any = {
+        titulo: `📱 ${conteudo.titulo}`,
+        descricao: `${conteudo.descricao}\n\n🔗 Rede: ${conteudo.redeSocial}\n📋 Tipo: ${conteudo.tipoConteudo}\n🏢 Cliente: ${conteudo.clienteEmpresa}`,
+        data: conteudo.dataPublicacao,
+        horaInicio: `${hora}:${minuto}`,
+        horaFim: `${horaFim}:${minuto}`,
+        tipo: 'outro',
+        prioridade: conteudo.status === 'aprovado' ? 'alta' : 'media',
+        cor: '#ec4899',
+        concluido: conteudo.status === 'publicado',
+        adminId: user?.uid,
+        criadoEm: new Date().toISOString(),
+        // Vincular com o conteúdo social media
+        socialMediaId: conteudo.id
+      };
+
+      // Adicionar cliente apenas se existir
+      if (conteudo.clienteNome) {
+        eventoData.cliente = conteudo.clienteNome;
+      }
+
+      // Adicionar projeto se existir
+      if (conteudo.projetoId) {
+        eventoData.projetoId = conteudo.projetoId;
+        if (conteudo.projetoTitulo) {
+          eventoData.projeto = conteudo.projetoTitulo;
+        }
+      }
+
+      console.log('📅 Criando evento vinculado:', eventoData);
+
+      const docRef = await addDoc(collection(db, 'eventos'), eventoData);
+      
+      // Atualizar o conteúdo com o ID do evento
+      await updateDoc(doc(db, 'social_media', conteudo.id), {
+        eventoVinculadoId: docRef.id
+      });
+
+      setShowSuccessMessage(true);
+      setTimeout(() => setShowSuccessMessage(false), 3000);
+      console.log('✅ Compromisso criado e vinculado:', docRef.id);
+    } catch (error) {
+      console.error('❌ Erro ao criar compromisso:', error);
+      alert('Erro ao criar compromisso na agenda');
     }
   };
 
@@ -262,6 +383,37 @@ const SocialMedia: React.FC = () => {
     { value: 'video', label: 'Vídeo', icon: Youtube },
     { value: 'artigo', label: 'Artigo', icon: FileText }
   ];
+
+  // Helper para renderizar botão de agenda
+  const renderAgendaButton = (conteudo: ConteudoSocial, className: string = '') => {
+    if (conteudo.eventoVinculadoId) {
+      return (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate('/agenda');
+          }}
+          className={`p-1.5 bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50 rounded transition-all ${className}`}
+          title="Ver evento na agenda"
+        >
+          <CalendarCheck className="w-4 h-4 text-green-600 dark:text-green-400" />
+        </button>
+      );
+    }
+    
+    return (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleCriarCompromisso(conteudo);
+        }}
+        className={`opacity-0 group-hover:opacity-100 p-1.5 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded transition-all ${className}`}
+        title="Adicionar à Agenda"
+      >
+        <CalendarPlus className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+      </button>
+    );
+  };
 
   // ============================================================================
   // FUNÇÕES AUXILIARES
@@ -413,15 +565,32 @@ const SocialMedia: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-                  Social Media
-                </h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+                    Social Media
+                  </h1>
+                  <button
+                    onClick={() => setShowGuide(!showGuide)}
+                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    title="Como usar esta página"
+                  >
+                    <Info className="w-5 h-5 text-gray-400 hover:text-pink-600" />
+                  </button>
+                </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   Calendário Editorial e Gestão de Conteúdo
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate('/agenda')}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-white rounded-lg transition-all hover:scale-105 font-semibold shadow-lg"
+                title="Ir para Command Center"
+              >
+                <Target className="w-5 h-5" />
+                Command Center
+              </button>
               <NotificacoesBell />
               <ThemeToggle />
               <button
@@ -433,6 +602,52 @@ const SocialMedia: React.FC = () => {
               </button>
             </div>
           </div>
+          
+          {/* Guia de Funcionalidades */}
+          {showGuide && (
+            <div className="mt-4 p-4 bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 border border-pink-200 dark:border-pink-800 rounded-xl">
+              <div className="flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-pink-600 dark:text-pink-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 text-sm text-gray-700 dark:text-gray-300">
+                  <h3 className="font-bold mb-2">Como usar Social Media:</h3>
+                  <ul className="space-y-1.5">
+                    <li className="flex items-start gap-2">
+                      <span className="text-pink-600 dark:text-pink-400">•</span>
+                      <span><strong>Calendário:</strong> Visualize todos os conteúdos organizados por data de publicação</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-pink-600 dark:text-pink-400">•</span>
+                      <span><strong>Kanban:</strong> Arraste conteúdos entre status (Planejado → Em Criação → Aprovado → Publicado)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-pink-600 dark:text-pink-400">•</span>
+                      <span><strong>Criar Compromisso:</strong> Use o botão 📅 em cada conteúdo para adicionar à sua agenda no Command Center</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-pink-600 dark:text-pink-400">•</span>
+                      <span><strong>Filtros:</strong> Use os filtros para visualizar por rede social, status ou cliente específico</span>
+                    </li>
+                  </ul>
+                </div>
+                <button
+                  onClick={() => setShowGuide(false)}
+                  className="p-1 hover:bg-pink-200 dark:hover:bg-pink-800 rounded transition-colors"
+                >
+                  <X className="w-4 h-4 text-gray-500" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Mensagem de sucesso */}
+          {showSuccessMessage && (
+            <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+              <span className="text-sm font-medium text-green-700 dark:text-green-300">
+                Compromisso adicionado à agenda com sucesso!
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -703,10 +918,12 @@ const SocialMedia: React.FC = () => {
                       key={conteudo.id}
                       draggable
                       onDragStart={(e) => handleDragStart(e, conteudo.id)}
-                      onClick={() => handleVisualizar(conteudo)}
-                      className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-move hover:shadow-lg transition-all"
+                      className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-move hover:shadow-lg transition-all"
                     >
-                      <div className="flex items-start gap-2 mb-2">
+                      <div 
+                        onClick={() => handleVisualizar(conteudo)}
+                        className="flex items-start gap-2 mb-2"
+                      >
                         <div className={`p-2 rounded bg-gradient-to-r ${getRedeColor(conteudo.redeSocial)}`}>
                           <RedeIcon className="w-4 h-4 text-white" />
                         </div>
@@ -719,14 +936,26 @@ const SocialMedia: React.FC = () => {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                        <span>{formatarData(conteudo.dataPublicacao)}</span>
-                        {conteudo.hashtags && (
-                          <span className="flex items-center gap-1">
-                            <Hash className="w-3 h-3" />
-                            {conteudo.hashtags.length}
-                          </span>
-                        )}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 dark:text-gray-400">{formatarData(conteudo.dataPublicacao)}</span>
+                        <div className="flex items-center gap-2">
+                          {conteudo.hashtags && (
+                            <span className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                              <Hash className="w-3 h-3" />
+                              {conteudo.hashtags.length}
+                            </span>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCriarCompromisso(conteudo);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded transition-all"
+                            title="Adicionar à Agenda"
+                          >
+                            <CalendarPlus className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -757,10 +986,12 @@ const SocialMedia: React.FC = () => {
                       key={conteudo.id}
                       draggable
                       onDragStart={(e) => handleDragStart(e, conteudo.id)}
-                      onClick={() => handleVisualizar(conteudo)}
-                      className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-move hover:shadow-lg transition-all"
+                      className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-move hover:shadow-lg transition-all"
                     >
-                      <div className="flex items-start gap-2 mb-2">
+                      <div 
+                        onClick={() => handleVisualizar(conteudo)}
+                        className="flex items-start gap-2 mb-2"
+                      >
                         <div className={`p-2 rounded bg-gradient-to-r ${getRedeColor(conteudo.redeSocial)}`}>
                           <RedeIcon className="w-4 h-4 text-white" />
                         </div>
@@ -773,14 +1004,26 @@ const SocialMedia: React.FC = () => {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                        <span>{formatarData(conteudo.dataPublicacao)}</span>
-                        {conteudo.hashtags && (
-                          <span className="flex items-center gap-1">
-                            <Hash className="w-3 h-3" />
-                            {conteudo.hashtags.length}
-                          </span>
-                        )}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 dark:text-gray-400">{formatarData(conteudo.dataPublicacao)}</span>
+                        <div className="flex items-center gap-2">
+                          {conteudo.hashtags && (
+                            <span className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                              <Hash className="w-3 h-3" />
+                              {conteudo.hashtags.length}
+                            </span>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCriarCompromisso(conteudo);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded transition-all"
+                            title="Adicionar à Agenda"
+                          >
+                            <CalendarPlus className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -811,10 +1054,12 @@ const SocialMedia: React.FC = () => {
                       key={conteudo.id}
                       draggable
                       onDragStart={(e) => handleDragStart(e, conteudo.id)}
-                      onClick={() => handleVisualizar(conteudo)}
-                      className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-move hover:shadow-lg transition-all"
+                      className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-move hover:shadow-lg transition-all"
                     >
-                      <div className="flex items-start gap-2 mb-2">
+                      <div 
+                        onClick={() => handleVisualizar(conteudo)}
+                        className="flex items-start gap-2 mb-2"
+                      >
                         <div className={`p-2 rounded bg-gradient-to-r ${getRedeColor(conteudo.redeSocial)}`}>
                           <RedeIcon className="w-4 h-4 text-white" />
                         </div>
@@ -827,14 +1072,26 @@ const SocialMedia: React.FC = () => {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                        <span>{formatarData(conteudo.dataPublicacao)}</span>
-                        {conteudo.hashtags && (
-                          <span className="flex items-center gap-1">
-                            <Hash className="w-3 h-3" />
-                            {conteudo.hashtags.length}
-                          </span>
-                        )}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 dark:text-gray-400">{formatarData(conteudo.dataPublicacao)}</span>
+                        <div className="flex items-center gap-2">
+                          {conteudo.hashtags && (
+                            <span className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                              <Hash className="w-3 h-3" />
+                              {conteudo.hashtags.length}
+                            </span>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCriarCompromisso(conteudo);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded transition-all"
+                            title="Adicionar à Agenda"
+                          >
+                            <CalendarPlus className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -865,10 +1122,12 @@ const SocialMedia: React.FC = () => {
                       key={conteudo.id}
                       draggable
                       onDragStart={(e) => handleDragStart(e, conteudo.id)}
-                      onClick={() => handleVisualizar(conteudo)}
-                      className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-move hover:shadow-lg transition-all"
+                      className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-move hover:shadow-lg transition-all"
                     >
-                      <div className="flex items-start gap-2 mb-2">
+                      <div 
+                        onClick={() => handleVisualizar(conteudo)}
+                        className="flex items-start gap-2 mb-2"
+                      >
                         <div className={`p-2 rounded bg-gradient-to-r ${getRedeColor(conteudo.redeSocial)}`}>
                           <RedeIcon className="w-4 h-4 text-white" />
                         </div>
@@ -881,14 +1140,26 @@ const SocialMedia: React.FC = () => {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                        <span>{formatarData(conteudo.dataPublicacao)}</span>
-                        {conteudo.hashtags && (
-                          <span className="flex items-center gap-1">
-                            <Hash className="w-3 h-3" />
-                            {conteudo.hashtags.length}
-                          </span>
-                        )}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 dark:text-gray-400">{formatarData(conteudo.dataPublicacao)}</span>
+                        <div className="flex items-center gap-2">
+                          {conteudo.hashtags && (
+                            <span className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                              <Hash className="w-3 h-3" />
+                              {conteudo.hashtags.length}
+                            </span>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCriarCompromisso(conteudo);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded transition-all"
+                            title="Adicionar à Agenda"
+                          >
+                            <CalendarPlus className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -919,10 +1190,12 @@ const SocialMedia: React.FC = () => {
                       key={conteudo.id}
                       draggable
                       onDragStart={(e) => handleDragStart(e, conteudo.id)}
-                      onClick={() => handleVisualizar(conteudo)}
-                      className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-move hover:shadow-lg transition-all"
+                      className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-move hover:shadow-lg transition-all"
                     >
-                      <div className="flex items-start gap-2 mb-2">
+                      <div 
+                        onClick={() => handleVisualizar(conteudo)}
+                        className="flex items-start gap-2 mb-2"
+                      >
                         <div className={`p-2 rounded bg-gradient-to-r ${getRedeColor(conteudo.redeSocial)}`}>
                           <RedeIcon className="w-4 h-4 text-white" />
                         </div>
@@ -935,14 +1208,26 @@ const SocialMedia: React.FC = () => {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                        <span>{formatarData(conteudo.dataPublicacao)}</span>
-                        {conteudo.hashtags && (
-                          <span className="flex items-center gap-1">
-                            <Hash className="w-3 h-3" />
-                            {conteudo.hashtags.length}
-                          </span>
-                        )}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 dark:text-gray-400">{formatarData(conteudo.dataPublicacao)}</span>
+                        <div className="flex items-center gap-2">
+                          {conteudo.hashtags && (
+                            <span className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                              <Hash className="w-3 h-3" />
+                              {conteudo.hashtags.length}
+                            </span>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCriarCompromisso(conteudo);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded transition-all"
+                            title="Adicionar à Agenda"
+                          >
+                            <CalendarPlus className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -967,8 +1252,7 @@ const SocialMedia: React.FC = () => {
                   return (
                     <div
                       key={conteudo.id}
-                      onClick={() => handleVisualizar(conteudo)}
-                      className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-lg transition-all cursor-pointer"
+                      className="group border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-lg transition-all"
                     >
                       <div className="flex items-start gap-4">
                         <div className={`p-3 rounded-lg bg-gradient-to-r ${getRedeColor(conteudo.redeSocial)}`}>
@@ -977,16 +1261,30 @@ const SocialMedia: React.FC = () => {
                         
                         <div className="flex-1">
                           <div className="flex items-start justify-between mb-2">
-                            <div>
+                            <div 
+                              onClick={() => handleVisualizar(conteudo)}
+                              className="flex-1 cursor-pointer"
+                            >
                               <h3 className="font-semibold text-gray-900 dark:text-white">{conteudo.titulo}</h3>
                               <p className="text-sm text-gray-600 dark:text-gray-400">{conteudo.clienteEmpresa}</p>
+                              {conteudo.projetoTitulo && (
+                                <p className="text-xs text-purple-600 dark:text-purple-400 mt-0.5">
+                                  📁 {conteudo.projetoTitulo}
+                                </p>
+                              )}
                             </div>
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusConfig[conteudo.status].color}`}>
-                              {statusConfig[conteudo.status].label}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusConfig[conteudo.status].color}`}>
+                                {statusConfig[conteudo.status].label}
+                              </span>
+                              {renderAgendaButton(conteudo, 'p-2')}
+                            </div>
                           </div>
                           
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                          <p 
+                            onClick={() => handleVisualizar(conteudo)}
+                            className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2 cursor-pointer"
+                          >
                             {conteudo.descricao}
                           </p>
                           

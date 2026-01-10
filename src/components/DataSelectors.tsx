@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { getClientesDropdown, getProjetosDropdown } from '../services/dataIntegration';
 
 interface ClienteSelectorProps {
@@ -16,14 +16,9 @@ export const ClienteSelector: React.FC<ClienteSelectorProps> = ({
   required = false,
   className = ''
 }) => {
-  const clientes = getClientesDropdown();
+  // Memoizado para evitar re-renders desnecessários
+  const clientes = useMemo(() => getClientesDropdown(), []);
   
-  // Debug: log para verificar clientes
-  React.useEffect(() => {
-    console.log('🔍 ClienteSelector - Total de clientes:', clientes.length);
-    console.log('📋 Clientes disponíveis:', clientes);
-  }, [clientes]);
-
   return (
     <div className={className}>
       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -69,7 +64,8 @@ export const ProjetoSelector: React.FC<ProjetoSelectorProps> = ({
   required = false,
   className = ''
 }) => {
-  const projetos = getProjetosDropdown(clienteId);
+  // Memoizado para evitar re-renders desnecessários
+  const projetos = useMemo(() => getProjetosDropdown(clienteId), [clienteId]);
 
   return (
     <div className={className}>

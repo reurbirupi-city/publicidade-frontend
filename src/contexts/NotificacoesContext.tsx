@@ -45,7 +45,8 @@ export const NotificacoesProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const emailsWebmaster = [
     'admin@agencia.com',
     'admin@admin.com',
-    'reurbirupi@gmail.com', // Webmaster principal
+    'reurbirupi@gmail.com',
+    'tributacao.irupi@gmail.com' // Webmaster principal
   ];
 
   // Verificar se é admin consultando a coleção admins no Firestore
