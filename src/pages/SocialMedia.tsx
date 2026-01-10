@@ -873,7 +873,7 @@ const SocialMedia: React.FC = () => {
                           <div
                             key={conteudo.id}
                             onClick={() => handleVisualizar(conteudo)}
-                            className={`group text-xs p-1.5 rounded cursor-pointer transition-all hover:scale-105 bg-gradient-to-r ${getRedeColor(conteudo.redeSocial)} text-white flex items-center gap-1`}
+                            className={`group relative text-xs p-1.5 pr-10 rounded cursor-pointer transition-all hover:scale-105 bg-gradient-to-r ${getRedeColor(conteudo.redeSocial)} text-white flex items-center gap-1`}
                             title={conteudo.titulo}
                           >
                             <RedeIcon className="w-3 h-3 flex-shrink-0" />
@@ -883,10 +883,11 @@ const SocialMedia: React.FC = () => {
                                 e.stopPropagation();
                                 handleEditar(conteudo);
                               }}
-                              className="p-0.5 rounded hover:bg-white/25 flex-shrink-0"
+                              className="absolute top-0.5 right-0.5 z-10 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/20 hover:bg-white/30 backdrop-blur border border-white/25"
                               title="Editar e usar IA"
                             >
-                              <Sparkles className="w-3 h-3 text-white" />
+                              <Sparkles className="w-3.5 h-3.5 text-white" />
+                              <span className="text-[10px] font-bold text-white">IA</span>
                             </button>
                           </div>
                         );
