@@ -1,8 +1,12 @@
 import axios from 'axios';
 import { auth } from './firebase';
 
+const fallbackBaseURL = import.meta.env.PROD
+  ? 'https://publicidade-backend.vercel.app/api'
+  : 'http://localhost:3000/api';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+  baseURL: import.meta.env.VITE_API_URL || fallbackBaseURL,
 });
 
 // Interceptor para adicionar token em todas as requisições
