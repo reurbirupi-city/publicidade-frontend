@@ -384,6 +384,22 @@ const SocialMedia: React.FC = () => {
     { value: 'artigo', label: 'Artigo', icon: FileText }
   ];
 
+  // Helper para renderizar botão IA (leva ao modal de edição)
+  const renderIAButton = (conteudo: ConteudoSocial, className: string = '') => {
+    return (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleEditar(conteudo);
+        }}
+        className={`p-1.5 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded transition-all ${className}`}
+        title="Editar e usar IA"
+      >
+        <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+      </button>
+    );
+  };
+
   // Helper para renderizar botão de agenda
   const renderAgendaButton = (conteudo: ConteudoSocial, className: string = '') => {
     if (conteudo.eventoVinculadoId) {
@@ -856,11 +872,21 @@ const SocialMedia: React.FC = () => {
                           <div
                             key={conteudo.id}
                             onClick={() => handleVisualizar(conteudo)}
-                            className={`text-xs p-1.5 rounded cursor-pointer transition-all hover:scale-105 bg-gradient-to-r ${getRedeColor(conteudo.redeSocial)} text-white flex items-center gap-1`}
+                            className={`group text-xs p-1.5 rounded cursor-pointer transition-all hover:scale-105 bg-gradient-to-r ${getRedeColor(conteudo.redeSocial)} text-white flex items-center gap-1`}
                             title={conteudo.titulo}
                           >
                             <RedeIcon className="w-3 h-3 flex-shrink-0" />
                             <span className="truncate flex-1">{conteudo.titulo}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditar(conteudo);
+                              }}
+                              className="p-0.5 rounded hover:bg-white/20 flex-shrink-0"
+                              title="Editar e usar IA"
+                            >
+                              <Sparkles className="w-3 h-3 text-white" />
+                            </button>
                           </div>
                         );
                       })}
@@ -945,6 +971,7 @@ const SocialMedia: React.FC = () => {
                               {conteudo.hashtags.length}
                             </span>
                           )}
+                          {renderIAButton(conteudo)}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1013,6 +1040,7 @@ const SocialMedia: React.FC = () => {
                               {conteudo.hashtags.length}
                             </span>
                           )}
+                          {renderIAButton(conteudo)}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1081,6 +1109,7 @@ const SocialMedia: React.FC = () => {
                               {conteudo.hashtags.length}
                             </span>
                           )}
+                          {renderIAButton(conteudo)}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1149,6 +1178,7 @@ const SocialMedia: React.FC = () => {
                               {conteudo.hashtags.length}
                             </span>
                           )}
+                          {renderIAButton(conteudo)}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1217,6 +1247,7 @@ const SocialMedia: React.FC = () => {
                               {conteudo.hashtags.length}
                             </span>
                           )}
+                          {renderIAButton(conteudo)}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1277,6 +1308,7 @@ const SocialMedia: React.FC = () => {
                               <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusConfig[conteudo.status].color}`}>
                                 {statusConfig[conteudo.status].label}
                               </span>
+                              {renderIAButton(conteudo)}
                               {renderAgendaButton(conteudo, 'p-2')}
                             </div>
                           </div>
