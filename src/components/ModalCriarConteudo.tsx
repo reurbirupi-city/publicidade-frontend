@@ -62,6 +62,9 @@ const ModalCriarConteudo: React.FC<ModalCriarConteudoProps> = ({
   const [iaInstrucoes, setIaInstrucoes] = useState('');
   const [isGerandoDescricaoIA, setIsGerandoDescricaoIA] = useState(false);
   const [isAjustandoDescricaoIA, setIsAjustandoDescricaoIA] = useState(false);
+  const [iaInstrucoesCopy, setIaInstrucoesCopy] = useState('');
+  const [isGerandoCopyIA, setIsGerandoCopyIA] = useState(false);
+  const [isAjustandoCopyIA, setIsAjustandoCopyIA] = useState(false);
 
   const redesSociais = [
     { value: 'instagram', label: 'Instagram' },
@@ -273,6 +276,76 @@ const ModalCriarConteudo: React.FC<ModalCriarConteudoProps> = ({
     }
   };
 
+  const handleGerarCopyIA = async () => {
+    if (isSubmitting || isGerandoCopyIA || isAjustandoCopyIA) return;
+
+    const assunto = formData.titulo.trim();
+    const brief = formData.descricao.trim();
+    if (!assunto && !brief) {
+      alert('Informe um título ou uma descrição para gerar a copy com IA.');
+      return;
+    }
+
+    try {
+      setIsGerandoCopyIA(true);
+
+      const cliente = formData.clienteId ? getClienteById(formData.clienteId) : null;
+      const response = await api.post('/ia/social-media/copy/gerar', {
+        titulo: assunto || undefined,
+        descricao: brief || undefined,
+        clienteNome: cliente?.nome,
+        clienteEmpresa: cliente?.empresa,
+        redeSocial: formData.redeSocial,
+        tipoConteudo: formData.tipoConteudo,
+      });
+
+      const copyGerada = response?.data?.copy;
+      if (typeof copyGerada === 'string' && copyGerada.trim()) {
+        setFormData(prev => ({ ...prev, copy: copyGerada.trim() }));
+      } else {
+        alert('A IA não retornou uma copy válida. Tente novamente.');
+      }
+    } catch (error) {
+      console.error('Erro ao gerar copy com IA:', error);
+      alert('Erro ao gerar copy com IA. Tente novamente.');
+    } finally {
+      setIsGerandoCopyIA(false);
+    }
+  };
+
+  const handleAjustarCopyIA = async () => {
+    if (isSubmitting || isGerandoCopyIA || isAjustandoCopyIA) return;
+
+    const texto = (formData.copy || '').trim();
+    if (!texto) {
+      alert('Escreva uma copy antes de ajustar com IA.');
+      return;
+    }
+
+    try {
+      setIsAjustandoCopyIA(true);
+
+      const response = await api.post('/ia/social-media/copy/ajustar', {
+        copy: texto,
+        instrucoes: iaInstrucoesCopy.trim() || undefined,
+        redeSocial: formData.redeSocial,
+        tipoConteudo: formData.tipoConteudo,
+      });
+
+      const copyAjustada = response?.data?.copy;
+      if (typeof copyAjustada === 'string' && copyAjustada.trim()) {
+        setFormData(prev => ({ ...prev, copy: copyAjustada.trim() }));
+      } else {
+        alert('A IA não retornou uma copy válida. Tente novamente.');
+      }
+    } catch (error) {
+      console.error('Erro ao ajustar copy com IA:', error);
+      alert('Erro ao ajustar copy com IA. Tente novamente.');
+    } finally {
+      setIsAjustandoCopyIA(false);
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Novo Conteúdo Social Media" size="xl">
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -443,6 +516,35 @@ const ModalCriarConteudo: React.FC<ModalCriarConteudoProps> = ({
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Copy/Legenda
           </label>
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              type="button"
+              onClick={handleGerarCopyIA}
+              disabled={isSubmitting || isGerandoCopyIA || isAjustandoCopyIA}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white hover:opacity-90 disabled:opacity-50"
+              title="Gerar copy/legenda com IA"
+            >
+              <Sparkles className="w-4 h-4" />
+              {isGerandoCopyIA ? 'Gerando…' : 'Gerar com IA'}
+            </button>
+            <button
+              type="button"
+              onClick={handleAjustarCopyIA}
+              disabled={isSubmitting || isGerandoCopyIA || isAjustandoCopyIA}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+              title="Corrigir e ajustar a copy com IA"
+            >
+              <Sparkles className="w-4 h-4" />
+              {isAjustandoCopyIA ? 'Ajustando…' : 'Ajustar com IA'}
+            </button>
+          </div>
+          <input
+            type="text"
+            value={iaInstrucoesCopy}
+            onChange={(e) => setIaInstrucoesCopy(e.target.value)}
+            placeholder="Instruções para IA (opcional). Ex: mais curto, mais engraçado, incluir hashtags"
+            className="w-full mb-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
+          />
           <textarea
             name="copy"
             value={formData.copy}
