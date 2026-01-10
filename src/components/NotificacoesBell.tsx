@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { 
   Bell, 
@@ -26,6 +27,8 @@ const NotificacoesBell: React.FC = () => {
   const { notificacoes, naoLidas, marcarLida, marcarTodasLidas, loading, isAdmin } = useNotificacoes();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
 
   // Função de teste para criar notificação de admin
   const criarNotificacaoTeste = async () => {
@@ -62,6 +65,38 @@ const NotificacoesBell: React.FC = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Calcular posição do dropdown (portal + fixed evita overflow/z-index issues)
+  useEffect(() => {
+    if (!isOpen) {
+      setDropdownPos(null);
+      return;
+    }
+
+    const updatePos = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const panelWidth = 384; // w-96
+      const margin = 8;
+      const desiredLeft = rect.right - panelWidth;
+      const left = Math.min(
+        Math.max(desiredLeft, margin),
+        Math.max(margin, window.innerWidth - panelWidth - margin)
+      );
+      const top = rect.bottom + margin;
+
+      setDropdownPos({ top, left });
+    };
+
+    updatePos();
+    window.addEventListener('resize', updatePos);
+    window.addEventListener('scroll', updatePos, true);
+    return () => {
+      window.removeEventListener('resize', updatePos);
+      window.removeEventListener('scroll', updatePos, true);
+    };
+  }, [isOpen]);
 
   // Ícone baseado no tipo
   const getIcone = (tipo: string) => {
@@ -106,9 +141,10 @@ const NotificacoesBell: React.FC = () => {
   };
 
   return (
-    <div className="relative z-50" ref={dropdownRef}>
+    <div className="relative" ref={dropdownRef}>
       {/* Botão do Sino */}
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
         title="Notificações"
@@ -124,8 +160,16 @@ const NotificacoesBell: React.FC = () => {
       </button>
 
       {/* Dropdown de Notificações */}
-      {isOpen && (
-        <div className="absolute right-0 mt-2 w-96 max-h-[500px] overflow-hidden bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50">
+      {isOpen && dropdownPos && createPortal(
+        <div
+          className="fixed inset-0 z-[9999]"
+          onMouseDown={() => setIsOpen(false)}
+        >
+          <div
+            className="absolute w-96 max-h-[500px] overflow-hidden bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700"
+            style={{ top: dropdownPos.top, left: dropdownPos.left }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-600 to-indigo-600">
             <div className="flex items-center gap-2">
@@ -251,7 +295,9 @@ const NotificacoesBell: React.FC = () => {
               </button>
             </div>
           )}
-        </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
