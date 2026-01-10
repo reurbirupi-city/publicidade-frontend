@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Edit2, Trash2, Instagram, Facebook, Linkedin, Twitter, Youtube, Calendar, Clock, User, Building2, FileText, Hash, Image, Video, Link as LinkIcon, MessageSquare, TrendingUp } from 'lucide-react';
+import { X, Edit2, Sparkles, Trash2, Instagram, Facebook, Linkedin, Twitter, Youtube, Calendar, Clock, User, Building2, FileText, Hash, Image, Video, Link as LinkIcon, MessageSquare, TrendingUp } from 'lucide-react';
 import Modal from './Modal';
 
 interface ConteudoSocial {
@@ -169,6 +169,14 @@ const ModalVisualizarConteudo: React.FC<ModalVisualizarConteudoProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => onEdit(conteudo)}
+              className="px-3 py-2 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 text-white hover:opacity-90 transition-opacity flex items-center gap-2"
+              title="Editar e usar IA"
+            >
+              <Sparkles className="w-5 h-5" />
+              <span className="text-sm font-semibold hidden sm:inline">IA</span>
+            </button>
             <button
               onClick={() => onEdit(conteudo)}
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
