@@ -162,7 +162,7 @@ const NotificacoesBell: React.FC = () => {
       {/* Dropdown de Notificações */}
       {isOpen && dropdownPos && createPortal(
         <div
-          className="fixed inset-0 z-[9999]"
+          className="fixed inset-0 z-[2147483647]"
           onMouseDown={() => setIsOpen(false)}
         >
           <div
