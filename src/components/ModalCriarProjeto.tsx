@@ -286,7 +286,12 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
   };
 
   const handleNext = () => {
-    if (validateStep(step)) setStep(prev => Math.min(prev + 1, steps.length - 1));
+    if (validateStep(step)) {
+      setStep(prev => Math.min(prev + 1, steps.length - 1));
+    } else {
+      // Scroll para o topo para mostrar erros
+      document.querySelector('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const handleBack = () => setStep(prev => Math.max(prev - 1, 0));
