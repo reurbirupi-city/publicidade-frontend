@@ -164,6 +164,14 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && step < steps.length - 1) {
+      e.preventDefault();
+      console.log('⚠️ Enter pressionado - disparando handleNext ao invés de submit');
+      handleNext();
+    }
+  };
+
   const handleGerarDescricaoIA = async () => {
     if (!formData.titulo.trim()) {
       alert('Preencha o título do projeto antes de gerar a descrição com IA.');
@@ -427,7 +435,17 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
       title={`Criar Novo Projeto — ${steps[step]} (${step + 1}/${steps.length})`}
       size="lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form 
+        onSubmit={handleSubmit} 
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && step < steps.length - 1) {
+            e.preventDefault();
+            console.log('⚠️ Enter no form - disparando handleNext');
+            handleNext();
+          }
+        }}
+        className="space-y-5"
+      >
         <WizardStepper steps={steps} step={step} className="-mt-1" />
 
         {step === 0 && (
@@ -459,6 +477,7 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
                 name="titulo"
                 value={formData.titulo}
                 onChange={handleChange}
+                onKeyDown={handleKeyDown}
                 required
                 placeholder="Ex: Campanha Digital Q1 2026"
                 className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 outline-none text-gray-900 dark:text-white"
@@ -524,6 +543,7 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
                   name="valorContratado"
                   value={formData.valorContratado}
                   onChange={handleChange}
+                  onKeyDown={handleKeyDown}
                   required
                   min="0"
                   step="0.01"
@@ -542,6 +562,7 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
                   name="valorPago"
                   value={formData.valorPago}
                   onChange={handleChange}
+                  onKeyDown={handleKeyDown}
                   min="0"
                   step="0.01"
                   placeholder="0.00"
@@ -560,6 +581,7 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
                   name="horasEstimadas"
                   value={formData.horasEstimadas}
                   onChange={handleChange}
+                  onKeyDown={handleKeyDown}
                   required
                   min="1"
                   step="0.5"
@@ -596,6 +618,7 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
                 name="dataInicio"
                 value={formData.dataInicio}
                 onChange={handleChange}
+                onKeyDown={handleKeyDown}
                 className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 outline-none text-gray-900 dark:text-white"
               />
             </div>
@@ -610,6 +633,7 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
                 name="servicosContratados"
                 value={formData.servicosContratados}
                 onChange={handleChange}
+                onKeyDown={handleKeyDown}
                 placeholder="Design, Desenvolvimento, Social Media (separados por vírgula)"
                 className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 outline-none text-gray-900 dark:text-white"
               />

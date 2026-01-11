@@ -274,6 +274,14 @@ const ModalEditarProjeto: React.FC<ModalEditarProjetoProps> = ({
 
   const handleBack = () => setStep(prev => Math.max(prev - 1, 0));
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && step < steps.length - 1) {
+      e.preventDefault();
+      console.log('⚠️ Enter pressionado - disparando handleNext ao invés de submit');
+      handleNext();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('📤 SUBMIT CHAMADO (EDIT) - Step atual:', step);
@@ -364,7 +372,17 @@ const ModalEditarProjeto: React.FC<ModalEditarProjetoProps> = ({
       title={`Editar Projeto: ${projeto.id} — ${steps[step]} (${step + 1}/${steps.length})`}
       size="lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form 
+        onSubmit={handleSubmit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && step < steps.length - 1) {
+            e.preventDefault();
+            console.log('⚠️ Enter no form - disparando handleNext');
+            handleNext();
+          }
+        }}
+        className="space-y-5"
+      >
         {/* Stepper */}
         <WizardStepper steps={steps} step={step} className="-mt-1" />
 
