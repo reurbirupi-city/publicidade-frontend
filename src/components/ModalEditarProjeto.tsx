@@ -259,7 +259,12 @@ const ModalEditarProjeto: React.FC<ModalEditarProjetoProps> = ({
     
     if (validateStep(step)) {
       console.log('✅ Validação passou! Avançando...');
-      setStep(prev => Math.min(prev + 1, steps.length - 1));
+      const nextStep = Math.min(step + 1, steps.length - 1);
+      setStep(nextStep);
+      
+      if (nextStep === 2) {
+        console.log('🎯 STEP 2 (DESCRIÇÃO COM IA) AGORA VISÍVEL - Não clique em "Salvar" ainda se quiser usar IA!');
+      }
     } else {
       console.log('❌ Validação falhou:', errors);
       // Scroll para o topo para mostrar erros
@@ -271,6 +276,7 @@ const ModalEditarProjeto: React.FC<ModalEditarProjetoProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('📤 SUBMIT CHAMADO (EDIT) - Step atual:', step);
 
     if (!projeto) return;
 
