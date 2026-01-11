@@ -320,6 +320,7 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('📤 SUBMIT CHAMADO - Step atual:', step);
+    console.trace('🔍 Stack trace do submit:');
 
     // Só permite submit no último step
     if (step < steps.length - 1) {
@@ -439,15 +440,14 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
         onSubmit={handleSubmit} 
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
-            e.preventDefault();
-            e.stopPropagation();
+            console.log('⚠️ Enter detectado no form - Step atual:', step);
             if (step < steps.length - 1) {
-              console.log('⚠️ Enter no form - disparando handleNext');
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('🔄 Bloqueando Enter e chamando handleNext');
               handleNext();
-            } else {
-              console.log('✅ Enter no último step - pode submeter');
-              handleSubmit(e as any);
             }
+            // Se step === último, deixa o comportamento padrão (submit)
           }
         }}
         className="space-y-5"
