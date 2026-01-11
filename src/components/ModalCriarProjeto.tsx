@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Save, Sparkles, X } from 'lucide-react';
 import Modal from './Modal';
 import WizardStepper from './WizardStepper';
@@ -42,6 +42,7 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
 }) => {
   const steps = ['Básico', 'Financeiro & Prazo', 'Descrição'];
   const [step, setStep] = useState(0);
+  const allowSubmitRef = useRef(false);
 
   const [formData, setFormData] = useState({
     titulo: '',
@@ -68,6 +69,12 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
   useEffect(() => {
     if (isOpen) setStep(0);
   }, [isOpen]);
+
+  // Monitorar mudanças no step
+  useEffect(() => {
+    console.log('📍 Step mudou para:', step);
+    allowSubmitRef.current = false; // Sempre bloqueia submit quando step muda
+  }, [step]);
 
   const categorias = [
     'Marketing Digital',
@@ -319,12 +326,17 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('📤 SUBMIT CHAMADO - Step atual:', step);
+    console.log('📤 SUBMIT CHAMADO - Step atual:', step, '| allowSubmit:', allowSubmitRef.current);
     console.trace('🔍 Stack trace do submit:');
 
-    // Só permite submit no último step
+    // Só permite submit no último step E se allowSubmitRef for true
     if (step < steps.length - 1) {
       console.log('⚠️ Submit bloqueado - ainda não está no último step. Use o botão "Próximo".');
+      return;
+    }
+
+    if (!allowSubmitRef.current) {
+      console.log('⚠️ Submit bloqueado por allowSubmitRef - use o botão "Criar Projeto"');
       return;
     }
 
@@ -771,6 +783,10 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
             ) : (
               <button
                 type="submit"
+                onClick={() => {
+                  console.log('🖱️ Botão "Criar Projeto" clicado - habilitando submit');
+                  allowSubmitRef.current = true;
+                }}
                 disabled={isSubmitting}
                 className="px-5 py-2 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white rounded-lg transition-all font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
