@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Calendar, User, FileText, CreditCard, Tag, AlertCircle, ArrowUpRight, ArrowDownRight, Briefcase } from 'lucide-react';
 import { getClientes, getProjetos } from '../services/dataIntegration';
+import WizardStepper from './WizardStepper';
 
 type TipoTransacao = 'receita' | 'despesa';
 type CategoriaReceita = 'projeto' | 'mensalidade' | 'consultoria' | 'outros';
@@ -37,6 +38,9 @@ interface ModalEditarTransacaoProps {
 }
 
 const ModalEditarTransacao: React.FC<ModalEditarTransacaoProps> = ({ isOpen, onClose, transacao, onSave }) => {
+  const steps = ['Básico', 'Pagamento', 'Vínculos & Observações'];
+  const [step, setStep] = useState(0);
+
   const [descricao, setDescricao] = useState('');
   const [valor, setValor] = useState('');
   const [categoria, setCategoria] = useState<CategoriaReceita | CategoriaDespesa>('projeto');
@@ -56,6 +60,7 @@ const ModalEditarTransacao: React.FC<ModalEditarTransacaoProps> = ({ isOpen, onC
   // Preenche form quando abre ou transacao muda
   useEffect(() => {
     if (isOpen && transacao) {
+      setStep(0);
       setDescricao(transacao.descricao);
       setValor(transacao.valor.toString().replace('.', ','));
       setCategoria(transacao.categoria);
@@ -96,42 +101,61 @@ const ModalEditarTransacao: React.FC<ModalEditarTransacaoProps> = ({ isOpen, onC
     { value: 'dinheiro', label: 'Dinheiro' }
   ];
 
-  const validarFormulario = (): boolean => {
-    const novosErros: string[] = [];
+  const getErrosPorPasso = () => {
+    const erros0: string[] = [];
+    const erros1: string[] = [];
+    const erros2: string[] = [];
 
-    if (!descricao.trim()) {
-      novosErros.push('Descrição é obrigatória');
-    }
+    if (!descricao.trim()) erros0.push('Descrição é obrigatória');
 
     const valorNum = parseFloat(valor.replace(',', '.'));
-    if (!valor || isNaN(valorNum) || valorNum <= 0) {
-      novosErros.push('Valor deve ser maior que zero');
-    }
+    if (!valor || Number.isNaN(valorNum) || valorNum <= 0) erros0.push('Valor deve ser maior que zero');
 
-    if (!dataVencimento) {
-      novosErros.push('Data de vencimento é obrigatória');
-    }
-
+    if (!dataVencimento) erros1.push('Data de vencimento é obrigatória');
     if (status === 'pago' && !dataPagamento) {
-      novosErros.push('Data de pagamento é obrigatória quando status é "Pago"');
+      erros1.push('Data de pagamento é obrigatória quando status é "Pago"');
     }
-
     if (status === 'pago' && !formaPagamento) {
-      novosErros.push('Forma de pagamento é obrigatória quando status é "Pago"');
+      erros1.push('Forma de pagamento é obrigatória quando status é "Pago"');
     }
 
     if (transacao?.tipo === 'receita' && !clienteId) {
-      novosErros.push('Cliente é obrigatório para receitas');
+      erros2.push('Cliente é obrigatório para receitas');
     }
 
-    setErros(novosErros);
-    return novosErros.length === 0;
+    const all = [...erros0, ...erros1, ...erros2];
+    return { all, byStep: [erros0, erros1, erros2] };
   };
+
+  const validarPasso = (currentStep: number) => {
+    const { all, byStep } = getErrosPorPasso();
+    if (byStep[currentStep]?.length) {
+      setErros(all);
+      return false;
+    }
+    return true;
+  };
+
+  const validarFormulario = (): boolean => {
+    const { all } = getErrosPorPasso();
+    setErros(all);
+    return all.length === 0;
+  };
+
+  const handleNext = () => {
+    if (validarPasso(step)) setStep(prev => Math.min(prev + 1, steps.length - 1));
+  };
+
+  const handleBack = () => setStep(prev => Math.max(prev - 1, 0));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!transacao || !validarFormulario()) {
+    if (!transacao) return;
+    if (!validarFormulario()) {
+      const { byStep } = getErrosPorPasso();
+      const firstInvalid = byStep.findIndex(s => s.length > 0);
+      setStep(firstInvalid >= 0 ? firstInvalid : 0);
       return;
     }
 
@@ -195,7 +219,11 @@ const ModalEditarTransacao: React.FC<ModalEditarTransacaoProps> = ({ isOpen, onC
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+        <form
+          id="form-editar-transacao"
+          onSubmit={handleSubmit}
+          className="p-6 overflow-y-auto max-h-[calc(90vh-220px)]"
+        >
           {/* Erros */}
           {erros.length > 0 && (
             <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -217,211 +245,213 @@ const ModalEditarTransacao: React.FC<ModalEditarTransacaoProps> = ({ isOpen, onC
             </div>
           )}
 
+          <WizardStepper steps={steps} step={step} className="mb-6" />
+
           <div className="space-y-6">
-            {/* Descrição */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                <FileText className="w-4 h-4 inline mr-1" />
-                Descrição *
-              </label>
-              <input
-                type="text"
-                value={descricao}
-                onChange={(e) => setDescricao(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
-              />
-            </div>
-
-            {/* Valor e Categoria */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  <DollarSign className="w-4 h-4 inline mr-1" />
-                  Valor *
-                </label>
-                <input
-                  type="text"
-                  value={valor}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9,]/g, '');
-                    setValor(val);
-                  }}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
-                  placeholder="0,00"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  <Tag className="w-4 h-4 inline mr-1" />
-                  Categoria *
-                </label>
-                <select
-                  value={categoria}
-                  onChange={(e) => setCategoria(e.target.value as CategoriaReceita | CategoriaDespesa)}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
-                >
-                  {transacao.tipo === 'receita'
-                    ? categoriasReceita.map(cat => (
-                        <option key={cat.value} value={cat.value}>{cat.label}</option>
-                      ))
-                    : categoriasDespesa.map(cat => (
-                        <option key={cat.value} value={cat.value}>{cat.label}</option>
-                      ))
-                  }
-                </select>
-              </div>
-            </div>
-
-            {/* Cliente e Projeto */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  <User className="w-4 h-4 inline mr-1" />
-                  Cliente {transacao.tipo === 'receita' && '*'}
-                </label>
-                <select
-                  value={clienteId}
-                  onChange={(e) => setClienteId(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
-                >
-                  <option value="">Selecione um cliente</option>
-                  {clientes.map(cliente => (
-                    <option key={cliente.id} value={cliente.id}>
-                      {cliente.nome} {cliente.sobrenome} {cliente.empresa && `- ${cliente.empresa}`}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  <Briefcase className="w-4 h-4 inline mr-1" />
-                  Projeto (opcional)
-                </label>
-                <select
-                  value={projetoId}
-                  onChange={(e) => setProjetoId(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
-                  disabled={!clienteId}
-                >
-                  <option value="">Nenhum projeto</option>
-                  {projetos
-                    .filter(p => p.clienteId === clienteId)
-                    .map(projeto => (
-                      <option key={projeto.id} value={projeto.id}>
-                        {projeto.titulo}
-                      </option>
-                    ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Status e Data Vencimento */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Status *
-                </label>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as StatusPagamento)}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
-                >
-                  <option value="pendente">⏳ Pendente</option>
-                  <option value="pago">✅ Pago</option>
-                  <option value="atrasado">❌ Atrasado</option>
-                  <option value="cancelado">🚫 Cancelado</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  <Calendar className="w-4 h-4 inline mr-1" />
-                  Data Vencimento *
-                </label>
-                <input
-                  type="date"
-                  value={dataVencimento}
-                  onChange={(e) => setDataVencimento(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            {/* Data Pagamento e Forma de Pagamento (se status = pago) */}
-            {status === 'pago' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+            {step === 0 && (
+              <>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    <Calendar className="w-4 h-4 inline mr-1" />
-                    Data Pagamento *
+                    <FileText className="w-4 h-4 inline mr-1" />
+                    Descrição *
                   </label>
                   <input
-                    type="date"
-                    value={dataPagamento}
-                    onChange={(e) => setDataPagamento(e.target.value)}
+                    type="text"
+                    value={descricao}
+                    onChange={(e) => setDescricao(e.target.value)}
                     className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    <CreditCard className="w-4 h-4 inline mr-1" />
-                    Forma de Pagamento *
-                  </label>
-                  <select
-                    value={formaPagamento}
-                    onChange={(e) => setFormaPagamento(e.target.value as FormaPagamento)}
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
-                  >
-                    {formasPagamento.map(forma => (
-                      <option key={forma.value} value={forma.value}>
-                        {forma.label}
-                      </option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <DollarSign className="w-4 h-4 inline mr-1" />
+                      Valor *
+                    </label>
+                    <input
+                      type="text"
+                      value={valor}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9,]/g, '');
+                        setValor(val);
+                      }}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
+                      placeholder="0,00"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <Tag className="w-4 h-4 inline mr-1" />
+                      Categoria *
+                    </label>
+                    <select
+                      value={categoria}
+                      onChange={(e) => setCategoria(e.target.value as CategoriaReceita | CategoriaDespesa)}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
+                    >
+                      {transacao.tipo === 'receita'
+                        ? categoriasReceita.map(cat => (
+                            <option key={cat.value} value={cat.value}>
+                              {cat.label}
+                            </option>
+                          ))
+                        : categoriasDespesa.map(cat => (
+                            <option key={cat.value} value={cat.value}>
+                              {cat.label}
+                            </option>
+                          ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
-            {/* Recorrente */}
-            <div className="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-              <input
-                type="checkbox"
-                id="recorrente-edit"
-                checked={recorrente}
-                onChange={(e) => setRecorrente(e.target.checked)}
-                className="w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
-              />
-              <label htmlFor="recorrente-edit" className="flex-1 cursor-pointer">
-                <span className="font-semibold text-gray-900 dark:text-white">
-                  Transação Recorrente
-                </span>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Esta {transacao.tipo} se repete mensalmente
-                </p>
-              </label>
-            </div>
+            {step === 1 && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Status *</label>
+                    <select
+                      value={status}
+                      onChange={(e) => setStatus(e.target.value as StatusPagamento)}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
+                    >
+                      <option value="pendente">⏳ Pendente</option>
+                      <option value="pago">✅ Pago</option>
+                      <option value="atrasado">❌ Atrasado</option>
+                      <option value="cancelado">🚫 Cancelado</option>
+                    </select>
+                  </div>
 
-            {/* Observações */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                Observações
-              </label>
-              <textarea
-                value={observacoes}
-                onChange={(e) => setObservacoes(e.target.value)}
-                rows={3}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent resize-none"
-                placeholder="Informações adicionais..."
-              />
-            </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <Calendar className="w-4 h-4 inline mr-1" />
+                      Data Vencimento *
+                    </label>
+                    <input
+                      type="date"
+                      value={dataVencimento}
+                      onChange={(e) => setDataVencimento(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {status === 'pago' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <Calendar className="w-4 h-4 inline mr-1" />
+                        Data Pagamento *
+                      </label>
+                      <input
+                        type="date"
+                        value={dataPagamento}
+                        onChange={(e) => setDataPagamento(e.target.value)}
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <CreditCard className="w-4 h-4 inline mr-1" />
+                        Forma de Pagamento *
+                      </label>
+                      <select
+                        value={formaPagamento}
+                        onChange={(e) => setFormaPagamento(e.target.value as FormaPagamento)}
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
+                      >
+                        {formasPagamento.map(forma => (
+                          <option key={forma.value} value={forma.value}>
+                            {forma.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                  <input
+                    type="checkbox"
+                    id="recorrente-edit"
+                    checked={recorrente}
+                    onChange={(e) => setRecorrente(e.target.checked)}
+                    className="w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
+                  />
+                  <label htmlFor="recorrente-edit" className="flex-1 cursor-pointer">
+                    <span className="font-semibold text-gray-900 dark:text-white">Transação Recorrente</span>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Esta {transacao.tipo} se repete mensalmente</p>
+                  </label>
+                </div>
+              </>
+            )}
+
+            {step === 2 && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <User className="w-4 h-4 inline mr-1" />
+                      Cliente {transacao.tipo === 'receita' && '*'}
+                    </label>
+                    <select
+                      value={clienteId}
+                      onChange={(e) => setClienteId(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
+                    >
+                      <option value="">Selecione um cliente</option>
+                      {clientes.map(cliente => (
+                        <option key={cliente.id} value={cliente.id}>
+                          {cliente.nome} {cliente.sobrenome} {cliente.empresa && `- ${cliente.empresa}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <Briefcase className="w-4 h-4 inline mr-1" />
+                      Projeto (opcional)
+                    </label>
+                    <select
+                      value={projetoId}
+                      onChange={(e) => setProjetoId(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent"
+                      disabled={!clienteId}
+                    >
+                      <option value="">Nenhum projeto</option>
+                      {projetos
+                        .filter(p => p.clienteId === clienteId)
+                        .map(projeto => (
+                          <option key={projeto.id} value={projeto.id}>
+                            {projeto.titulo}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Observações</label>
+                  <textarea
+                    value={observacoes}
+                    onChange={(e) => setObservacoes(e.target.value)}
+                    rows={3}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-transparent resize-none"
+                    placeholder="Informações adicionais..."
+                  />
+                </div>
+              </>
+            )}
           </div>
         </form>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-end gap-3">
+        <div className="p-6 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={onClose}
@@ -429,12 +459,36 @@ const ModalEditarTransacao: React.FC<ModalEditarTransacaoProps> = ({ isOpen, onC
           >
             Cancelar
           </button>
-          <button
-            onClick={handleSubmit}
-            className="px-6 py-3 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold transition-all hover:scale-105 shadow-lg"
-          >
-            Salvar Alterações
-          </button>
+
+          <div className="flex items-center justify-end gap-3">
+            {step > 0 && (
+              <button
+                type="button"
+                onClick={handleBack}
+                className="px-6 py-3 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-semibold"
+              >
+                Voltar
+              </button>
+            )}
+
+            {step < steps.length - 1 ? (
+              <button
+                type="button"
+                onClick={handleNext}
+                className="px-6 py-3 rounded-lg text-white font-semibold transition-all hover:scale-105 shadow-lg bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500"
+              >
+                Próximo
+              </button>
+            ) : (
+              <button
+                type="submit"
+                form="form-editar-transacao"
+                className="px-6 py-3 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold transition-all hover:scale-105 shadow-lg"
+              >
+                Salvar Alterações
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

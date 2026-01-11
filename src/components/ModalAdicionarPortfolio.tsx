@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   X,
   Upload,
@@ -8,16 +8,15 @@ import {
   Star,
   CheckCircle,
   AlertCircle,
-  Link as LinkIcon,
   Tag,
   Calendar,
-  Building,
   User,
   FileText,
   Sparkles,
   Loader
 } from 'lucide-react';
 import { uploadImage, uploadMultipleImages } from '../services/imageUpload';
+import WizardStepper from './WizardStepper';
 
 // ============================================================================
 // INTERFACES
@@ -57,6 +56,9 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
   onClose,
   onSalvar
 }) => {
+  const steps = ['Cliente & Projeto', 'Imagens', 'Tags & Resultados'];
+  const [step, setStep] = useState(0);
+
   const [formData, setFormData] = useState<NovoItemPortfolio>({
     clienteNome: '',
     clienteEmpresa: '',
@@ -79,7 +81,6 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
   });
 
   const [novaTag, setNovaTag] = useState('');
-  const [novaImagemUrl, setNovaImagemUrl] = useState('');
   const [erros, setErros] = useState<string[]>([]);
   const [uploadingCapa, setUploadingCapa] = useState(false);
   const [uploadingGaleria, setUploadingGaleria] = useState(false);
@@ -87,98 +88,70 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
   const inputCapaRef = useRef<HTMLInputElement>(null);
   const inputGaleriaRef = useRef<HTMLInputElement>(null);
 
+  const isUploading = uploadingCapa || uploadingGaleria;
+
+  useEffect(() => {
+    if (isOpen) {
+      setStep(0);
+      setErros([]);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   // ============================================================================
   // VALIDAÇÃO
   // ============================================================================
 
-  const validarFormulario = (): boolean => {
-    const novosErros: string[] = [];
+  const getErrosPorPasso = () => {
+    const erros0: string[] = [];
+    const erros1: string[] = [];
+    const erros2: string[] = [];
 
-    if (!formData.titulo.trim()) novosErros.push('Título é obrigatório');
-    if (!formData.descricao.trim()) novosErros.push('Descrição é obrigatória');
-    if (!formData.clienteNome.trim()) novosErros.push('Nome do cliente é obrigatório');
-    if (!formData.clienteEmpresa.trim()) novosErros.push('Empresa do cliente é obrigatória');
-    if (!formData.imagemCapa.trim()) novosErros.push('Imagem de capa é obrigatória');
-    if (formData.imagensGaleria.length === 0) novosErros.push('Adicione ao menos 1 imagem na galeria');
-    if (formData.tags.length === 0) novosErros.push('Adicione ao menos 1 tag');
+    if (!formData.clienteNome.trim()) erros0.push('Nome do cliente é obrigatório');
+    if (!formData.clienteEmpresa.trim()) erros0.push('Empresa do cliente é obrigatória');
+    if (!formData.titulo.trim()) erros0.push('Título é obrigatório');
+    if (!formData.descricao.trim()) erros0.push('Descrição é obrigatória');
+    if (!formData.dataFinalizacao) erros0.push('Data de finalização é obrigatória');
 
-    setErros(novosErros);
-    return novosErros.length === 0;
+    if (!formData.imagemCapa.trim()) erros1.push('Imagem de capa é obrigatória');
+    if (formData.imagensGaleria.length === 0) erros1.push('Adicione ao menos 1 imagem na galeria');
+
+    if (formData.tags.length === 0) erros2.push('Adicione ao menos 1 tag');
+
+    const all = [...erros0, ...erros1, ...erros2];
+    return { all, byStep: [erros0, erros1, erros2] };
   };
 
-  // ============================================================================
-  // HANDLERS
-  // ============================================================================
-
-  const handleSubmit = async () => {
-    console.log('🎯 Validando formulário...');
-    
-    if (validarFormulario()) {
-      console.log('✅ Formulário válido, salvando...');
-      
-      try {
-        await onSalvar(formData);
-        console.log('✅ Portfólio salvo com sucesso');
-        
-        // Limpar formulário após sucesso
-        setFormData({
-          clienteNome: '',
-          clienteEmpresa: '',
-          titulo: '',
-          descricao: '',
-          categoria: 'web',
-          autorizadoPublicacao: true,
-          imagemCapa: '',
-          imagensGaleria: [],
-          tags: [],
-          destaque: false,
-          dataFinalizacao: new Date().toISOString().split('T')[0],
-          alcance: '',
-          engajamento: '',
-          conversao: '',
-          roi: '',
-          testemunhoTexto: '',
-          testemunhoAutor: '',
-          testemunhoCargo: ''
-        });
-        setErros([]);
-        onClose();
-      } catch (error) {
-        console.error('❌ Erro ao salvar portfólio:', error);
-        setErros(['Erro ao salvar portfólio. Tente novamente.']);
-      }
-    } else {
-      console.log('❌ Formulário inválido:', erros);
+  const validarPasso = (currentStep: number) => {
+    const { all, byStep } = getErrosPorPasso();
+    if (byStep[currentStep]?.length) {
+      setErros(all);
+      return false;
     }
+    return true;
   };
+
+  const handleNext = () => {
+    if (isUploading) return;
+    if (validarPasso(step)) setStep(prev => Math.min(prev + 1, steps.length - 1));
+  };
+
+  const handleBack = () => setStep(prev => Math.max(prev - 1, 0));
 
   const handleAdicionarTag = () => {
-    if (novaTag.trim() && !formData.tags.includes(novaTag.trim())) {
-      setFormData({
-        ...formData,
-        tags: [...formData.tags, novaTag.trim()]
-      });
+    const tag = novaTag.trim();
+    if (!tag) return;
+    if (formData.tags.includes(tag)) {
       setNovaTag('');
+      return;
     }
+    setFormData({ ...formData, tags: [...formData.tags, tag] });
+    setNovaTag('');
   };
 
   const handleRemoverTag = (tag: string) => {
-    setFormData({
-      ...formData,
-      tags: formData.tags.filter(t => t !== tag)
-    });
-  };
-
-  const handleAdicionarImagem = () => {
-    if (novaImagemUrl.trim() && !formData.imagensGaleria.includes(novaImagemUrl.trim())) {
-      setFormData({
-        ...formData,
-        imagensGaleria: [...formData.imagensGaleria, novaImagemUrl.trim()]
-      });
-      setNovaImagemUrl('');
-    }
+    setFormData({ ...formData, tags: formData.tags.filter(t => t !== tag) });
   };
 
   const handleRemoverImagem = (url: string) => {
@@ -188,12 +161,59 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
     });
   };
 
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
+
+  const handleSubmit = async () => {
+    if (isUploading) return;
+
+    const { all, byStep } = getErrosPorPasso();
+    setErros(all);
+
+    if (all.length > 0) {
+      const firstInvalid = byStep.findIndex(s => s.length > 0);
+      setStep(firstInvalid >= 0 ? firstInvalid : 0);
+      return;
+    }
+
+    try {
+      await onSalvar(formData);
+
+      setFormData({
+        clienteNome: '',
+        clienteEmpresa: '',
+        titulo: '',
+        descricao: '',
+        categoria: 'web',
+        autorizadoPublicacao: true,
+        imagemCapa: '',
+        imagensGaleria: [],
+        tags: [],
+        destaque: false,
+        dataFinalizacao: new Date().toISOString().split('T')[0],
+        alcance: '',
+        engajamento: '',
+        conversao: '',
+        roi: '',
+        testemunhoTexto: '',
+        testemunhoAutor: '',
+        testemunhoCargo: ''
+      });
+      setNovaTag('');
+      setErros([]);
+      onClose();
+    } catch (error) {
+      console.error('❌ Erro ao salvar portfólio:', error);
+      alert('Erro ao salvar portfólio. Tente novamente.');
+    }
+  };
+
   // Upload de imagem de capa
   const handleUploadCapa = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validar tipo de arquivo
     if (!file.type.startsWith('image/')) {
       alert('Por favor, selecione apenas arquivos de imagem.');
       return;
@@ -263,7 +283,7 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6 text-white">
           <div className="flex items-center justify-between">
@@ -306,9 +326,13 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
 
         {/* Conteúdo do Formulário */}
         <div className="flex-1 overflow-y-auto p-6">
+          <WizardStepper steps={steps} step={step} className="mb-6" />
+
           <div className="space-y-6">
-            {/* Informações do Cliente */}
-            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+            {step === 0 && (
+              <>
+                {/* Informações do Cliente */}
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                 <User className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                 Cliente
@@ -341,8 +365,8 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
               </div>
             </div>
 
-            {/* Informações do Projeto */}
-            <div>
+                {/* Informações do Projeto */}
+                <div>
               <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                 <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                 Projeto
@@ -437,6 +461,12 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
                 </div>
               </div>
             </div>
+
+              </>
+            )}
+
+            {step === 1 && (
+              <>
 
             {/* Imagens */}
             <div>
@@ -573,6 +603,12 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
                 )}
               </div>
             </div>
+
+              </>
+            )}
+
+            {step === 2 && (
+              <>
 
             {/* Tags */}
             <div>
@@ -713,15 +749,17 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
                 )}
               </div>
             </div>
+
+              </>
+            )}
           </div>
         </div>
 
         {/* Footer */}
         <div className="border-t border-gray-200 dark:border-gray-800 p-6 bg-gray-50 dark:bg-gray-800/50">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              * Campos obrigatórios
-            </p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-gray-600 dark:text-gray-400">* Campos obrigatórios</p>
+
             <div className="flex items-center gap-3">
               <button
                 onClick={onClose}
@@ -729,12 +767,37 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
               >
                 Cancelar
               </button>
-              <button
-                onClick={handleSubmit}
-                className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg transition-all font-semibold shadow-lg"
-              >
-                ✨ Adicionar ao Portfolio
-              </button>
+
+              {step > 0 && (
+                <button
+                  onClick={handleBack}
+                  className="px-6 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-semibold"
+                >
+                  Voltar
+                </button>
+              )}
+
+              {step < steps.length - 1 ? (
+                <button
+                  onClick={handleNext}
+                  disabled={isUploading}
+                  className={`px-6 py-2 rounded-lg text-white font-semibold transition-all shadow-lg bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 ${
+                    isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'
+                  }`}
+                >
+                  Próximo
+                </button>
+              ) : (
+                <button
+                  onClick={handleSubmit}
+                  disabled={isUploading}
+                  className={`px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg transition-all font-semibold shadow-lg ${
+                    isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'
+                  }`}
+                >
+                  ✨ Adicionar ao Portfolio
+                </button>
+              )}
             </div>
           </div>
         </div>

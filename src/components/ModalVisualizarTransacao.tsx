@@ -146,7 +146,7 @@ const ModalVisualizarTransacao: React.FC<ModalVisualizarTransacaoProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
         {/* Header */}
         <div className={`p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r ${
           transacao.tipo === 'receita'

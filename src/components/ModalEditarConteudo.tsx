@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Sparkles, X } from 'lucide-react';
 import Modal from './Modal';
+import WizardStepper from './WizardStepper';
 import { ClienteSelector, ProjetoSelector } from './DataSelectors';
 import { getClienteById, getProjetoById } from '../services/dataIntegration';
 import api from '../services/api';
@@ -46,6 +47,9 @@ const ModalEditarConteudo: React.FC<ModalEditarConteudoProps> = ({
   conteudo,
   onSuccess,
 }) => {
+  const steps = ['Contexto', 'Brief & Agenda', 'Copy & Mídia'];
+  const [step, setStep] = useState(0);
+
   const [formData, setFormData] = useState({
     titulo: '',
     descricao: '',
@@ -73,6 +77,10 @@ const ModalEditarConteudo: React.FC<ModalEditarConteudoProps> = ({
   const [iaInstrucoesCopy, setIaInstrucoesCopy] = useState('');
   const [isGerandoCopyIA, setIsGerandoCopyIA] = useState(false);
   const [isAjustandoCopyIA, setIsAjustandoCopyIA] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) setStep(0);
+  }, [isOpen, conteudo?.id]);
 
   useEffect(() => {
     if (conteudo && isOpen) {
@@ -150,7 +158,7 @@ const ModalEditarConteudo: React.FC<ModalEditarConteudoProps> = ({
     }
   };
 
-  const validate = (): boolean => {
+  const getValidationErrors = (): Record<string, string> => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.titulo.trim()) {
@@ -163,15 +171,53 @@ const ModalEditarConteudo: React.FC<ModalEditarConteudoProps> = ({
       newErrors.dataPublicacao = 'Data de publicação é obrigatória';
     }
 
+    return newErrors;
+  };
+
+  const validate = (): boolean => {
+    const newErrors = getValidationErrors();
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+  const validateStep = (currentStep: number): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (currentStep === 0) {
+      if (!formData.clienteId) newErrors.clienteId = 'Selecione um cliente';
+      if (!formData.titulo.trim()) newErrors.titulo = 'Título é obrigatório';
+    }
+
+    if (currentStep === 1) {
+      if (!formData.dataPublicacao) newErrors.dataPublicacao = 'Data de publicação é obrigatória';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(prev => ({ ...prev, ...newErrors }));
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleNext = () => {
+    if (validateStep(step)) setStep(prev => Math.min(prev + 1, steps.length - 1));
+  };
+
+  const handleBack = () => setStep(prev => Math.max(prev - 1, 0));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!conteudo) return;
-    if (!validate()) return;
+
+    const newErrors = getValidationErrors();
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      if (newErrors.titulo || newErrors.clienteId) setStep(0);
+      else setStep(1);
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -373,338 +419,349 @@ const ModalEditarConteudo: React.FC<ModalEditarConteudoProps> = ({
   if (!conteudo) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Editar: ${conteudo.titulo}`} size="xl">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Alerta de cliente alterado */}
-        {clienteAlterado && (
-          <div className="bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-700 p-4 rounded-lg">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
-              ⚠️ <strong>Atenção:</strong> Você alterou o cliente. O projeto vinculado será removido.
-            </p>
-          </div>
-        )}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Editar: ${conteudo.titulo} — ${steps[step]} (${step + 1}/${steps.length})`}
+      size="lg"
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+              <WizardStepper steps={steps} step={step} className="-mt-1" />
 
-        {/* Cliente */}
-        <div>
-          <ClienteSelector
-            value={formData.clienteId}
-            onChange={handleClienteChange}
-            required
-          />
-          {errors.clienteId && (
-            <p className="text-sm text-red-500 mt-1">{errors.clienteId}</p>
-          )}
-        </div>
+              {step === 0 && (
+                <div className="space-y-5">
+                  {clienteAlterado && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-700 p-4 rounded-lg">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                        ⚠️ <strong>Atenção:</strong> Você alterou o cliente. O projeto vinculado será removido.
+                      </p>
+                    </div>
+                  )}
 
-        {/* Projeto (Opcional) */}
-        {formData.clienteId && (
-          <div>
-            <ProjetoSelector
-              value={formData.projetoId}
-              onChange={(projetoId) => setFormData(prev => ({ ...prev, projetoId }))}
-              clienteId={formData.clienteId}
-              label="Projeto (Opcional)"
-              required={false}
-            />
-          </div>
-        )}
+                  <div>
+                    <ClienteSelector value={formData.clienteId} onChange={handleClienteChange} required />
+                    {errors.clienteId && <p className="text-sm text-red-500 mt-1">{errors.clienteId}</p>}
+                  </div>
 
-        {/* Título */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Título do Conteúdo <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            name="titulo"
-            value={formData.titulo}
-            onChange={handleChange}
-            required
-            className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
-          />
-          {errors.titulo && (
-            <p className="text-sm text-red-500 mt-1">{errors.titulo}</p>
-          )}
-        </div>
+                  {formData.clienteId && (
+                    <div>
+                      <ProjetoSelector
+                        value={formData.projetoId}
+                        onChange={(projetoId) => setFormData(prev => ({ ...prev, projetoId }))}
+                        clienteId={formData.clienteId}
+                        label="Projeto (Opcional)"
+                        required={false}
+                      />
+                    </div>
+                  )}
 
-        {/* Descrição */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Descrição
-          </label>
-          <div className="flex items-center gap-2 mb-2">
-            <button
-              type="button"
-              onClick={handleGerarDescricaoIA}
-              disabled={isSubmitting || isGerandoDescricaoIA || isAjustandoDescricaoIA}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white hover:opacity-90 disabled:opacity-50"
-              title="Gerar descrição/brief com IA"
-            >
-              <Sparkles className="w-4 h-4" />
-              {isGerandoDescricaoIA ? 'Gerando…' : 'Gerar com IA'}
-            </button>
-            <button
-              type="button"
-              onClick={handleAjustarDescricaoIA}
-              disabled={isSubmitting || isGerandoDescricaoIA || isAjustandoDescricaoIA}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
-              title="Corrigir e ajustar o texto com IA"
-            >
-              <Sparkles className="w-4 h-4" />
-              {isAjustandoDescricaoIA ? 'Ajustando…' : 'Ajustar com IA'}
-            </button>
-          </div>
-          <input
-            type="text"
-            value={iaInstrucoes}
-            onChange={(e) => setIaInstrucoes(e.target.value)}
-            placeholder="Instruções para IA (opcional). Ex: mais direto, tom informal, incluir CTA"
-            className="w-full mb-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
-          />
-          <textarea
-            name="descricao"
-            value={formData.descricao}
-            onChange={handleChange}
-            rows={3}
-            className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white resize-none"
-          />
-        </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Título do Conteúdo <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="titulo"
+                      value={formData.titulo}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
+                    />
+                    {errors.titulo && <p className="text-sm text-red-500 mt-1">{errors.titulo}</p>}
+                  </div>
 
-        {/* Grid 3 colunas */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Rede Social */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Rede Social <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="redeSocial"
-              value={formData.redeSocial}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
-            >
-              {redesSociais.map(rede => (
-                <option key={rede.value} value={rede.value}>{rede.label}</option>
-              ))}
-            </select>
-          </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Rede Social <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="redeSocial"
+                        value={formData.redeSocial}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
+                      >
+                        {redesSociais.map(rede => (
+                          <option key={rede.value} value={rede.value}>
+                            {rede.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-          {/* Tipo de Conteúdo */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Tipo de Conteúdo <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="tipoConteudo"
-              value={formData.tipoConteudo}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
-            >
-              {tiposConteudo.map(tipo => (
-                <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
-              ))}
-            </select>
-          </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Tipo de Conteúdo <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="tipoConteudo"
+                        value={formData.tipoConteudo}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
+                      >
+                        {tiposConteudo.map(tipo => (
+                          <option key={tipo.value} value={tipo.value}>
+                            {tipo.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-          {/* Status */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Status <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="status"
-              value={formData.status}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
-            >
-              {statusOptions.map(status => (
-                <option key={status.value} value={status.value}>{status.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Status <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="status"
+                        value={formData.status}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
+                      >
+                        {statusOptions.map(status => (
+                          <option key={status.value} value={status.value}>
+                            {status.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-        {/* Grid 2 colunas - Data e Hora */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Data de Publicação <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              name="dataPublicacao"
-              value={formData.dataPublicacao}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
-            />
-          </div>
+              {step === 1 && (
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Descrição</label>
+                    <div className="flex items-center gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={handleGerarDescricaoIA}
+                        disabled={isSubmitting || isGerandoDescricaoIA || isAjustandoDescricaoIA}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white hover:opacity-90 disabled:opacity-50"
+                        title="Gerar descrição/brief com IA"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        {isGerandoDescricaoIA ? 'Gerando…' : 'Gerar com IA'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAjustarDescricaoIA}
+                        disabled={isSubmitting || isGerandoDescricaoIA || isAjustandoDescricaoIA}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                        title="Corrigir e ajustar o texto com IA"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        {isAjustandoDescricaoIA ? 'Ajustando…' : 'Ajustar com IA'}
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={iaInstrucoes}
+                      onChange={(e) => setIaInstrucoes(e.target.value)}
+                      placeholder="Instruções para IA (opcional). Ex: mais direto, tom informal, incluir CTA"
+                      className="w-full mb-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
+                    />
+                    <textarea
+                      name="descricao"
+                      value={formData.descricao}
+                      onChange={handleChange}
+                      rows={4}
+                      className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white resize-none"
+                    />
+                  </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Hora de Publicação
-            </label>
-            <input
-              type="time"
-              name="horaPublicacao"
-              value={formData.horaPublicacao}
-              onChange={handleChange}
-              className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
-            />
-          </div>
-        </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Data de Publicação <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        name="dataPublicacao"
+                        value={formData.dataPublicacao}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
+                      />
+                      {errors.dataPublicacao && <p className="text-sm text-red-500 mt-1">{errors.dataPublicacao}</p>}
+                    </div>
 
-        {/* Copy */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Copy/Legenda
-          </label>
-          <div className="flex items-center gap-2 mb-2">
-            <button
-              type="button"
-              onClick={handleGerarCopyIA}
-              disabled={isSubmitting || isGerandoCopyIA || isAjustandoCopyIA}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white hover:opacity-90 disabled:opacity-50"
-              title="Gerar copy/legenda com IA"
-            >
-              <Sparkles className="w-4 h-4" />
-              {isGerandoCopyIA ? 'Gerando…' : 'Gerar com IA'}
-            </button>
-            <button
-              type="button"
-              onClick={handleAjustarCopyIA}
-              disabled={isSubmitting || isGerandoCopyIA || isAjustandoCopyIA}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
-              title="Corrigir e ajustar a copy com IA"
-            >
-              <Sparkles className="w-4 h-4" />
-              {isAjustandoCopyIA ? 'Ajustando…' : 'Ajustar com IA'}
-            </button>
-          </div>
-          <input
-            type="text"
-            value={iaInstrucoesCopy}
-            onChange={(e) => setIaInstrucoesCopy(e.target.value)}
-            placeholder="Instruções para IA (opcional). Ex: mais curto, mais engraçado, incluir hashtags"
-            className="w-full mb-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
-          />
-          <textarea
-            name="copy"
-            value={formData.copy}
-            onChange={handleChange}
-            rows={4}
-            className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white resize-none"
-          />
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {formData.copy.length} caracteres
-          </p>
-        </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Hora de Publicação</label>
+                      <input
+                        type="time"
+                        name="horaPublicacao"
+                        value={formData.horaPublicacao}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
-        {/* Hashtags */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Hashtags
-          </label>
-          <input
-            type="text"
-            name="hashtags"
-            value={formData.hashtags}
-            onChange={handleChange}
-            placeholder="marketing, digital, branding (separadas por vírgula)"
-            className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
-          />
-        </div>
+              {step === 2 && (
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Copy/Legenda</label>
+                    <div className="flex items-center gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={handleGerarCopyIA}
+                        disabled={isSubmitting || isGerandoCopyIA || isAjustandoCopyIA}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white hover:opacity-90 disabled:opacity-50"
+                        title="Gerar copy/legenda com IA"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        {isGerandoCopyIA ? 'Gerando…' : 'Gerar com IA'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAjustarCopyIA}
+                        disabled={isSubmitting || isGerandoCopyIA || isAjustandoCopyIA}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                        title="Corrigir e ajustar a copy com IA"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        {isAjustandoCopyIA ? 'Ajustando…' : 'Ajustar com IA'}
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={iaInstrucoesCopy}
+                      onChange={(e) => setIaInstrucoesCopy(e.target.value)}
+                      placeholder="Instruções para IA (opcional). Ex: mais curto, mais engraçado, incluir hashtags"
+                      className="w-full mb-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
+                    />
+                    <textarea
+                      name="copy"
+                      value={formData.copy}
+                      onChange={handleChange}
+                      rows={4}
+                      className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white resize-none"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formData.copy.length} caracteres</p>
+                  </div>
 
-        {/* URLs */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              URL da Imagem
-            </label>
-            <input
-              type="url"
-              name="urlImagem"
-              value={formData.urlImagem}
-              onChange={handleChange}
-              placeholder="https://..."
-              className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
-            />
-          </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Hashtags</label>
+                    <input
+                      type="text"
+                      name="hashtags"
+                      value={formData.hashtags}
+                      onChange={handleChange}
+                      placeholder="marketing, digital, branding (separadas por vírgula)"
+                      className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Separe as hashtags com vírgula (não precisa usar #)</p>
+                  </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              URL do Vídeo
-            </label>
-            <input
-              type="url"
-              name="urlVideo"
-              value={formData.urlVideo}
-              onChange={handleChange}
-              placeholder="https://..."
-              className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
-            />
-          </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">URL da Imagem</label>
+                      <input
+                        type="url"
+                        name="urlImagem"
+                        value={formData.urlImagem}
+                        onChange={handleChange}
+                        placeholder="https://..."
+                        className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
+                      />
+                    </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Link Externo
-            </label>
-            <input
-              type="url"
-              name="linkExterno"
-              value={formData.linkExterno}
-              onChange={handleChange}
-              placeholder="https://..."
-              className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
-            />
-          </div>
-        </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">URL do Vídeo</label>
+                      <input
+                        type="url"
+                        name="urlVideo"
+                        value={formData.urlVideo}
+                        onChange={handleChange}
+                        placeholder="https://..."
+                        className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
+                      />
+                    </div>
 
-        {/* Observações */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Observações
-          </label>
-          <textarea
-            name="observacoes"
-            value={formData.observacoes}
-            onChange={handleChange}
-            rows={2}
-            className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white resize-none"
-          />
-        </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Link Externo</label>
+                      <input
+                        type="url"
+                        name="linkExterno"
+                        value={formData.linkExterno}
+                        onChange={handleChange}
+                        placeholder="https://..."
+                        className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
 
-        {/* Botões */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="px-6 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50"
-          >
-            <X className="w-5 h-5 inline mr-2" />
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-6 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white rounded-lg transition-all hover:scale-105 font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? (
-              <>⏳ Salvando...</>
-            ) : (
-              <>
-                <Save className="w-5 h-5 inline mr-2" />
-                Salvar Alterações
-              </>
-            )}
-          </button>
-        </div>
-      </form>
-    </Modal>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Observações</label>
+                    <textarea
+                      name="observacoes"
+                      value={formData.observacoes}
+                      onChange={handleChange}
+                      rows={2}
+                      className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-white resize-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <X className="w-5 h-5 inline mr-2" />
+                  Cancelar
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {step > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleBack}
+                      disabled={isSubmitting}
+                      className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      Voltar
+                    </button>
+                  )}
+
+                  {step < steps.length - 1 ? (
+                    <button
+                      type="button"
+                      onClick={handleNext}
+                      disabled={isSubmitting}
+                      className="px-5 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white rounded-lg transition-all font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Próximo
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="px-5 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white rounded-lg transition-all font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSubmitting ? (
+                        <>⏳ Salvando...</>
+                      ) : (
+                        <>
+                          <Save className="w-5 h-5 inline mr-2" />
+                          Salvar Alterações
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </form>
+          </Modal>
   );
 };
 

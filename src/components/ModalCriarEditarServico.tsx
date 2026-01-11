@@ -135,7 +135,7 @@ const ModalCriarEditarServico: React.FC<ModalCriarEditarServicoProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-200 dark:border-gray-800">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-200 dark:border-gray-800">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 flex items-center justify-between">
           <div>

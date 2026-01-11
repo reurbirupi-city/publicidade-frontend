@@ -19,6 +19,7 @@ import {
   Loader
 } from 'lucide-react';
 import { uploadImage, uploadMultipleImages } from '../services/imageUpload';
+import WizardStepper from './WizardStepper';
 
 // ============================================================================
 // INTERFACES
@@ -66,6 +67,9 @@ const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
   onSalvar,
   item
 }) => {
+  const steps = ['Cliente & Projeto', 'Imagens', 'Tags & Resultados'];
+  const [step, setStep] = useState(0);
+
   const [formData, setFormData] = useState<ItemPortfolio | null>(null);
   const [novaTag, setNovaTag] = useState('');
   const [novaImagemUrl, setNovaImagemUrl] = useState('');
@@ -76,9 +80,12 @@ const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
   const inputCapaRef = useRef<HTMLInputElement>(null);
   const inputGaleriaRef = useRef<HTMLInputElement>(null);
 
+  const isUploading = uploadingCapa || uploadingGaleria;
+
   // Inicializa o formulário quando o item mudar
   useEffect(() => {
     if (item) {
+      setStep(0);
       setFormData({ ...item });
       setErros([]);
     }
@@ -90,30 +97,58 @@ const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
   // VALIDAÇÃO
   // ============================================================================
 
-  const validarFormulario = (): boolean => {
-    const novosErros: string[] = [];
+  const getErrosPorPasso = () => {
+    const erros0: string[] = [];
+    const erros1: string[] = [];
+    const erros2: string[] = [];
 
-    if (!formData.titulo.trim()) novosErros.push('Título é obrigatório');
-    if (!formData.descricao.trim()) novosErros.push('Descrição é obrigatória');
-    if (!formData.clienteNome.trim()) novosErros.push('Nome do cliente é obrigatório');
-    if (!formData.clienteEmpresa.trim()) novosErros.push('Empresa do cliente é obrigatória');
-    if (!formData.imagemCapa.trim()) novosErros.push('Imagem de capa é obrigatória');
-    if (formData.imagensGaleria.length === 0) novosErros.push('Adicione ao menos 1 imagem na galeria');
-    if (formData.tags.length === 0) novosErros.push('Adicione ao menos 1 tag');
+    if (!formData.clienteNome.trim()) erros0.push('Nome do cliente é obrigatório');
+    if (!formData.clienteEmpresa.trim()) erros0.push('Empresa do cliente é obrigatória');
+    if (!formData.titulo.trim()) erros0.push('Título é obrigatório');
+    if (!formData.descricao.trim()) erros0.push('Descrição é obrigatória');
+    if (!formData.dataFinalizacao) erros0.push('Data de finalização é obrigatória');
 
-    setErros(novosErros);
-    return novosErros.length === 0;
+    if (!formData.imagemCapa.trim()) erros1.push('Imagem de capa é obrigatória');
+    if (formData.imagensGaleria.length === 0) erros1.push('Adicione ao menos 1 imagem na galeria');
+
+    if (formData.tags.length === 0) erros2.push('Adicione ao menos 1 tag');
+
+    const all = [...erros0, ...erros1, ...erros2];
+    return { all, byStep: [erros0, erros1, erros2] };
   };
+
+  const validarPasso = (currentStep: number) => {
+    const { all, byStep } = getErrosPorPasso();
+    if (byStep[currentStep]?.length) {
+      setErros(all);
+      return false;
+    }
+    return true;
+  };
+
+  const handleNext = () => {
+    if (isUploading) return;
+    if (validarPasso(step)) setStep(prev => Math.min(prev + 1, steps.length - 1));
+  };
+
+  const handleBack = () => setStep(prev => Math.max(prev - 1, 0));
 
   // ============================================================================
   // HANDLERS
   // ============================================================================
 
   const handleSubmit = () => {
-    if (validarFormulario()) {
-      onSalvar(formData);
-      onClose();
+    const { all, byStep } = getErrosPorPasso();
+    setErros(all);
+
+    if (all.length > 0) {
+      const firstInvalid = byStep.findIndex(s => s.length > 0);
+      setStep(firstInvalid >= 0 ? firstInvalid : 0);
+      return;
     }
+
+    onSalvar(formData);
+    onClose();
   };
 
   const handleAdicionarTag = () => {
@@ -277,9 +312,13 @@ const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
 
         {/* Body - Scrollable */}
         <div className="flex-1 overflow-y-auto p-6">
+          <WizardStepper steps={steps} step={step} className="mb-6" />
+
           <div className="space-y-6">
-            {/* SEÇÃO 1: INFORMAÇÕES DO CLIENTE */}
-            <div className="border-l-4 border-blue-500 pl-4">
+            {step === 0 && (
+              <>
+                {/* SEÇÃO 1: INFORMAÇÕES DO CLIENTE */}
+                <div className="border-l-4 border-blue-500 pl-4">
               <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                 <User className="w-5 h-5" />
                 Cliente
@@ -312,8 +351,8 @@ const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
               </div>
             </div>
 
-            {/* SEÇÃO 2: INFORMAÇÕES DO PROJETO */}
-            <div className="border-l-4 border-purple-500 pl-4">
+                {/* SEÇÃO 2: INFORMAÇÕES DO PROJETO */}
+                <div className="border-l-4 border-purple-500 pl-4">
               <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                 <FileText className="w-5 h-5" />
                 Projeto
@@ -403,6 +442,12 @@ const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
                 </div>
               </div>
             </div>
+
+              </>
+            )}
+
+            {step === 1 && (
+              <>
 
             {/* SEÇÃO 3: IMAGENS */}
             <div className="border-l-4 border-pink-500 pl-4">
@@ -545,6 +590,12 @@ const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
                 )}
               </div>
             </div>
+
+              </>
+            )}
+
+            {step === 2 && (
+              <>
 
             {/* SEÇÃO 4: TAGS */}
             <div className="border-l-4 border-green-500 pl-4">
@@ -694,29 +745,56 @@ const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
                 </div>
               </div>
             </div>
+
+              </>
+            )}
           </div>
         </div>
 
         {/* Footer */}
         <div className="border-t border-gray-200 dark:border-gray-700 p-6 bg-gray-50 dark:bg-gray-800/50">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              * Campos obrigatórios
-            </p>
-            <div className="flex gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-gray-600 dark:text-gray-400">* Campos obrigatórios</p>
+
+            <div className="flex items-center gap-3">
               <button
                 onClick={onClose}
                 className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 Cancelar
               </button>
-              <button
-                onClick={handleSubmit}
-                className="px-6 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-lg transition-all flex items-center gap-2 shadow-lg hover:shadow-xl"
-              >
-                <CheckCircle className="w-5 h-5" />
-                Salvar Alterações
-              </button>
+
+              {step > 0 && (
+                <button
+                  onClick={handleBack}
+                  className="px-6 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Voltar
+                </button>
+              )}
+
+              {step < steps.length - 1 ? (
+                <button
+                  onClick={handleNext}
+                  disabled={isUploading}
+                  className={`px-6 py-2 rounded-lg text-white font-semibold transition-all shadow-lg bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 ${
+                    isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'
+                  }`}
+                >
+                  Próximo
+                </button>
+              ) : (
+                <button
+                  onClick={handleSubmit}
+                  disabled={isUploading}
+                  className={`px-6 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-lg transition-all flex items-center gap-2 shadow-lg hover:shadow-xl ${
+                    isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'
+                  }`}
+                >
+                  <CheckCircle className="w-5 h-5" />
+                  Salvar Alterações
+                </button>
+              )}
             </div>
           </div>
         </div>

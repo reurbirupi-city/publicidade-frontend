@@ -22,6 +22,7 @@ import {
   ArrowUpCircle,
   Search
 } from 'lucide-react';
+import WizardStepper from './WizardStepper';
 import {
   Admin,
   AdminRole,
