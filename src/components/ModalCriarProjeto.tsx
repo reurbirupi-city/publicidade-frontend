@@ -438,10 +438,16 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
       <form 
         onSubmit={handleSubmit} 
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && step < steps.length - 1) {
+          if (e.key === 'Enter') {
             e.preventDefault();
-            console.log('⚠️ Enter no form - disparando handleNext');
-            handleNext();
+            e.stopPropagation();
+            if (step < steps.length - 1) {
+              console.log('⚠️ Enter no form - disparando handleNext');
+              handleNext();
+            } else {
+              console.log('✅ Enter no último step - pode submeter');
+              handleSubmit(e as any);
+            }
           }
         }}
         className="space-y-5"
