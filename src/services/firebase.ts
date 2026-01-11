@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, setLogLevel } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getAnalytics } from 'firebase/analytics';
 
@@ -21,6 +21,15 @@ const app = initializeApp(firebaseConfig);
 // Inicializar serviços
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// Evita logs verbosos do Firestore no console (principalmente em produção)
+const firestoreLogLevel = (import.meta.env.VITE_FIRESTORE_LOG_LEVEL || (import.meta.env.PROD ? 'error' : 'warn')) as
+  | 'debug'
+  | 'error'
+  | 'silent'
+  | 'warn';
+setLogLevel(firestoreLogLevel);
+
 const storage = getStorage(app);
 
 // Inicializar Analytics (apenas no browser)
@@ -29,8 +38,11 @@ if (typeof window !== 'undefined') {
   analytics = getAnalytics(app);
 }
 
-console.log('✅ Firebase inicializado com sucesso!');
-console.log('📦 Projeto:', firebaseConfig.projectId);
+if (import.meta.env.DEV) {
+  console.log('✅ Firebase inicializado com sucesso!');
+  console.log('📦 Projeto:', firebaseConfig.projectId);
+  console.log('🧾 Firestore log level:', firestoreLogLevel);
+}
 
 export { auth, db, storage, analytics };
 export default app;

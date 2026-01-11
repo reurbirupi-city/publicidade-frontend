@@ -34,6 +34,7 @@ const NotificacoesContext = createContext<NotificacoesContextData>({} as Notific
 // ============================================================================
 
 export const NotificacoesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const isDev = import.meta.env.DEV;
   const { user } = useAuth();
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +69,7 @@ export const NotificacoesProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (isWeb) {
         setIsAdmin(true);
         setAdminChecked(true);
-        console.log('✅ NotificacoesContext - Webmaster identificado:', user.email);
+        if (isDev) console.log('✅ NotificacoesContext - Webmaster identificado:', user.email);
         return;
       }
 
@@ -77,10 +78,10 @@ export const NotificacoesProvider: React.FC<{ children: React.ReactNode }> = ({ 
         const adminDoc = await getDoc(doc(db, 'admins', user.uid));
         if (adminDoc.exists()) {
           setIsAdmin(true);
-          console.log('✅ NotificacoesContext - Admin identificado via Firestore:', user.email);
+          if (isDev) console.log('✅ NotificacoesContext - Admin identificado via Firestore:', user.email);
         } else {
           setIsAdmin(false);
-          console.log('👤 NotificacoesContext - Cliente identificado:', user.email);
+          if (isDev) console.log('👤 NotificacoesContext - Cliente identificado:', user.email);
         }
       } catch (error) {
         console.error('❌ Erro ao verificar admin:', error);
@@ -100,7 +101,20 @@ export const NotificacoesProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Debug: log para verificar identificação
   useEffect(() => {
     if (adminChecked) {
-      console.log('🔐 NotificacoesContext - User:', user?.email, '| isWebmaster:', isWebmaster, '| isAdmin:', isAdmin, '| destinatarioTipo:', destinatarioTipo, '| destinatarioId:', destinatarioId);
+      if (isDev) {
+        console.log(
+          '🔐 NotificacoesContext - User:',
+          user?.email,
+          '| isWebmaster:',
+          isWebmaster,
+          '| isAdmin:',
+          isAdmin,
+          '| destinatarioTipo:',
+          destinatarioTipo,
+          '| destinatarioId:',
+          destinatarioId
+        );
+      }
     }
   }, [adminChecked, user?.email, isWebmaster, isAdmin, destinatarioTipo, destinatarioId]);
 
@@ -113,7 +127,7 @@ export const NotificacoesProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
 
     setLoading(true);
-    console.log('🔔 NotificacoesContext - Iniciando listener para:', destinatarioTipo, destinatarioId);
+    if (isDev) console.log('🔔 NotificacoesContext - Iniciando listener para:', destinatarioTipo, destinatarioId);
     
     const unsubscribe = escutarNotificacoes(
       destinatarioTipo,
@@ -121,9 +135,9 @@ export const NotificacoesProvider: React.FC<{ children: React.ReactNode }> = ({ 
       (novasNotificacoes) => {
         setNotificacoes(novasNotificacoes);
         setLoading(false);
-        
+
         // Log de debug
-        console.log('📥 NotificacoesContext - Recebidas:', novasNotificacoes.length, 'notificações');
+        if (isDev) console.log('📥 NotificacoesContext - Recebidas:', novasNotificacoes.length, 'notificações');
       }
     );
 
