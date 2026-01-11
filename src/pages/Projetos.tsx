@@ -28,6 +28,7 @@ import ModalCriarProjeto from '../components/ModalCriarProjeto';
 import ModalVisualizarProjeto from '../components/ModalVisualizarProjeto';
 import ModalEditarProjeto from '../components/ModalEditarProjeto';
 import ModalDeleteProjeto from '../components/ModalDeleteProjeto';
+import { useAuth } from '../contexts/AuthContext';
 import {
   getProjetos,
   saveProjetos,
@@ -269,6 +270,7 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ projeto, onDragStart, onDragEnd
 
 const Projetos: React.FC = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [viewMode, setViewMode] = useState<'kanban' | 'lista' | 'timeline' | 'analytics'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<StatusProjeto | 'todos'>('todos');
@@ -311,6 +313,9 @@ const Projetos: React.FC = () => {
 
   // Listener em tempo real para sincronizar aprovações do cliente
   useEffect(() => {
+    if (authLoading) return;
+    if (!user?.uid) return;
+
     const projetosRef = collection(db, 'projetos');
     const unsubscribe = onSnapshot(projetosRef, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
@@ -335,7 +340,7 @@ const Projetos: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [authLoading, user?.uid]);
 
   // ============================================================================
   // FUNÇÕES UTILITÁRIAS
