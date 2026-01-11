@@ -277,18 +277,26 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
       return true;
     }
 
+    console.log('🔍 Validando step', currentStep, '- Erros encontrados:', newErrors);
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(prev => ({ ...prev, ...newErrors }));
       return false;
     }
 
+    setErrors({});
     return true;
   };
 
   const handleNext = () => {
+    console.log('🔄 Tentando avançar do step', step, 'para', step + 1);
+    console.log('📋 FormData atual:', formData);
+    
     if (validateStep(step)) {
+      console.log('✅ Validação passou! Avançando...');
       setStep(prev => Math.min(prev + 1, steps.length - 1));
     } else {
+      console.log('❌ Validação falhou:', errors);
       // Scroll para o topo para mostrar erros
       document.querySelector('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
     }
