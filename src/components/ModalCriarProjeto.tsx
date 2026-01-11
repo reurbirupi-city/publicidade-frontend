@@ -494,7 +494,7 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
         {step === 1 && (
           <div className="space-y-5">
             {/* Valores e horas */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Valor Contratado <span className="text-red-500">*</span>
@@ -528,7 +528,9 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
                   className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 outline-none text-gray-900 dark:text-white"
                 />
               </div>
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Horas Estimadas <span className="text-red-500">*</span>
@@ -546,22 +548,6 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
                 />
                 {errors.horasEstimadas && <p className="text-sm text-red-500 mt-1">{errors.horasEstimadas}</p>}
               </div>
-            </div>
-
-            {/* Datas */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Data de Início
-                </label>
-                <input
-                  type="date"
-                  name="dataInicio"
-                  value={formData.dataInicio}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 outline-none text-gray-900 dark:text-white"
-                />
-              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -578,6 +564,20 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
                 />
                 {errors.prazoEstimado && <p className="text-sm text-red-500 mt-1">{errors.prazoEstimado}</p>}
               </div>
+            </div>
+
+            {/* Data de início */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Data de Início
+              </label>
+              <input
+                type="date"
+                name="dataInicio"
+                value={formData.dataInicio}
+                onChange={handleChange}
+                className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 outline-none text-gray-900 dark:text-white"
+              />
             </div>
 
             {/* Serviços */}
