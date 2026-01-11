@@ -242,18 +242,26 @@ const ModalEditarProjeto: React.FC<ModalEditarProjetoProps> = ({
       return true;
     }
 
+    console.log('🔍 Validando step', currentStep, '- Erros encontrados:', newErrors);
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(prev => ({ ...prev, ...newErrors }));
       return false;
     }
 
+    setErrors({});
     return true;
   };
 
   const handleNext = () => {
+    console.log('🔄 Tentando avançar do step', step, 'para', step + 1);
+    console.log('📋 FormData atual:', formData);
+    
     if (validateStep(step)) {
+      console.log('✅ Validação passou! Avançando...');
       setStep(prev => Math.min(prev + 1, steps.length - 1));
     } else {
+      console.log('❌ Validação falhou:', errors);
       // Scroll para o topo para mostrar erros
       document.querySelector('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -413,7 +421,7 @@ const ModalEditarProjeto: React.FC<ModalEditarProjetoProps> = ({
 
         {step === 1 && (
           <div className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Valor Contratado <span className="text-red-500">*</span>
@@ -445,7 +453,9 @@ const ModalEditarProjeto: React.FC<ModalEditarProjetoProps> = ({
                   className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 outline-none text-gray-900 dark:text-white"
                 />
               </div>
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Horas Estimadas <span className="text-red-500">*</span>
@@ -462,6 +472,22 @@ const ModalEditarProjeto: React.FC<ModalEditarProjetoProps> = ({
                   className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 outline-none text-gray-900 dark:text-white"
                 />
                 {errors.horasEstimadas && <p className="text-sm text-red-500 mt-1">{errors.horasEstimadas}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Prazo Estimado <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  name="prazoEstimado"
+                  value={formData.prazoEstimado}
+                  onChange={handleChange}
+                  required
+                  min={formData.dataInicio}
+                  className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 outline-none text-gray-900 dark:text-white"
+                />
+                {errors.prazoEstimado && <p className="text-sm text-red-500 mt-1">{errors.prazoEstimado}</p>}
               </div>
             </div>
 
@@ -488,33 +514,15 @@ const ModalEditarProjeto: React.FC<ModalEditarProjetoProps> = ({
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data de Início</label>
-                <input
-                  type="date"
-                  name="dataInicio"
-                  value={formData.dataInicio}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 outline-none text-gray-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Prazo Estimado <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  name="prazoEstimado"
-                  value={formData.prazoEstimado}
-                  onChange={handleChange}
-                  required
-                  min={formData.dataInicio}
-                  className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 outline-none text-gray-900 dark:text-white"
-                />
-                {errors.prazoEstimado && <p className="text-sm text-red-500 mt-1">{errors.prazoEstimado}</p>}
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data de Início</label>
+              <input
+                type="date"
+                name="dataInicio"
+                value={formData.dataInicio}
+                onChange={handleChange}
+                className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:focus:ring-amber-500 outline-none text-gray-900 dark:text-white"
+              />
             </div>
 
             <div>
