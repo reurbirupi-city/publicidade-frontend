@@ -280,6 +280,12 @@ const ModalEditarProjeto: React.FC<ModalEditarProjetoProps> = ({
 
     if (!projeto) return;
 
+    // Só permite submit no último step
+    if (step < steps.length - 1) {
+      console.log('⚠️ Submit bloqueado - ainda não está no último step. Use o botão "Próximo".');
+      return;
+    }
+
     const newErrors = getValidationErrors();
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
