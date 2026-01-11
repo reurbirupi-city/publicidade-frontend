@@ -237,6 +237,11 @@ const ModalEditarProjeto: React.FC<ModalEditarProjetoProps> = ({
       }
     }
 
+    // Step 2 (Descrição) é opcional, sempre válido
+    if (currentStep === 2) {
+      return true;
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(prev => ({ ...prev, ...newErrors }));
       return false;
