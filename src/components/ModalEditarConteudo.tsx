@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Save, Sparkles, X } from 'lucide-react';
 import Modal from './Modal';
 import WizardStepper from './WizardStepper';
@@ -49,6 +49,7 @@ const ModalEditarConteudo: React.FC<ModalEditarConteudoProps> = ({
 }) => {
   const steps = ['Contexto', 'Brief & Agenda', 'Copy & Mídia'];
   const [step, setStep] = useState(0);
+  const allowSubmitRef = useRef(false);
 
   const [formData, setFormData] = useState({
     titulo: '',
@@ -104,6 +105,12 @@ const ModalEditarConteudo: React.FC<ModalEditarConteudoProps> = ({
       setClienteAlterado(false);
     }
   }, [conteudo, isOpen]);
+
+  // Monitorar mudanças no step
+  useEffect(() => {
+    console.log('📍 Step mudou para:', step);
+    allowSubmitRef.current = false;
+  }, [step]);
 
   const redesSociais = [
     { value: 'instagram', label: 'Instagram' },
@@ -208,8 +215,20 @@ const ModalEditarConteudo: React.FC<ModalEditarConteudoProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('📤 SUBMIT CHAMADO (EDIT) - Step atual:', step, '| allowSubmit:', allowSubmitRef.current);
     
     if (!conteudo) return;
+
+    // Só permite submit no último step E se allowSubmitRef for true
+    if (step < steps.length - 1) {
+      console.log('⚠️ Submit bloqueado - ainda não está no último step.');
+      return;
+    }
+
+    if (!allowSubmitRef.current) {
+      console.log('⚠️ Submit bloqueado por allowSubmitRef - use o botão "Salvar"');
+      return;
+    }
 
     const newErrors = getValidationErrors();
     if (Object.keys(newErrors).length > 0) {
@@ -425,7 +444,21 @@ const ModalEditarConteudo: React.FC<ModalEditarConteudoProps> = ({
       title={`Editar: ${conteudo.titulo} — ${steps[step]} (${step + 1}/${steps.length})`}
       size="lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form 
+        onSubmit={handleSubmit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            console.log('⚠️ Enter detectado no form - Step atual:', step);
+            if (step < steps.length - 1) {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('🔄 Bloqueando Enter e chamando handleNext');
+              handleNext();
+            }
+          }
+        }}
+        className="space-y-5"
+      >
               <WizardStepper steps={steps} step={step} className="-mt-1" />
 
               {step === 0 && (
@@ -745,6 +778,10 @@ const ModalEditarConteudo: React.FC<ModalEditarConteudoProps> = ({
                   ) : (
                     <button
                       type="submit"
+                      onClick={() => {
+                        console.log('🖱️ Botão "Salvar Alterações" clicado - habilitando submit');
+                        allowSubmitRef.current = true;
+                      }}
                       disabled={isSubmitting}
                       className="px-5 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white rounded-lg transition-all font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >

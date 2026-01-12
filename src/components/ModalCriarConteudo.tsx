@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Save, Sparkles, X } from 'lucide-react';
 import Modal from './Modal';
 import WizardStepper from './WizardStepper';
@@ -43,6 +43,7 @@ const ModalCriarConteudo: React.FC<ModalCriarConteudoProps> = ({
 }) => {
   const steps = ['Contexto', 'Brief & Agenda', 'Copy & Mídia'];
   const [step, setStep] = useState(0);
+  const allowSubmitRef = useRef(false);
 
   const [formData, setFormData] = useState({
     titulo: '',
@@ -73,6 +74,12 @@ const ModalCriarConteudo: React.FC<ModalCriarConteudoProps> = ({
   useEffect(() => {
     if (isOpen) setStep(0);
   }, [isOpen]);
+
+  // Monitorar mudanças no step
+  useEffect(() => {
+    console.log('📍 Step mudou para:', step);
+    allowSubmitRef.current = false; // Sempre bloqueia submit quando step muda
+  }, [step]);
 
   const redesSociais = [
     { value: 'instagram', label: 'Instagram' },
@@ -165,6 +172,18 @@ const ModalCriarConteudo: React.FC<ModalCriarConteudoProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('📤 SUBMIT CHAMADO - Step atual:', step, '| allowSubmit:', allowSubmitRef.current);
+
+    // Só permite submit no último step E se allowSubmitRef for true
+    if (step < steps.length - 1) {
+      console.log('⚠️ Submit bloqueado - ainda não está no último step. Use o botão "Próximo".');
+      return;
+    }
+
+    if (!allowSubmitRef.current) {
+      console.log('⚠️ Submit bloqueado por allowSubmitRef - use o botão "Criar Conteúdo"');
+      return;
+    }
 
     const newErrors = getValidationErrors();
     if (Object.keys(newErrors).length > 0) {
@@ -396,7 +415,21 @@ const ModalCriarConteudo: React.FC<ModalCriarConteudoProps> = ({
       title={`Novo Conteúdo Social Media — ${steps[step]} (${step + 1}/${steps.length})`}
       size="lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form 
+        onSubmit={handleSubmit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            console.log('⚠️ Enter detectado no form - Step atual:', step);
+            if (step < steps.length - 1) {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('🔄 Bloqueando Enter e chamando handleNext');
+              handleNext();
+            }
+          }
+        }}
+        className="space-y-5"
+      >
         <WizardStepper steps={steps} step={step} className="-mt-1" />
 
         {step === 0 && (
@@ -693,6 +726,10 @@ const ModalCriarConteudo: React.FC<ModalCriarConteudoProps> = ({
             ) : (
               <button
                 type="submit"
+                onClick={() => {
+                  console.log('🖱️ Botão "Criar Conteúdo" clicado - habilitando submit');
+                  allowSubmitRef.current = true;
+                }}
                 disabled={isSubmitting}
                 className="px-5 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white rounded-lg transition-all font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
