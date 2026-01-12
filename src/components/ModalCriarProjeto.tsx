@@ -4,6 +4,9 @@ import Modal from './Modal';
 import WizardStepper from './WizardStepper';
 import { ClienteSelector } from './DataSelectors';
 import { getClienteById, createProjetoWithSync, atualizarStatusCliente } from '../services/dataIntegration';
+import { useAuth } from '../contexts/AuthContext';
+import { db } from '../services/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 import api from '../services/api';
 
 interface Projeto {
@@ -43,6 +46,7 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
   const steps = ['Básico', 'Financeiro & Prazo', 'Descrição'];
   const [step, setStep] = useState(0);
   const allowSubmitRef = useRef(false);
+  const { user } = useAuth();
 
   const [formData, setFormData] = useState({
     titulo: '',
@@ -412,6 +416,37 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
       // Atualizar status do cliente para "ativo"
       await atualizarStatusCliente(formData.clienteId, 'ativo', 'ativo');
       console.log('✅ Status do cliente atualizado para "ativo"');
+      
+      // Se há valor pago, criar transação financeira automaticamente
+      if (parseFloat(formData.valorPago) > 0) {
+        try {
+          const transacao = {
+            tipo: 'receita',
+            descricao: `Pagamento do projeto: ${formData.titulo.trim()}`,
+            valor: parseFloat(formData.valorPago),
+            categoria: 'projeto',
+            status: 'pago',
+            dataVencimento: formData.dataInicio || hoje.toISOString().split('T')[0],
+            dataPagamento: formData.dataInicio || hoje.toISOString().split('T')[0],
+            formaPagamento: 'transferencia',
+            clienteId: formData.clienteId,
+            clienteNome: cliente.nome,
+            projetoId: projetoId,
+            projetoTitulo: formData.titulo.trim(),
+            recorrente: false,
+            observacoes: `Pagamento registrado automaticamente na criação do projeto`,
+            adminId: user?.uid,
+            criadoEm: hoje.toISOString(),
+            atualizadoEm: hoje.toISOString()
+          };
+          
+          await addDoc(collection(db, 'transacoes'), transacao);
+          console.log('💰 Transação financeira criada automaticamente: R$', parseFloat(formData.valorPago));
+        } catch (error) {
+          console.error('⚠️ Erro ao criar transação automática:', error);
+          // Não bloqueia a criação do projeto se falhar
+        }
+      }
       
       console.log('✅ Projeto criado:', novoProjeto);
       onSuccess(novoProjeto);
