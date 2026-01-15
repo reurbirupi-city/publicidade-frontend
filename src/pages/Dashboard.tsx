@@ -144,25 +144,32 @@ const Dashboard: React.FC = () => {
           });
         });
 
-        // Buscar transações financeiras recentes
+        // Buscar transações financeiras recentes (coleção canônica: `transacoes`)
         const financeiroQuery = query(
-          collection(db, 'financeiro'),
-          orderBy('data', 'desc'),
+          collection(db, 'transacoes'),
+          orderBy('criadoEm', 'desc'),
           limit(3)
         );
         const financeiroSnap = await getDocs(financeiroQuery);
         financeiroSnap.forEach(doc => {
-          const data = doc.data();
-          const dataTransacao = data.data instanceof Timestamp 
-            ? data.data.toDate() 
-            : new Date(data.data);
-          const isPago = data.status === 'pago' || data.pago;
+          const data = doc.data() as any;
+
+          const rawDate = data.dataPagamento || data.dataVencimento || data.criadoEm;
+          const dataTransacao = rawDate instanceof Timestamp
+            ? rawDate.toDate()
+            : new Date(rawDate);
+
+          const isPago = data.status === 'pago';
+          const isReceita = data.tipo === 'receita';
+
           atividadesReais.push({
             id: `fin-${doc.id}`,
-            type: isPago ? 'success' : 'warning',
-            message: isPago 
-              ? `Pagamento recebido: ${data.descricao || 'Transação'}` 
-              : `Pagamento pendente: ${data.descricao || 'Transação'}`,
+            type: isPago ? 'success' : (isReceita ? 'warning' : 'info'),
+            message: isReceita
+              ? (isPago
+                  ? `Receita recebida: ${data.descricao || 'Transação'}`
+                  : `Receita pendente: ${data.descricao || 'Transação'}`)
+              : `Despesa: ${data.descricao || 'Transação'}`,
             time: formatTimeAgo(dataTransacao),
             icon: DollarSign,
             timestamp: dataTransacao

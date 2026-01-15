@@ -420,6 +420,10 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
       // Se há valor pago, criar transação financeira automaticamente
       if (parseFloat(formData.valorPago) > 0) {
         try {
+          if (!user?.uid) {
+            throw new Error('Usuário não autenticado para registrar transação financeira');
+          }
+
           const transacao = {
             tipo: 'receita',
             descricao: `Pagamento do projeto: ${formData.titulo.trim()}`,
@@ -435,7 +439,7 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
             projetoTitulo: formData.titulo.trim(),
             recorrente: false,
             observacoes: `Pagamento registrado automaticamente na criação do projeto`,
-            adminId: user?.uid,
+            adminId: user.uid,
             criadoEm: hoje.toISOString(),
             atualizadoEm: hoje.toISOString()
           };
@@ -473,7 +477,7 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
                 totalParcelas: numeroParcelas,
                 recorrente: false,
                 observacoes: `Parcela ${i} de ${numeroParcelas}. Saldo restante: R$ ${saldoRestante.toFixed(2)}`,
-                adminId: user?.uid,
+                adminId: user.uid,
                 criadoEm: hoje.toISOString(),
                 atualizadoEm: hoje.toISOString()
               };

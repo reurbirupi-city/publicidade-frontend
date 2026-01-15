@@ -147,6 +147,66 @@ const Financeiro: React.FC = () => {
       })) as any[];
       
       console.log(`📊 Encontradas ${transacoesData.length} transações e ${parcelasData.length} parcelas`);
+
+      // 2.5. Reconciliar pagamentos de projetos -> receitas em `transacoes`
+      // (Corrige casos antigos em que o projeto tem valorPago, mas não existe transação paga correspondente.)
+      try {
+        const projetosLocal = (getProjetos() as any[]) || [];
+        const receitasPagasPorProjeto = new Map<string, number>();
+
+        for (const t of transacoesData as any[]) {
+          if (t?.tipo === 'receita' && t?.categoria === 'projeto' && t?.status === 'pago' && t?.projetoId) {
+            const atual = receitasPagasPorProjeto.get(t.projetoId) || 0;
+            receitasPagasPorProjeto.set(t.projetoId, atual + (Number(t.valor) || 0));
+          }
+        }
+
+        let receitasCriadas = 0;
+        for (const p of projetosLocal) {
+          const projetoId = p?.id;
+          if (!projetoId) continue;
+          const valorPagoProjeto = Number(p?.valorPago || 0);
+          if (valorPagoProjeto <= 0) continue;
+
+          const registrado = receitasPagasPorProjeto.get(projetoId) || 0;
+          const delta = valorPagoProjeto - registrado;
+          if (delta <= 0) continue;
+
+          const hoje = new Date();
+          const dataPagamento = p?.dataInicio || hoje.toISOString().split('T')[0];
+
+          const nova = {
+            tipo: 'receita',
+            descricao: `Pagamento do projeto: ${p?.titulo || projetoId}`,
+            valor: delta,
+            categoria: 'projeto',
+            status: 'pago',
+            dataVencimento: dataPagamento,
+            dataPagamento,
+            formaPagamento: 'transferencia',
+            clienteId: p?.clienteId,
+            clienteNome: p?.clienteNome,
+            projetoId,
+            projetoTitulo: p?.titulo || projetoId,
+            recorrente: false,
+            observacoes: `Sync automático: valorPago do projeto (R$ ${valorPagoProjeto.toFixed(2)}) maior que receitas registradas (R$ ${registrado.toFixed(2)}).`,
+            adminId: user.uid,
+            criadoEm: hoje.toISOString(),
+            atualizadoEm: hoje.toISOString(),
+          };
+
+          await addDoc(collection(db, 'transacoes'), nova as any);
+          transacoesData.push({ id: `sync-${projetoId}-${Date.now()}`, ...(nova as any) } as any);
+          receitasPagasPorProjeto.set(projetoId, registrado + delta);
+          receitasCriadas++;
+        }
+
+        if (receitasCriadas > 0) {
+          console.log(`💰 Sync financeiro: ${receitasCriadas} receitas criadas a partir de projetos pagos.`);
+        }
+      } catch (syncError) {
+        console.warn('⚠️ Falha no sync automático de projetos → transações:', syncError);
+      }
       
       // 3. Verificar e atualizar status de vencidas
       let countAtrasadas = 0;

@@ -359,84 +359,82 @@ const ModalEditarProjeto: React.FC<ModalEditarProjetoProps> = ({
         atualizadoEm: hoje.toISOString(),
       };
 
-      // Salva com sincronização automática
-      updateProjetoWithSync(projeto.id, updates);
+      // Salva com sincronização automática (localStorage + Firestore)
+      await updateProjetoWithSync(projeto.id, updates);
       
       const projetoAtualizado = { ...projeto, ...updates };
       
       // ===== INTEGRAÇÃO FINANCEIRA =====
-      // Verificar se o valorPago mudou
-      const valorPagoAntigo = projeto.valorPago || 0;
-      const valorPagoNovo = parseFloat(formData.valorPago);
-      const valorContratadoNovo = parseFloat(formData.valorContratado);
-      
+      // Se o valorPago aumentou, registra a diferença como receita paga em `transacoes`.
+      const valorPagoAntigo = Number(projeto.valorPago || 0);
+      const valorPagoNovo = Number(parseFloat(formData.valorPago) || 0);
+      const valorContratadoNovo = Number(parseFloat(formData.valorContratado) || 0);
+
       if (valorPagoNovo !== valorPagoAntigo) {
         console.log('💰 Valor pago foi alterado:', valorPagoAntigo, '→', valorPagoNovo);
-        
+
         try {
-          // Buscar transação existente para este projeto
+          if (!user?.uid) {
+            throw new Error('Usuário não autenticado para registrar transação financeira');
+          }
+
+          const hoje = new Date();
+          const dataPagamento = formData.dataInicio || hoje.toISOString().split('T')[0];
+
           const transacoesRef = collection(db, 'transacoes');
           const q = query(transacoesRef, where('projetoId', '==', projeto.id));
           const snapshot = await getDocs(q);
-          
-          if (!snapshot.empty && valorPagoNovo > 0) {
-            // Atualizar transação existente
-            const transacaoDoc = snapshot.docs[0];
-            await updateDoc(doc(db, 'transacoes', transacaoDoc.id), {
-              valor: valorPagoNovo,
-              status: 'pago',
-              dataPagamento: formData.dataInicio || new Date().toISOString().split('T')[0],
-              observacoes: `Valor atualizado de R$ ${valorPagoAntigo.toFixed(2)} para R$ ${valorPagoNovo.toFixed(2)} na edição do projeto`,
-              atualizadoEm: new Date().toISOString()
-            });
-            console.log('✅ Transação existente atualizada');
-          } else if (valorPagoNovo > 0) {
-            // Criar nova transação se não existir
-            const hoje = new Date();
-            const transacao = {
+
+          const transacoesProjeto = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+          const receitasPagasProjeto = transacoesProjeto.filter(t =>
+            t?.tipo === 'receita' && t?.categoria === 'projeto' && t?.status === 'pago'
+          );
+
+          const valorRegistrado = receitasPagasProjeto.reduce((sum: number, t: any) => sum + (Number(t.valor) || 0), 0);
+          const delta = valorPagoNovo - valorRegistrado;
+
+          if (delta > 0) {
+            await addDoc(collection(db, 'transacoes'), {
               tipo: 'receita',
               descricao: `Pagamento do projeto: ${formData.titulo.trim()}`,
-              valor: valorPagoNovo,
+              valor: delta,
               categoria: 'projeto',
               status: 'pago',
-              dataVencimento: formData.dataInicio || hoje.toISOString().split('T')[0],
-              dataPagamento: formData.dataInicio || hoje.toISOString().split('T')[0],
+              dataVencimento: dataPagamento,
+              dataPagamento,
               formaPagamento: 'transferencia',
               clienteId: formData.clienteId,
               clienteNome: cliente.nome,
               projetoId: projeto.id,
               projetoTitulo: formData.titulo.trim(),
               recorrente: false,
-              observacoes: `Pagamento registrado na edição do projeto`,
-              adminId: user?.uid,
+              observacoes: `Pagamento registrado na edição do projeto (delta: R$ ${delta.toFixed(2)}).`,
+              adminId: user.uid,
               criadoEm: hoje.toISOString(),
               atualizadoEm: hoje.toISOString()
-            };
-            
-            await addDoc(collection(db, 'transacoes'), transacao);
-            console.log('💰 Nova transação financeira criada: R$', valorPagoNovo);
+            });
+            console.log('✅ Receita registrada no financeiro (delta): R$', delta);
+          } else if (delta < 0) {
+            console.warn('⚠️ valorPago diminuiu; ajuste manual pode ser necessário no financeiro.', { valorRegistrado, valorPagoNovo });
           }
-          
+
           // ===== SISTEMA DE PARCELAS =====
-          // Verificar se precisa criar/atualizar parcelas
           const saldoRestante = valorContratadoNovo - valorPagoNovo;
-          
+
           if (saldoRestante > 0) {
-            // Buscar parcelas existentes
             const parcelasRef = collection(db, 'parcelas');
             const qParcelas = query(parcelasRef, where('projetoId', '==', projeto.id));
             const snapshotParcelas = await getDocs(qParcelas);
-            
+
             if (snapshotParcelas.empty) {
-              // Criar parcelas se não existirem
               const numeroParcelas = 3;
               const valorParcela = saldoRestante / numeroParcelas;
-              
+
               for (let i = 1; i <= numeroParcelas; i++) {
                 const dataVencimento = new Date(formData.dataInicio);
                 dataVencimento.setMonth(dataVencimento.getMonth() + i);
-                
-                const parcela = {
+
+                await addDoc(collection(db, 'parcelas'), {
                   tipo: 'receita',
                   descricao: `Parcela ${i}/${numeroParcelas} - ${formData.titulo.trim()}`,
                   valor: valorParcela,
@@ -451,24 +449,20 @@ const ModalEditarProjeto: React.FC<ModalEditarProjetoProps> = ({
                   totalParcelas: numeroParcelas,
                   recorrente: false,
                   observacoes: `Parcela ${i} de ${numeroParcelas}. Criada na edição do projeto.`,
-                  adminId: user?.uid,
+                  adminId: user.uid,
                   criadoEm: new Date().toISOString(),
                   atualizadoEm: new Date().toISOString()
-                };
-                
-                await addDoc(collection(db, 'parcelas'), parcela);
+                });
               }
-              console.log(`📅 ${numeroParcelas} parcelas criadas. Saldo: R$ ${saldoRestante.toFixed(2)}`);
               alert(`✅ Projeto atualizado!\n\n💰 Valor Pago: R$ ${valorPagoNovo.toFixed(2)}\n📅 Saldo Parcelado: R$ ${saldoRestante.toFixed(2)} em ${numeroParcelas}x de R$ ${valorParcela.toFixed(2)}\n\nAs parcelas foram registradas no financeiro.`);
             } else {
-              console.log('ℹ️ Parcelas já existem para este projeto');
               alert(`✅ Projeto atualizado!\n\n💰 Valor Pago: R$ ${valorPagoNovo.toFixed(2)}\n\nObservação: As parcelas existentes não foram alteradas. Gerencie-as na página Financeiro se necessário.`);
             }
           } else if (valorPagoNovo === valorContratadoNovo && valorPagoNovo > 0) {
             alert(`✅ Projeto atualizado!\n\n💰 Valor Total Pago: R$ ${valorPagoNovo.toFixed(2)}\n\n✓ Projeto totalmente quitado!`);
           }
         } catch (error) {
-          console.error('⚠️ Erro ao atualizar transação/parcelas:', error);
+          console.error('⚠️ Erro ao registrar transação/parcelas:', error);
           alert('⚠️ Projeto atualizado, mas houve um erro ao registrar no financeiro. Verifique a página Financeiro.');
         }
       }

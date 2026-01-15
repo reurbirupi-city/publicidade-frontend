@@ -334,7 +334,7 @@ export const createProjetoWithSync = async (projeto: any): Promise<void> => {
 /**
  * Atualiza um projeto e sincroniza mudanças
  */
-export const updateProjetoWithSync = (projetoId: string, updates: any): void => {
+export const updateProjetoWithSync = async (projetoId: string, updates: any): Promise<void> => {
   const projetos = getProjetos();
   const projetoAntigo = projetos.find(p => p.id === projetoId);
   
@@ -357,6 +357,21 @@ export const updateProjetoWithSync = (projetoId: string, updates: any): void => 
   // Se mudou o valor, recalcula totais
   if (updates.valorContratado !== undefined && projetoAntigo) {
     recalcularTotaisCliente(projetoAntigo.clienteId);
+  }
+
+  // Salvar no Firestore (merge) para manter consistência entre telas
+  try {
+    await setDoc(
+      doc(db, 'projetos', projetoId),
+      {
+        ...updates,
+        syncedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+    console.log(`✅ Projeto ${projetoId} atualizado no Firestore`);
+  } catch (error) {
+    console.error('❌ Erro ao atualizar projeto no Firestore:', error);
   }
   
   console.log(`✅ Projeto ${projetoId} atualizado e sincronizado`);
