@@ -110,8 +110,17 @@ const Portfolio: React.FC = () => {
       localStorage.setItem(key, value);
       return true;
     } catch (e) {
-      console.warn(`⚠️ localStorage cheio; não foi possível salvar '${key}'`, e);
-      return false;
+      console.warn(`⚠️ localStorage cheio; não foi possível salvar '${key}'. Tentando limpar cache...`, e);
+      try {
+        // Recupera de um estado comum: base64 antigo gravado no cache.
+        localStorage.removeItem('portfolio_v1');
+        localStorage.removeItem('portfolio_backup');
+        localStorage.setItem(key, value);
+        return true;
+      } catch (e2) {
+        console.warn(`⚠️ Ainda não foi possível salvar '${key}' após limpeza`, e2);
+        return false;
+      }
     }
   };
 
