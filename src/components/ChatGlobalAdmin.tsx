@@ -10,7 +10,17 @@ import {
   Search,
   RefreshCw
 } from 'lucide-react';
-import { collection, query, where, getDocs, doc, updateDoc, onSnapshot, orderBy } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  updateDoc,
+  onSnapshot,
+  getDoc,
+  QuerySnapshot,
+  QueryDocumentSnapshot,
+  DocumentData,
+  FirestoreError,
+} from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { notificarNovaMensagem } from '../services/notificacoes';
@@ -69,17 +79,13 @@ const ChatGlobalAdmin: React.FC = () => {
         localStorage.getItem('userRole') === 'admin' ||
         localStorage.getItem('userRole') === 'webmaster';
       
-      // Verificar também na coleção admins do Firestore
+      // Verificar também na coleção admins do Firestore (por UID)
       if (!adminCheck && user.uid) {
         try {
-          const adminDoc = await getDocs(query(
-            collection(db, 'admins'),
-            where('email', '==', user.email)
-          ));
-          
-          if (!adminDoc.empty) {
+          const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+          if (adminDoc.exists()) {
             adminCheck = true;
-            console.log('✅ Usuário encontrado na coleção admins');
+            console.log('✅ Usuário encontrado na coleção admins (UID)');
           }
         } catch (error) {
           console.log('⚠️ Erro ao verificar coleção admins:', error);
@@ -104,21 +110,19 @@ const ChatGlobalAdmin: React.FC = () => {
     console.log('🔍 Carregando conversas para o admin...');
     setCarregando(true);
 
-    const q = query(
-      collection(db, 'solicitacoes_clientes')
-    );
+    const colRef = collection(db, 'solicitacoes_clientes');
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(colRef, (snapshot: QuerySnapshot<DocumentData>) => {
       const conversasData: Conversa[] = [];
       
-      snapshot.forEach((doc) => {
-        const data = doc.data();
+      snapshot.forEach((snapDoc: QueryDocumentSnapshot<DocumentData>) => {
+        const data = snapDoc.data();
         const respostas = data.respostas || [];
         const ultimaResposta = respostas.length > 0 ? respostas[respostas.length - 1] : null;
         const naoLidas = respostas.filter((r: any) => r.autor === 'Cliente' && !r.lidaPeloAdmin).length;
         
         conversasData.push({
-          id: doc.id,
+          id: snapDoc.id,
           nomeCliente: data.nomeCliente || 'Cliente',
           titulo: data.titulo || data.servicoTitulo || 'Solicitação',
           ultimaMensagem: ultimaResposta?.texto?.substring(0, 50) + (ultimaResposta?.texto?.length > 50 ? '...' : ''),
@@ -147,7 +151,7 @@ const ChatGlobalAdmin: React.FC = () => {
           setConversaSelecionada(atualizada);
         }
       }
-    }, (error) => {
+    }, (error: FirestoreError) => {
       console.error('❌ Erro ao carregar conversas:', error);
       setCarregando(false);
     });
