@@ -8,6 +8,8 @@ import { TutorialProvider } from './contexts/TutorialContext';
 import ChatGlobalAdmin from './components/ChatGlobalAdmin';
 import Home from './pages/Home';
 import Login from './pages/Login';
+
+// Build: v2.0.1 - Cache-bust 2026-01-15
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import CRM from './pages/CRM';
