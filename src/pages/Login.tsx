@@ -55,6 +55,14 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const isPermissionDenied = (err: any) => {
+    const code = err?.code || '';
+    const msg = String(err?.message || '').toLowerCase();
+    return code === 'permission-denied' || msg.includes('missing or insufficient permissions');
+  };
+
   useEffect(() => {
     setIsLoaded(true);
     // Verificar se há mensagem de sucesso do registro
@@ -106,9 +114,35 @@ const Login: React.FC = () => {
       
       // Buscar role do usuário no Firestore
       console.log('📄 Buscando documento do usuário no Firestore...');
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+
+      // Em produção, alguns browsers podem ainda estar propagando o token para o Firestore
+      // imediatamente após o signIn, causando um permission-denied transitório.
+      // Fazemos um pequeno retry com refresh do token.
+      let userDoc: any = null;
+      let lastFirestoreError: any = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          if (attempt > 1) {
+            await userCredential.user.getIdToken(true);
+            await sleep(300 * attempt);
+          }
+          userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+          lastFirestoreError = null;
+          break;
+        } catch (e: any) {
+          lastFirestoreError = e;
+          if (!isPermissionDenied(e) || attempt === 3) {
+            throw e;
+          }
+          console.warn(`⚠️ Firestore permission-denied transitório (tentativa ${attempt}/3). Retentando...`);
+        }
+      }
+
+      if (!userDoc && lastFirestoreError) {
+        throw lastFirestoreError;
+      }
       
-      if (userDoc.exists()) {
+      if (userDoc && userDoc.exists()) {
         const userData = userDoc.data();
         console.log('✅ Documento encontrado. Role:', userData.role);
         
@@ -141,7 +175,10 @@ const Login: React.FC = () => {
       } else if (err.code === 'auth/too-many-requests') {
         setError('Muitas tentativas. Tente novamente mais tarde.');
       } else {
-        setError(`Erro ao fazer login: ${err.message}`);
+        const extraHint = isPermissionDenied(err)
+          ? `\n\nDica: isso costuma acontecer quando as regras do Firestore não foram aplicadas no projeto correto, ou quando o token ainda está sendo propagado (tente novamente em alguns segundos).`
+          : '';
+        setError(`Erro ao fazer login: ${err.message}${extraHint}`);
       }
     } finally {
       setLoading(false);
