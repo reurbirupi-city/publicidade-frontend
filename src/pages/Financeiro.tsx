@@ -39,6 +39,7 @@ import { collection, addDoc, onSnapshot, query, where, doc, updateDoc, deleteDoc
 import { useAuth } from '../contexts/AuthContext';
 import { isWebmaster } from '../services/adminService';
 import { notificarNovaTransacao } from '../services/notificacoes';
+import api from '../services/api';
 
 // ============================================================================
 // INTERFACES E TIPOS
@@ -104,6 +105,14 @@ const Financeiro: React.FC = () => {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [loading, setLoading] = useState(true);
   const [atualizando, setAtualizando] = useState(false);
+  const [useApiMode, setUseApiMode] = useState(false);
+
+  const loadTransacoesFromApi = async () => {
+    const resp = await api.get('/financeiro/transacoes');
+    const list = (resp.data?.data || resp.data) as any[];
+    setTransacoes((Array.isArray(list) ? list : []) as Transacao[]);
+    setLoading(false);
+  };
 
   // Função para atualizar e sincronizar todos os dados financeiros
   const handleAtualizarFinanceiro = async () => {
@@ -122,6 +131,15 @@ const Financeiro: React.FC = () => {
       const hoje = new Date();
       const hojeStr = hoje.toISOString().split('T')[0];
       
+      // Se Firestore estiver bloqueado por rules, usa API do backend (Admin SDK)
+      if (useApiMode) {
+        const resp = await api.post('/financeiro/sync');
+        await loadTransacoesFromApi();
+        alert(`✅ Financeiro Atualizado!\n\nSync: ${JSON.stringify(resp.data?.data || resp.data)}`);
+        setAtualizando(false);
+        return;
+      }
+
       // 1. Buscar todas as transações
       const transacoesRef = collection(db, 'transacoes');
       const qTransacoes = userIsWebmaster 
@@ -315,7 +333,20 @@ const Financeiro: React.FC = () => {
       
     } catch (error) {
       console.error('❌ Erro ao atualizar financeiro:', error);
-      alert('Erro ao atualizar dados. Tente novamente.');
+      const msg = String((error as any)?.message || '');
+      if (msg.includes('Missing or insufficient permissions')) {
+        try {
+          setUseApiMode(true);
+          const resp = await api.post('/financeiro/sync');
+          await loadTransacoesFromApi();
+          alert(`✅ Financeiro Atualizado via servidor!\n\nSync: ${JSON.stringify(resp.data?.data || resp.data)}`);
+        } catch (e) {
+          console.error('❌ Falha no fallback via API:', e);
+          alert('Erro ao atualizar dados. Permissão negada no Firestore e falha ao usar API.');
+        }
+      } else {
+        alert('Erro ao atualizar dados. Tente novamente.');
+      }
     } finally {
       setAtualizando(false);
     }
@@ -325,6 +356,16 @@ const Financeiro: React.FC = () => {
   useEffect(() => {
     if (!user?.uid) {
       console.log('⏳ Financeiro: Aguardando autenticação do usuário...');
+      return;
+    }
+
+    if (useApiMode) {
+      console.log('🌐 Financeiro: carregando transações via API');
+      setLoading(true);
+      loadTransacoesFromApi().catch((e) => {
+        console.error('❌ Erro ao carregar transações via API:', e);
+        setLoading(false);
+      });
       return;
     }
 
@@ -351,16 +392,43 @@ const Financeiro: React.FC = () => {
       localStorage.setItem('financeiro_v1', JSON.stringify(docs));
     }, (error) => {
       console.error(' Erro ao escutar transações:', error);
+      const msg = String((error as any)?.message || '');
+      if (msg.includes('Missing or insufficient permissions')) {
+        console.warn('⚠️ Firestore bloqueado por rules; alternando para API');
+        setUseApiMode(true);
+        loadTransacoesFromApi().catch((e) => {
+          console.error('❌ Erro ao carregar transações via API:', e);
+          const stored = localStorage.getItem('financeiro_v1');
+          if (stored) setTransacoes(JSON.parse(stored));
+          setLoading(false);
+        });
+        return;
+      }
+
       const stored = localStorage.getItem('financeiro_v1');
       if (stored) setTransacoes(JSON.parse(stored));
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [user?.uid, userIsWebmaster]);
+  }, [user?.uid, userIsWebmaster, useApiMode]);
 
   // Handlers de Modais
   const handleCriarTransacao = async (novaTransacao: any) => {
+    if (useApiMode) {
+      try {
+        const resp = await api.post('/financeiro/transacoes', novaTransacao);
+        const created = resp.data?.data || resp.data;
+        setTransacoes(prev => [created as any, ...prev]);
+        setModalCriar(false);
+        return;
+      } catch (e) {
+        console.error('Erro ao criar transação via API:', e);
+        alert('Erro ao criar transação via servidor.');
+        return;
+      }
+    }
+
     const transacaoData = {
       ...novaTransacao,
       adminId: user?.uid,
@@ -398,6 +466,21 @@ const Financeiro: React.FC = () => {
   const handleEditarTransacao = async (transacaoEditada: any) => {
     if (!transacaoSelecionada) return;
 
+    if (useApiMode) {
+      try {
+        const resp = await api.put(`/financeiro/transacoes/${transacaoSelecionada.id}`, transacaoEditada);
+        const updated = resp.data?.data || resp.data;
+        setTransacoes(transacoes.map(t => (t.id === transacaoSelecionada.id ? (updated as any) : t)));
+        setModalEditar(false);
+        setTransacaoSelecionada(null);
+        return;
+      } catch (e) {
+        console.error('Erro ao editar transação via API:', e);
+        alert('Erro ao editar transação via servidor.');
+        return;
+      }
+    }
+
     try {
       await updateDoc(doc(db, 'transacoes', transacaoSelecionada.id), {
         ...transacaoEditada,
@@ -417,6 +500,20 @@ const Financeiro: React.FC = () => {
 
   const handleDeletarTransacao = async () => {
     if (!transacaoSelecionada) return;
+
+    if (useApiMode) {
+      try {
+        await api.delete(`/financeiro/transacoes/${transacaoSelecionada.id}`);
+        setTransacoes(transacoes.filter(t => t.id !== transacaoSelecionada.id));
+        setModalDeletar(false);
+        setTransacaoSelecionada(null);
+        return;
+      } catch (e) {
+        console.error('Erro ao deletar transação via API:', e);
+        alert('Erro ao deletar transação via servidor.');
+        return;
+      }
+    }
 
     try {
       await deleteDoc(doc(db, 'transacoes', transacaoSelecionada.id));
