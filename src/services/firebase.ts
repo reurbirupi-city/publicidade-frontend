@@ -15,6 +15,8 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-VG9E54NZ6W"
 };
 
+export const FIREBASE_PROJECT_ID = firebaseConfig.projectId;
+
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 

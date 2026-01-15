@@ -107,12 +107,25 @@ const ChatGlobalAdmin: React.FC = () => {
   useEffect(() => {
     if (!isAdmin) return;
 
+    let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
+
     console.log('🔍 Carregando conversas para o admin...');
     setCarregando(true);
 
     const colRef = collection(db, 'solicitacoes_clientes');
 
-    const unsubscribe = onSnapshot(colRef, (snapshot: QuerySnapshot<DocumentData>) => {
+    (async () => {
+      try {
+        // Garante token pronto antes da primeira query.
+        await user?.getIdToken();
+      } catch (e) {
+        console.warn('⚠️ ChatGlobalAdmin - Falha ao obter token antes do listener:', e);
+      }
+
+      if (cancelled) return;
+
+      unsubscribe = onSnapshot(colRef, (snapshot: QuerySnapshot<DocumentData>) => {
       const conversasData: Conversa[] = [];
       
       snapshot.forEach((snapDoc: QueryDocumentSnapshot<DocumentData>) => {
@@ -156,7 +169,12 @@ const ChatGlobalAdmin: React.FC = () => {
       setCarregando(false);
     });
 
-    return () => unsubscribe();
+    })();
+
+    return () => {
+      cancelled = true;
+      if (unsubscribe) unsubscribe();
+    };
   }, [isAdmin]);
 
   // Marcar mensagens como lidas quando abrir a conversa

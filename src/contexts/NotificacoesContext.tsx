@@ -126,22 +126,38 @@ export const NotificacoesProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return;
     }
 
+    let unsubscribe: (() => void) | null = null;
+    let cancelled = false;
+
     setLoading(true);
     if (isDev) console.log('🔔 NotificacoesContext - Iniciando listener para:', destinatarioTipo, destinatarioId);
-    
-    const unsubscribe = escutarNotificacoes(
-      destinatarioTipo,
-      destinatarioId,
-      (novasNotificacoes) => {
-        setNotificacoes(novasNotificacoes);
-        setLoading(false);
 
-        // Log de debug
-        if (isDev) console.log('📥 NotificacoesContext - Recebidas:', novasNotificacoes.length, 'notificações');
+    (async () => {
+      try {
+        // Evita permission-denied por corrida logo após login/refresh.
+        await user.getIdToken();
+      } catch (e) {
+        if (isDev) console.warn('⚠️ NotificacoesContext - Falha ao obter token antes do listener:', e);
       }
-    );
 
-    return () => unsubscribe();
+      if (cancelled) return;
+
+      unsubscribe = escutarNotificacoes(
+        destinatarioTipo,
+        destinatarioId,
+        (novasNotificacoes) => {
+          setNotificacoes(novasNotificacoes);
+          setLoading(false);
+
+          if (isDev) console.log('📥 NotificacoesContext - Recebidas:', novasNotificacoes.length, 'notificações');
+        }
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+      if (unsubscribe) unsubscribe();
+    };
   }, [user, adminChecked, destinatarioTipo, destinatarioId]);
 
   // Contar não lidas

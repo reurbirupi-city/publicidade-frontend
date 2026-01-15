@@ -21,8 +21,22 @@ import {
   Rocket
 } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { db, FIREBASE_PROJECT_ID } from '../services/firebase';
 import { inicializarAdmin, isWebmaster } from '../services/adminService';
+
+const decodeJwtPayload = (jwt: string): Record<string, any> | null => {
+  try {
+    const parts = jwt.split('.');
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+};
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -63,6 +77,26 @@ const Login: React.FC = () => {
       console.log('📞 Chamando signIn...');
       const userCredential = await signIn(email, password);
       console.log('✅ Login bem-sucedido! UID:', userCredential.user.uid);
+
+      // Garante que o token esteja disponível antes de qualquer chamada ao Firestore.
+      // Em alguns cenários (principalmente produção), a primeira chamada Firestore pode ocorrer
+      // antes do token ser propagado, resultando em permission-denied.
+      let idToken: string | null = null;
+      try {
+        idToken = await userCredential.user.getIdToken(true);
+        const payload = decodeJwtPayload(idToken);
+        const aud = payload?.aud;
+        if (aud && FIREBASE_PROJECT_ID && aud !== FIREBASE_PROJECT_ID) {
+          console.error('❌ Token aud diferente do projectId do app:', { aud, projectId: FIREBASE_PROJECT_ID });
+          throw new Error(
+            `Configuração Firebase inconsistente (token aud='${aud}', projectId='${FIREBASE_PROJECT_ID}'). ` +
+              `Verifique VITE_FIREBASE_* no frontend.`
+          );
+        }
+      } catch (e: any) {
+        console.warn('⚠️ Não foi possível validar token antes do Firestore:', e?.message || e);
+        // Continua — se for realmente problema de permissão, será capturado abaixo.
+      }
       
       // Se for um webmaster, inicializar no sistema de admins
       if (isWebmaster(email)) {
