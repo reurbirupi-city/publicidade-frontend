@@ -107,6 +107,23 @@ const Financeiro: React.FC = () => {
   const [atualizando, setAtualizando] = useState(false);
   const [useApiMode, setUseApiMode] = useState(false);
 
+  const formatSyncSummary = (payload: any): string => {
+    const data = payload?.data || payload;
+    const projetos = Number(data?.projetos ?? 0);
+    const transacoesExistentes = Number(data?.transacoesExistentes ?? 0);
+    const transacoesCriadas = Number(data?.transacoesCriadas ?? 0);
+
+    return [
+      '✅ Financeiro atualizado com sucesso!',
+      '',
+      `📌 Projetos analisados: ${Number.isFinite(projetos) ? projetos : 0}`,
+      `🧾 Transações já existentes: ${Number.isFinite(transacoesExistentes) ? transacoesExistentes : 0}`,
+      `💰 Novas transações criadas: ${Number.isFinite(transacoesCriadas) ? transacoesCriadas : 0}`,
+      '',
+      'Se algo ainda não aparecer, aguarde alguns segundos e clique em “Atualizar” novamente.',
+    ].join('\n');
+  };
+
   const loadTransacoesFromApi = async () => {
     const resp = await api.get('/financeiro/transacoes');
     const list = (resp.data?.data || resp.data) as any[];
@@ -135,7 +152,7 @@ const Financeiro: React.FC = () => {
       if (useApiMode) {
         const resp = await api.post('/financeiro/sync');
         await loadTransacoesFromApi();
-        alert(`✅ Financeiro Atualizado!\n\nSync: ${JSON.stringify(resp.data?.data || resp.data)}`);
+        alert(formatSyncSummary(resp.data));
         setAtualizando(false);
         return;
       }
@@ -329,7 +346,17 @@ const Financeiro: React.FC = () => {
         atrasadas: countAtrasadas
       });
       
-      alert(`✅ Financeiro Atualizado!\n\n📊 ${transacoesData.length} transações\n💰 ${parcelasData.length} parcelas\n✓ ${pagas} pagas\n⏳ ${pendentes} pendentes${countAtrasadas > 0 ? `\n⚠️ ${countAtrasadas} atrasadas` : ''}`);
+      alert(
+        [
+          '✅ Financeiro atualizado com sucesso!',
+          '',
+          `📊 Transações: ${transacoesData.length}`,
+          `💳 Parcelas: ${parcelasData.length}`,
+          `✓ Pagas: ${pagas}`,
+          `⏳ Pendentes: ${pendentes}`,
+          ...(countAtrasadas > 0 ? [`⚠️ Atrasadas: ${countAtrasadas}`] : []),
+        ].join('\n')
+      );
       
     } catch (error) {
       console.error('❌ Erro ao atualizar financeiro:', error);
@@ -339,13 +366,28 @@ const Financeiro: React.FC = () => {
           setUseApiMode(true);
           const resp = await api.post('/financeiro/sync');
           await loadTransacoesFromApi();
-          alert(`✅ Financeiro Atualizado via servidor!\n\nSync: ${JSON.stringify(resp.data?.data || resp.data)}`);
+          alert(
+            [
+              '✅ Pronto! Atualizei o Financeiro via servidor.',
+              '',
+              'Seu acesso ao Firestore está mais restrito no momento, então usei um caminho seguro (API) para carregar e sincronizar seus dados.',
+              '',
+              formatSyncSummary(resp.data),
+            ].join('\n')
+          );
         } catch (e) {
           console.error('❌ Falha no fallback via API:', e);
-          alert('Erro ao atualizar dados. Permissão negada no Firestore e falha ao usar API.');
+          alert(
+            [
+              'Não consegui atualizar agora.',
+              '',
+              'O Firestore bloqueou o acesso e a tentativa via servidor também falhou.',
+              'Tente novamente em alguns instantes. Se continuar, me avise que eu verifico o backend/credenciais.',
+            ].join('\n')
+          );
         }
       } else {
-        alert('Erro ao atualizar dados. Tente novamente.');
+        alert('Não consegui atualizar agora. Tente novamente em alguns instantes.');
       }
     } finally {
       setAtualizando(false);
