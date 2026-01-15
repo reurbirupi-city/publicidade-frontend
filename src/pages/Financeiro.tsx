@@ -22,7 +22,8 @@ import {
   Receipt,
   Building2,
   User,
-  FileText
+  FileText,
+  RefreshCw
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
@@ -34,7 +35,7 @@ import ModalEditarTransacao from '../components/ModalEditarTransacao';
 import ModalDeletarTransacao from '../components/ModalDeletarTransacao';
 import { getClientes, getProjetos } from '../services/dataIntegration';
 import { db } from '../services/firebase';
-import { collection, addDoc, onSnapshot, query, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, where, doc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { isWebmaster } from '../services/adminService';
 import { notificarNovaTransacao } from '../services/notificacoes';
@@ -102,6 +103,116 @@ const Financeiro: React.FC = () => {
 
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [loading, setLoading] = useState(true);
+  const [atualizando, setAtualizando] = useState(false);
+
+  // Função para atualizar e sincronizar todos os dados financeiros
+  const handleAtualizarFinanceiro = async () => {
+    setAtualizando(true);
+    console.log('🔄 Iniciando atualização completa do financeiro...');
+    
+    try {
+      const hoje = new Date();
+      const hojeStr = hoje.toISOString().split('T')[0];
+      
+      // 1. Buscar todas as transações
+      const transacoesRef = collection(db, 'transacoes');
+      const qTransacoes = userIsWebmaster 
+        ? query(transacoesRef)
+        : query(transacoesRef, where('adminId', '==', user?.uid));
+      
+      const snapshotTransacoes = await getDocs(qTransacoes);
+      const transacoesData = snapshotTransacoes.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Transacao[];
+      
+      // 2. Buscar todas as parcelas
+      const parcelasRef = collection(db, 'parcelas');
+      const qParcelas = userIsWebmaster
+        ? query(parcelasRef)
+        : query(parcelasRef, where('adminId', '==', user?.uid));
+      
+      const snapshotParcelas = await getDocs(qParcelas);
+      const parcelasData = snapshotParcelas.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+      
+      console.log(`📊 Encontradas ${transacoesData.length} transações e ${parcelasData.length} parcelas`);
+      
+      // 3. Verificar e atualizar status de vencidas
+      let countAtrasadas = 0;
+      const updatePromises: Promise<void>[] = [];
+      
+      // Atualizar transações vencidas
+      for (const transacao of transacoesData) {
+        if (transacao.status === 'pendente' && transacao.dataVencimento) {
+          const dataVenc = new Date(transacao.dataVencimento);
+          if (dataVenc < hoje) {
+            updatePromises.push(
+              updateDoc(doc(db, 'transacoes', transacao.id), {
+                status: 'atrasado',
+                atualizadoEm: hoje.toISOString()
+              })
+            );
+            transacao.status = 'atrasado';
+            countAtrasadas++;
+          }
+        }
+      }
+      
+      // Atualizar parcelas vencidas
+      for (const parcela of parcelasData) {
+        if (parcela.status === 'pendente' && parcela.dataVencimento) {
+          const dataVenc = new Date(parcela.dataVencimento);
+          if (dataVenc < hoje) {
+            updatePromises.push(
+              updateDoc(doc(db, 'parcelas', parcela.id), {
+                status: 'atrasado',
+                atualizadoEm: hoje.toISOString()
+              })
+            );
+            countAtrasadas++;
+          }
+        }
+      }
+      
+      // Executar todas as atualizações
+      if (updatePromises.length > 0) {
+        await Promise.all(updatePromises);
+        console.log(`⚠️ ${countAtrasadas} itens marcados como atrasados`);
+      }
+      
+      // 4. Atualizar estado local
+      setTransacoes(transacoesData);
+      localStorage.setItem('financeiro_v1', JSON.stringify(transacoesData));
+      
+      // 5. Calcular estatísticas atualizadas
+      const totalReceitas = transacoesData.filter(t => t.tipo === 'receita').reduce((sum, t) => sum + t.valor, 0);
+      const totalDespesas = transacoesData.filter(t => t.tipo === 'despesa').reduce((sum, t) => sum + t.valor, 0);
+      const pagas = transacoesData.filter(t => t.status === 'pago').length;
+      const pendentes = transacoesData.filter(t => t.status === 'pendente').length;
+      const atrasadas = transacoesData.filter(t => t.status === 'atrasado').length;
+      
+      console.log('✅ Atualização concluída:', {
+        transacoes: transacoesData.length,
+        parcelas: parcelasData.length,
+        receitas: totalReceitas,
+        despesas: totalDespesas,
+        pagas,
+        pendentes,
+        atrasadas: countAtrasadas
+      });
+      
+      alert(`✅ Financeiro Atualizado!\n\n📊 ${transacoesData.length} transações\n💰 ${parcelasData.length} parcelas\n✓ ${pagas} pagas\n⏳ ${pendentes} pendentes${countAtrasadas > 0 ? `\n⚠️ ${countAtrasadas} atrasadas` : ''}`);
+      
+    } catch (error) {
+      console.error('❌ Erro ao atualizar financeiro:', error);
+      alert('Erro ao atualizar dados. Tente novamente.');
+    } finally {
+      setAtualizando(false);
+    }
+  };
 
   // Listener em tempo real para transações do Firestore
   useEffect(() => {
@@ -390,6 +501,15 @@ const Financeiro: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={handleAtualizarFinanceiro}
+                disabled={atualizando}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Atualizar dados financeiros"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${atualizando ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Atualizar</span>
+              </button>
               <NotificacoesBell />
               <ThemeToggle />
               <button
