@@ -111,6 +111,14 @@ const Financeiro: React.FC = () => {
     console.log('🔄 Iniciando atualização completa do financeiro...');
     
     try {
+      // Verificar se usuário está autenticado
+      if (!user?.uid) {
+        console.error('❌ Usuário não autenticado');
+        alert('Erro: Usuário não autenticado. Faça login novamente.');
+        setAtualizando(false);
+        return;
+      }
+
       const hoje = new Date();
       const hojeStr = hoje.toISOString().split('T')[0];
       
@@ -118,7 +126,7 @@ const Financeiro: React.FC = () => {
       const transacoesRef = collection(db, 'transacoes');
       const qTransacoes = userIsWebmaster 
         ? query(transacoesRef)
-        : query(transacoesRef, where('adminId', '==', user?.uid));
+        : query(transacoesRef, where('adminId', '==', user.uid));
       
       const snapshotTransacoes = await getDocs(qTransacoes);
       const transacoesData = snapshotTransacoes.docs.map(doc => ({
@@ -130,7 +138,7 @@ const Financeiro: React.FC = () => {
       const parcelasRef = collection(db, 'parcelas');
       const qParcelas = userIsWebmaster
         ? query(parcelasRef)
-        : query(parcelasRef, where('adminId', '==', user?.uid));
+        : query(parcelasRef, where('adminId', '==', user.uid));
       
       const snapshotParcelas = await getDocs(qParcelas);
       const parcelasData = snapshotParcelas.docs.map(doc => ({
@@ -216,8 +224,12 @@ const Financeiro: React.FC = () => {
 
   // Listener em tempo real para transações do Firestore
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid) {
+      console.log('⏳ Financeiro: Aguardando autenticação do usuário...');
+      return;
+    }
 
+    console.log('🔥 Financeiro: Iniciando listener de transações para:', user.uid);
     setLoading(true);
     const transacoesRef = collection(db, 'transacoes');
     
@@ -232,13 +244,14 @@ const Financeiro: React.FC = () => {
         ...doc.data()
       })) as Transacao[];
       
+      console.log(`💾 Financeiro: Salvou ${docs.length} transações`);
       setTransacoes(docs);
       setLoading(false);
       
       // Sincronizar com localStorage para cache
       localStorage.setItem('financeiro_v1', JSON.stringify(docs));
     }, (error) => {
-      console.error('Erro ao escutar transações:', error);
+      console.error(' Erro ao escutar transações:', error);
       const stored = localStorage.getItem('financeiro_v1');
       if (stored) setTransacoes(JSON.parse(stored));
       setLoading(false);
