@@ -18,7 +18,8 @@ import {
   Layers,
   TrendingUp,
   Users,
-  CheckCircle
+  CheckCircle,
+  Trash2
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificacoesBell from '../components/NotificacoesBell';
@@ -104,6 +105,7 @@ const Portfolio: React.FC = () => {
 
   const [portfolio, setPortfolio] = useState<ItemPortfolio[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cacheNotice, setCacheNotice] = useState<string | null>(null);
 
   const safeLocalStorageSet = (key: string, value: string) => {
     try {
@@ -130,6 +132,19 @@ const Portfolio: React.FC = () => {
     } catch (e) {
       console.warn(`⚠️ localStorage indisponível; não foi possível ler '${key}'`, e);
       return null;
+    }
+  };
+
+  const clearPortfolioCache = () => {
+    try {
+      localStorage.removeItem('portfolio_v1');
+      localStorage.removeItem('portfolio_backup');
+      setCacheNotice('Cache limpo');
+      setTimeout(() => setCacheNotice(null), 2500);
+    } catch (e) {
+      console.warn('⚠️ Não foi possível limpar cache do Portfólio:', e);
+      setCacheNotice('Não foi possível limpar');
+      setTimeout(() => setCacheNotice(null), 2500);
     }
   };
 
@@ -405,6 +420,19 @@ const Portfolio: React.FC = () => {
               <ThemeToggle />
               {!isClientView && (
                 <button
+                  type="button"
+                  onClick={() => {
+                    const ok = window.confirm('Limpar o cache local do Portfólio? (Isso não apaga dados do sistema)');
+                    if (ok) clearPortfolioCache();
+                  }}
+                  title="Limpar cache do Portfólio (local)"
+                  className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+              {!isClientView && (
+                <button
                   onClick={() => setModalAdicionarOpen(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg transition-all hover:scale-105 font-semibold shadow-lg"
                 >
@@ -414,6 +442,11 @@ const Portfolio: React.FC = () => {
               )}
             </div>
           </div>
+          {cacheNotice && (
+            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {cacheNotice}
+            </div>
+          )}
         </div>
       </div>
 
