@@ -4,6 +4,9 @@ import Modal from './Modal';
 import WizardStepper from './WizardStepper';
 import { ClienteSelector } from './DataSelectors';
 import { getClienteById, updateProjetoWithSync } from '../services/dataIntegration';
+import { useAuth } from '../contexts/AuthContext';
+import { db } from '../services/firebase';
+import { collection, addDoc, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
 import api from '../services/api';
 
 interface Projeto {
@@ -46,6 +49,7 @@ const ModalEditarProjeto: React.FC<ModalEditarProjetoProps> = ({
   const steps = ['Básico', 'Financeiro & Prazo', 'Descrição'];
   const [step, setStep] = useState(0);
   const allowSubmitRef = useRef(false);
+  const { user } = useAuth();
 
   const [formData, setFormData] = useState({
     titulo: '',
@@ -359,6 +363,115 @@ const ModalEditarProjeto: React.FC<ModalEditarProjetoProps> = ({
       updateProjetoWithSync(projeto.id, updates);
       
       const projetoAtualizado = { ...projeto, ...updates };
+      
+      // ===== INTEGRAÇÃO FINANCEIRA =====
+      // Verificar se o valorPago mudou
+      const valorPagoAntigo = projeto.valorPago || 0;
+      const valorPagoNovo = parseFloat(formData.valorPago);
+      const valorContratadoNovo = parseFloat(formData.valorContratado);
+      
+      if (valorPagoNovo !== valorPagoAntigo) {
+        console.log('💰 Valor pago foi alterado:', valorPagoAntigo, '→', valorPagoNovo);
+        
+        try {
+          // Buscar transação existente para este projeto
+          const transacoesRef = collection(db, 'transacoes');
+          const q = query(transacoesRef, where('projetoId', '==', projeto.id));
+          const snapshot = await getDocs(q);
+          
+          if (!snapshot.empty && valorPagoNovo > 0) {
+            // Atualizar transação existente
+            const transacaoDoc = snapshot.docs[0];
+            await updateDoc(doc(db, 'transacoes', transacaoDoc.id), {
+              valor: valorPagoNovo,
+              status: 'pago',
+              dataPagamento: formData.dataInicio || new Date().toISOString().split('T')[0],
+              observacoes: `Valor atualizado de R$ ${valorPagoAntigo.toFixed(2)} para R$ ${valorPagoNovo.toFixed(2)} na edição do projeto`,
+              atualizadoEm: new Date().toISOString()
+            });
+            console.log('✅ Transação existente atualizada');
+          } else if (valorPagoNovo > 0) {
+            // Criar nova transação se não existir
+            const hoje = new Date();
+            const transacao = {
+              tipo: 'receita',
+              descricao: `Pagamento do projeto: ${formData.titulo.trim()}`,
+              valor: valorPagoNovo,
+              categoria: 'projeto',
+              status: 'pago',
+              dataVencimento: formData.dataInicio || hoje.toISOString().split('T')[0],
+              dataPagamento: formData.dataInicio || hoje.toISOString().split('T')[0],
+              formaPagamento: 'transferencia',
+              clienteId: formData.clienteId,
+              clienteNome: cliente.nome,
+              projetoId: projeto.id,
+              projetoTitulo: formData.titulo.trim(),
+              recorrente: false,
+              observacoes: `Pagamento registrado na edição do projeto`,
+              adminId: user?.uid,
+              criadoEm: hoje.toISOString(),
+              atualizadoEm: hoje.toISOString()
+            };
+            
+            await addDoc(collection(db, 'transacoes'), transacao);
+            console.log('💰 Nova transação financeira criada: R$', valorPagoNovo);
+          }
+          
+          // ===== SISTEMA DE PARCELAS =====
+          // Verificar se precisa criar/atualizar parcelas
+          const saldoRestante = valorContratadoNovo - valorPagoNovo;
+          
+          if (saldoRestante > 0) {
+            // Buscar parcelas existentes
+            const parcelasRef = collection(db, 'parcelas');
+            const qParcelas = query(parcelasRef, where('projetoId', '==', projeto.id));
+            const snapshotParcelas = await getDocs(qParcelas);
+            
+            if (snapshotParcelas.empty) {
+              // Criar parcelas se não existirem
+              const numeroParcelas = 3;
+              const valorParcela = saldoRestante / numeroParcelas;
+              
+              for (let i = 1; i <= numeroParcelas; i++) {
+                const dataVencimento = new Date(formData.dataInicio);
+                dataVencimento.setMonth(dataVencimento.getMonth() + i);
+                
+                const parcela = {
+                  tipo: 'receita',
+                  descricao: `Parcela ${i}/${numeroParcelas} - ${formData.titulo.trim()}`,
+                  valor: valorParcela,
+                  categoria: 'projeto',
+                  status: 'pendente',
+                  dataVencimento: dataVencimento.toISOString().split('T')[0],
+                  clienteId: formData.clienteId,
+                  clienteNome: cliente.nome,
+                  projetoId: projeto.id,
+                  projetoTitulo: formData.titulo.trim(),
+                  numeroParcela: i,
+                  totalParcelas: numeroParcelas,
+                  recorrente: false,
+                  observacoes: `Parcela ${i} de ${numeroParcelas}. Criada na edição do projeto.`,
+                  adminId: user?.uid,
+                  criadoEm: new Date().toISOString(),
+                  atualizadoEm: new Date().toISOString()
+                };
+                
+                await addDoc(collection(db, 'parcelas'), parcela);
+              }
+              console.log(`📅 ${numeroParcelas} parcelas criadas. Saldo: R$ ${saldoRestante.toFixed(2)}`);
+              alert(`✅ Projeto atualizado!\n\n💰 Valor Pago: R$ ${valorPagoNovo.toFixed(2)}\n📅 Saldo Parcelado: R$ ${saldoRestante.toFixed(2)} em ${numeroParcelas}x de R$ ${valorParcela.toFixed(2)}\n\nAs parcelas foram registradas no financeiro.`);
+            } else {
+              console.log('ℹ️ Parcelas já existem para este projeto');
+              alert(`✅ Projeto atualizado!\n\n💰 Valor Pago: R$ ${valorPagoNovo.toFixed(2)}\n\nObservação: As parcelas existentes não foram alteradas. Gerencie-as na página Financeiro se necessário.`);
+            }
+          } else if (valorPagoNovo === valorContratadoNovo && valorPagoNovo > 0) {
+            alert(`✅ Projeto atualizado!\n\n💰 Valor Total Pago: R$ ${valorPagoNovo.toFixed(2)}\n\n✓ Projeto totalmente quitado!`);
+          }
+        } catch (error) {
+          console.error('⚠️ Erro ao atualizar transação/parcelas:', error);
+          alert('⚠️ Projeto atualizado, mas houve um erro ao registrar no financeiro. Verifique a página Financeiro.');
+        }
+      }
       
       console.log('✅ Projeto atualizado:', projetoAtualizado);
       
