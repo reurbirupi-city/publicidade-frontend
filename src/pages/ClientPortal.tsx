@@ -1267,6 +1267,37 @@ const ClientPortal: React.FC = () => {
         await atualizarStatusCliente(user.uid, 'ativo', 'contratado');
         console.log('✅ Status do cliente atualizado para "contratado"');
       
+        // ===== REGISTRO FINANCEIRO AUTOMÁTICO =====
+        // Criar transação financeira para o valor do contrato
+        if (contrato.valor > 0) {
+          try {
+            const hoje = new Date();
+            const transacao = {
+              tipo: 'receita',
+              descricao: `Contrato assinado pelo cliente - ${contrato.titulo}`,
+              valor: contrato.valor,
+              categoria: 'projeto',
+              status: 'pendente',
+              dataVencimento: hoje.toISOString().split('T')[0],
+              clienteId: user.uid,
+              clienteNome: clientData?.nome || user.email || 'Cliente',
+              contratoId: contratoId,
+              solicitacaoId: contrato.solicitacaoId,
+              recorrente: false,
+              observacoes: `Contrato assinado pelo cliente. Serviços: ${(contrato.servicos || []).map((s: any) => s.nome || s).join(', ')}`,
+              adminId: clientData?.adminId || '',
+              criadoEm: hoje.toISOString(),
+              atualizadoEm: hoje.toISOString()
+            };
+            
+            await addDoc(collection(db, 'transacoes'), transacao);
+            console.log('💰 Transação financeira criada automaticamente para contrato:', contratoId, 'Valor: R$', contrato.valor);
+          } catch (error) {
+            console.error('⚠️ Erro ao criar transação automática:', error);
+            // Não bloqueia o fluxo se falhar
+          }
+        }
+      
       // Notificar admin que contrato foi assinado
       await notificarContratoAssinado(
         clientData?.nome || user?.email || 'Cliente',

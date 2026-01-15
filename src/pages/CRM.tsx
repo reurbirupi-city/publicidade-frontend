@@ -36,6 +36,7 @@ import { collection, getDocs, query, where, doc, setDoc, deleteDoc } from 'fireb
 import { useAuth } from '../contexts/AuthContext';
 import { isWebmaster, getAdminByEmail } from '../services/adminService';
 import { notificarNovoCliente } from '../services/notificacoes';
+import { addDoc } from 'firebase/firestore';
 
 // Tipos auxiliares para o módulo de clientes
 interface ServicoContratado {
@@ -444,7 +445,7 @@ const CRM: React.FC = () => {
     setSelectedCliente(clienteAtualizado);
   };
   
-  const handleContratoAssinado = (contratoId: string, assinaturaBase64: string, filename: string) => {
+  const handleContratoAssinado = async (contratoId: string, assinaturaBase64: string, filename: string) => {
     if (!selectedCliente) return;
     
     // Criar documento do contrato
@@ -469,6 +470,9 @@ const CRM: React.FC = () => {
       status: 'ativo' as const
     }));
     
+    // Calcular valor total dos serviços
+    const valorTotalServicos = servicosContratados.reduce((total, s) => total + s.valor, 0);
+    
     // Atualizar cliente
     const clienteAtualizado: Cliente = {
       ...selectedCliente,
@@ -483,6 +487,67 @@ const CRM: React.FC = () => {
     setClientes(clientes.map(c => c.id === selectedCliente.id ? clienteAtualizado : c));
     setSelectedCliente(clienteAtualizado);
     setShowModalContrato(false);
+    
+    // ===== REGISTRO FINANCEIRO AUTOMÁTICO =====
+    // Criar transação financeira para o valor total contratado
+    if (valorTotalServicos > 0) {
+      try {
+        const hoje = new Date();
+        const transacao = {
+          tipo: 'receita',
+          descricao: `Contrato assinado - ${selectedCliente.empresa}`,
+          valor: valorTotalServicos,
+          categoria: 'projeto',
+          status: 'pendente',
+          dataVencimento: hoje.toISOString().split('T')[0],
+          clienteId: selectedCliente.id,
+          clienteNome: selectedCliente.nome,
+          contratoId: contratoId,
+          recorrente: servicosContratados.some(s => s.recorrente),
+          observacoes: `Contrato assinado. Serviços: ${servicosContratados.map(s => s.nome).join(', ')}`,
+          adminId: user?.uid,
+          criadoEm: hoje.toISOString(),
+          atualizadoEm: hoje.toISOString()
+        };
+        
+        await addDoc(collection(db, 'transacoes'), transacao);
+        console.log('💰 Transação financeira criada automaticamente para contrato:', contratoId, 'Valor: R$', valorTotalServicos);
+        
+        // Se houver serviços recorrentes, criar primeira parcela mensal
+        const servicosRecorrentes = servicosContratados.filter(s => s.recorrente);
+        if (servicosRecorrentes.length > 0) {
+          const valorMensal = servicosRecorrentes.reduce((total, s) => total + s.valor, 0);
+          const dataVencimento = new Date();
+          dataVencimento.setDate(10); // Vencimento no dia 10
+          if (dataVencimento < hoje) {
+            dataVencimento.setMonth(dataVencimento.getMonth() + 1);
+          }
+          
+          const parcela = {
+            tipo: 'receita',
+            descricao: `Mensalidade - ${selectedCliente.empresa}`,
+            valor: valorMensal,
+            categoria: 'mensalidade',
+            status: 'pendente',
+            dataVencimento: dataVencimento.toISOString().split('T')[0],
+            clienteId: selectedCliente.id,
+            clienteNome: selectedCliente.nome,
+            contratoId: contratoId,
+            recorrente: true,
+            observacoes: `Mensalidade recorrente. Serviços: ${servicosRecorrentes.map(s => s.nome).join(', ')}`,
+            adminId: user?.uid,
+            criadoEm: hoje.toISOString(),
+            atualizadoEm: hoje.toISOString()
+          };
+          
+          await addDoc(collection(db, 'parcelas'), parcela);
+          console.log('📅 Primeira parcela mensal criada automaticamente. Valor: R$', valorMensal);
+        }
+      } catch (error) {
+        console.error('⚠️ Erro ao criar transação/parcela automática:', error);
+        // Não bloqueia o fluxo se falhar
+      }
+    }
     
     // Limpar dados temporários
     setServicosCotados([]);

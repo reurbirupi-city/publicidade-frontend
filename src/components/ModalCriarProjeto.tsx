@@ -442,8 +442,51 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
           
           await addDoc(collection(db, 'transacoes'), transacao);
           console.log('💰 Transação financeira criada automaticamente: R$', parseFloat(formData.valorPago));
+          
+          // ===== SISTEMA DE PARCELAS =====
+          // Se o valor pago é menor que o contratado, criar parcelas para o saldo restante
+          const valorContratado = parseFloat(formData.valorContratado);
+          const valorPago = parseFloat(formData.valorPago);
+          const saldoRestante = valorContratado - valorPago;
+          
+          if (saldoRestante > 0) {
+            // Criar parcelas automáticas (dividir em 3 parcelas por padrão)
+            const numeroParcelas = 3;
+            const valorParcela = saldoRestante / numeroParcelas;
+            
+            for (let i = 1; i <= numeroParcelas; i++) {
+              const dataVencimento = new Date(formData.dataInicio);
+              dataVencimento.setMonth(dataVencimento.getMonth() + i);
+              
+              const parcela = {
+                tipo: 'receita',
+                descricao: `Parcela ${i}/${numeroParcelas} - ${formData.titulo.trim()}`,
+                valor: valorParcela,
+                categoria: 'projeto',
+                status: 'pendente',
+                dataVencimento: dataVencimento.toISOString().split('T')[0],
+                clienteId: formData.clienteId,
+                clienteNome: cliente.nome,
+                projetoId: projetoId,
+                projetoTitulo: formData.titulo.trim(),
+                numeroParcela: i,
+                totalParcelas: numeroParcelas,
+                recorrente: false,
+                observacoes: `Parcela ${i} de ${numeroParcelas}. Saldo restante: R$ ${saldoRestante.toFixed(2)}`,
+                adminId: user?.uid,
+                criadoEm: hoje.toISOString(),
+                atualizadoEm: hoje.toISOString()
+              };
+              
+              await addDoc(collection(db, 'parcelas'), parcela);
+            }
+            console.log(`📅 ${numeroParcelas} parcelas criadas automaticamente. Saldo: R$ ${saldoRestante.toFixed(2)}`);
+            alert(`✅ Projeto criado com sucesso!\n\n💰 Valor Pago: R$ ${valorPago.toFixed(2)}\n📅 Saldo Parcelado: R$ ${saldoRestante.toFixed(2)} em ${numeroParcelas}x de R$ ${valorParcela.toFixed(2)}\n\nAs parcelas foram registradas automaticamente no financeiro.`);
+          } else {
+            alert(`✅ Projeto criado com sucesso!\n\n💰 Valor Total Pago: R$ ${valorPago.toFixed(2)}`);
+          }
         } catch (error) {
-          console.error('⚠️ Erro ao criar transação automática:', error);
+          console.error('⚠️ Erro ao criar transação/parcelas automáticas:', error);
           // Não bloqueia a criação do projeto se falhar
         }
       }
