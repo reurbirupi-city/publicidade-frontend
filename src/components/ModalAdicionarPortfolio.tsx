@@ -219,9 +219,9 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
       return;
     }
 
-    // Validar tamanho (máx 32MB para ImgBB)
-    if (file.size > 32 * 1024 * 1024) {
-      alert('A imagem deve ter no máximo 32MB.');
+    // Validação suave: o upload otimiza a imagem e o backend aceita até ~4MB após compressão
+    if (file.size > 12 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 12MB (ela será otimizada automaticamente).');
       return;
     }
 

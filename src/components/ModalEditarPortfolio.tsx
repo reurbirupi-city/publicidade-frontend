@@ -195,8 +195,8 @@ const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert('A imagem deve ter no máximo 5MB.');
+    if (file.size > 12 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 12MB (ela será otimizada automaticamente).');
       return;
     }
 
@@ -226,7 +226,7 @@ const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
       const validFiles: File[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        if (file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024) {
+        if (file.type.startsWith('image/') && file.size <= 12 * 1024 * 1024) {
           validFiles.push(file);
         }
       }

@@ -105,6 +105,25 @@ const Portfolio: React.FC = () => {
   const [portfolio, setPortfolio] = useState<ItemPortfolio[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const safeLocalStorageSet = (key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch (e) {
+      console.warn(`⚠️ localStorage cheio; não foi possível salvar '${key}'`, e);
+      return false;
+    }
+  };
+
+  const safeLocalStorageGet = (key: string) => {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      console.warn(`⚠️ localStorage indisponível; não foi possível ler '${key}'`, e);
+      return null;
+    }
+  };
+
   // Listener em tempo real para portfólio do Firestore
   useEffect(() => {
     if (!user?.uid) return;
@@ -127,10 +146,10 @@ const Portfolio: React.FC = () => {
       setLoading(false);
       
       // Sincronizar com localStorage para cache
-      localStorage.setItem('portfolio_v1', JSON.stringify(docs));
+      safeLocalStorageSet('portfolio_v1', JSON.stringify(docs));
     }, (error) => {
       console.error('Erro ao escutar portfólio:', error);
-      const stored = localStorage.getItem('portfolio_v1');
+      const stored = safeLocalStorageGet('portfolio_v1');
       if (stored) setPortfolio(JSON.parse(stored));
       setLoading(false);
     });
@@ -140,7 +159,7 @@ const Portfolio: React.FC = () => {
 
   // Salva no localStorage quando portfolio mudar
   useEffect(() => {
-    localStorage.setItem('portfolio_v1', JSON.stringify(portfolio));
+    safeLocalStorageSet('portfolio_v1', JSON.stringify(portfolio));
     console.log('💾 Portfolio: Salvou', portfolio.length, 'itens');
   }, [portfolio]);
 
@@ -251,6 +270,15 @@ const Portfolio: React.FC = () => {
 
     console.log('📦 Dados preparados para salvar:', itemData);
 
+    // Evita gravar base64 (estoura limites do Firestore e do localStorage)
+    const hasBase64 =
+      (typeof itemData.imagemCapa === 'string' && itemData.imagemCapa.startsWith('data:image/')) ||
+      (Array.isArray(itemData.imagensGaleria) && itemData.imagensGaleria.some((u: any) => typeof u === 'string' && u.startsWith('data:image/')));
+    if (hasBase64) {
+      alert('As imagens precisam ser enviadas antes de salvar (URLs). Tente reenviar as imagens.');
+      return;
+    }
+
     try {
       console.log('💾 Tentando salvar no Firestore...');
       const docRef = await addDoc(collection(db, 'portfolio'), itemData);
@@ -274,9 +302,9 @@ const Portfolio: React.FC = () => {
         setModalAdicionarOpen(false);
         
         // Salvar também no localStorage como backup
-        const portfolioAtual = JSON.parse(localStorage.getItem('portfolio_backup') || '[]');
+        const portfolioAtual = JSON.parse(safeLocalStorageGet('portfolio_backup') || '[]');
         portfolioAtual.push(item);
-        localStorage.setItem('portfolio_backup', JSON.stringify(portfolioAtual));
+        safeLocalStorageSet('portfolio_backup', JSON.stringify(portfolioAtual));
         console.log('💾 Item salvo no localStorage como backup');
         
       } catch (localError) {
