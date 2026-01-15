@@ -408,6 +408,7 @@ const ModalCriarProjeto: React.FC<ModalCriarProjetoProps> = ({
         categoria: formData.categoria,
         criadoEm: hoje.toISOString(),
         atualizadoEm: hoje.toISOString(),
+        adminId: user?.uid,
       };
 
       // Salva com sincronização automática

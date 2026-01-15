@@ -153,11 +153,17 @@ const Financeiro: React.FC = () => {
       try {
         const projetosLocal = (getProjetos() as any[]) || [];
         const receitasPagasPorProjeto = new Map<string, number>();
+        const receitasPendentesPorProjeto = new Map<string, number>();
 
         for (const t of transacoesData as any[]) {
           if (t?.tipo === 'receita' && t?.categoria === 'projeto' && t?.status === 'pago' && t?.projetoId) {
             const atual = receitasPagasPorProjeto.get(t.projetoId) || 0;
             receitasPagasPorProjeto.set(t.projetoId, atual + (Number(t.valor) || 0));
+          }
+
+          if (t?.tipo === 'receita' && t?.categoria === 'projeto' && t?.status === 'pendente' && t?.projetoId) {
+            const atual = receitasPendentesPorProjeto.get(t.projetoId) || 0;
+            receitasPendentesPorProjeto.set(t.projetoId, atual + (Number(t.valor) || 0));
           }
         }
 
@@ -166,39 +172,72 @@ const Financeiro: React.FC = () => {
           const projetoId = p?.id;
           if (!projetoId) continue;
           const valorPagoProjeto = Number(p?.valorPago || 0);
-          if (valorPagoProjeto <= 0) continue;
-
-          const registrado = receitasPagasPorProjeto.get(projetoId) || 0;
-          const delta = valorPagoProjeto - registrado;
-          if (delta <= 0) continue;
+          const valorContratadoProjeto = Number(p?.valorContratado || 0);
+          if (valorPagoProjeto <= 0 && valorContratadoProjeto <= 0) continue;
 
           const hoje = new Date();
           const dataPagamento = p?.dataInicio || hoje.toISOString().split('T')[0];
 
-          const nova = {
-            tipo: 'receita',
-            descricao: `Pagamento do projeto: ${p?.titulo || projetoId}`,
-            valor: delta,
-            categoria: 'projeto',
-            status: 'pago',
-            dataVencimento: dataPagamento,
-            dataPagamento,
-            formaPagamento: 'transferencia',
-            clienteId: p?.clienteId,
-            clienteNome: p?.clienteNome,
-            projetoId,
-            projetoTitulo: p?.titulo || projetoId,
-            recorrente: false,
-            observacoes: `Sync automático: valorPago do projeto (R$ ${valorPagoProjeto.toFixed(2)}) maior que receitas registradas (R$ ${registrado.toFixed(2)}).`,
-            adminId: user.uid,
-            criadoEm: hoje.toISOString(),
-            atualizadoEm: hoje.toISOString(),
-          };
+          // 1) Sync de receitas pagas
+          const registradoPago = receitasPagasPorProjeto.get(projetoId) || 0;
+          const deltaPago = valorPagoProjeto - registradoPago;
+          if (deltaPago > 0) {
+            const novaPago = {
+              tipo: 'receita',
+              descricao: `Pagamento do projeto: ${p?.titulo || projetoId}`,
+              valor: deltaPago,
+              categoria: 'projeto',
+              status: 'pago',
+              dataVencimento: dataPagamento,
+              dataPagamento,
+              formaPagamento: 'transferencia',
+              clienteId: p?.clienteId,
+              clienteNome: p?.clienteNome,
+              projetoId,
+              projetoTitulo: p?.titulo || projetoId,
+              recorrente: false,
+              observacoes: `Sync automático: valorPago do projeto (R$ ${valorPagoProjeto.toFixed(2)}) maior que receitas pagas registradas (R$ ${registradoPago.toFixed(2)}).`,
+              adminId: user.uid,
+              criadoEm: hoje.toISOString(),
+              atualizadoEm: hoje.toISOString(),
+            };
 
-          await addDoc(collection(db, 'transacoes'), nova as any);
-          transacoesData.push({ id: `sync-${projetoId}-${Date.now()}`, ...(nova as any) } as any);
-          receitasPagasPorProjeto.set(projetoId, registrado + delta);
-          receitasCriadas++;
+            await addDoc(collection(db, 'transacoes'), novaPago as any);
+            transacoesData.push({ id: `sync-pago-${projetoId}-${Date.now()}`, ...(novaPago as any) } as any);
+            receitasPagasPorProjeto.set(projetoId, registradoPago + deltaPago);
+            receitasCriadas++;
+          }
+
+          // 2) Sync de receita pendente do saldo (valorContratado - valorPago)
+          const saldoRestante = Math.max(0, valorContratadoProjeto - valorPagoProjeto);
+          if (saldoRestante > 0) {
+            const registradoPendente = receitasPendentesPorProjeto.get(projetoId) || 0;
+            const deltaPendente = saldoRestante - registradoPendente;
+            if (deltaPendente > 0) {
+              const novaPendente = {
+                tipo: 'receita',
+                descricao: `Saldo do projeto: ${p?.titulo || projetoId}`,
+                valor: deltaPendente,
+                categoria: 'projeto',
+                status: 'pendente',
+                dataVencimento: dataPagamento,
+                clienteId: p?.clienteId,
+                clienteNome: p?.clienteNome,
+                projetoId,
+                projetoTitulo: p?.titulo || projetoId,
+                recorrente: false,
+                observacoes: `Sync automático: saldo do projeto (R$ ${saldoRestante.toFixed(2)}) maior que pendências registradas (R$ ${registradoPendente.toFixed(2)}).`,
+                adminId: user.uid,
+                criadoEm: hoje.toISOString(),
+                atualizadoEm: hoje.toISOString(),
+              };
+
+              await addDoc(collection(db, 'transacoes'), novaPendente as any);
+              transacoesData.push({ id: `sync-pendente-${projetoId}-${Date.now()}`, ...(novaPendente as any) } as any);
+              receitasPendentesPorProjeto.set(projetoId, registradoPendente + deltaPendente);
+              receitasCriadas++;
+            }
+          }
         }
 
         if (receitasCriadas > 0) {
@@ -530,6 +569,12 @@ const Financeiro: React.FC = () => {
   stats.saldoAtual = stats.receitasPagas - stats.despesasPagas;
   stats.lucroLiquido = stats.totalReceitas - stats.totalDespesas;
 
+  const safePercent = (numerator: number, denominator: number): number => {
+    if (!denominator || !Number.isFinite(denominator)) return 0;
+    if (!Number.isFinite(numerator)) return 0;
+    return (numerator / denominator) * 100;
+  };
+
   // Receitas por categoria
   const receitasPorCategoria = {
     projeto: receitas.filter(r => r.categoria === 'projeto').reduce((sum, r) => sum + r.valor, 0),
@@ -666,7 +711,7 @@ const Financeiro: React.FC = () => {
                 <div className="flex items-center justify-between mb-2">
                   <TrendingUp className="w-8 h-8 text-purple-500" />
                   <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30 px-2 py-1 rounded-full">
-                    {((stats.lucroLiquido / stats.totalReceitas) * 100).toFixed(0)}%
+                    {safePercent(stats.lucroLiquido, stats.totalReceitas).toFixed(0)}%
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Lucro Líquido</p>
@@ -697,7 +742,7 @@ const Financeiro: React.FC = () => {
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
                         className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full"
-                        style={{ width: `${(receitasPorCategoria.projeto / stats.totalReceitas) * 100}%` }}
+                        style={{ width: `${safePercent(receitasPorCategoria.projeto, stats.totalReceitas)}%` }}
                       />
                     </div>
                   </div>
@@ -709,7 +754,7 @@ const Financeiro: React.FC = () => {
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
                         className="bg-gradient-to-r from-teal-500 to-cyan-500 h-2 rounded-full"
-                        style={{ width: `${(receitasPorCategoria.mensalidade / stats.totalReceitas) * 100}%` }}
+                        style={{ width: `${safePercent(receitasPorCategoria.mensalidade, stats.totalReceitas)}%` }}
                       />
                     </div>
                   </div>
@@ -721,7 +766,7 @@ const Financeiro: React.FC = () => {
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
                         className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full"
-                        style={{ width: `${(receitasPorCategoria.consultoria / stats.totalReceitas) * 100}%` }}
+                        style={{ width: `${safePercent(receitasPorCategoria.consultoria, stats.totalReceitas)}%` }}
                       />
                     </div>
                   </div>
@@ -733,7 +778,7 @@ const Financeiro: React.FC = () => {
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
                         className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full"
-                        style={{ width: `${(receitasPorCategoria.outros / stats.totalReceitas) * 100}%` }}
+                        style={{ width: `${safePercent(receitasPorCategoria.outros, stats.totalReceitas)}%` }}
                       />
                     </div>
                   </div>
@@ -754,8 +799,8 @@ const Financeiro: React.FC = () => {
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
-                        className="bg-gradient-to-r from-red-500 to-orange-500 h-2 rounded-full"
-                        style={{ width: `${(despesasPorCategoria.equipe / stats.totalDespesas) * 100}%` }}
+                        className="bg-gradient-to-r from-red-500 to-rose-500 h-2 rounded-full"
+                        style={{ width: `${safePercent(despesasPorCategoria.equipe, stats.totalDespesas)}%` }}
                       />
                     </div>
                   </div>
@@ -767,7 +812,7 @@ const Financeiro: React.FC = () => {
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
                         className="bg-gradient-to-r from-orange-500 to-amber-500 h-2 rounded-full"
-                        style={{ width: `${(despesasPorCategoria.ferramentas / stats.totalDespesas) * 100}%` }}
+                        style={{ width: `${safePercent(despesasPorCategoria.ferramentas, stats.totalDespesas)}%` }}
                       />
                     </div>
                   </div>
@@ -778,8 +823,8 @@ const Financeiro: React.FC = () => {
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
-                        className="bg-gradient-to-r from-pink-500 to-rose-500 h-2 rounded-full"
-                        style={{ width: `${(despesasPorCategoria.marketing / stats.totalDespesas) * 100}%` }}
+                        className="bg-gradient-to-r from-yellow-500 to-orange-500 h-2 rounded-full"
+                        style={{ width: `${safePercent(despesasPorCategoria.marketing, stats.totalDespesas)}%` }}
                       />
                     </div>
                   </div>
@@ -790,8 +835,8 @@ const Financeiro: React.FC = () => {
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
-                        className="bg-gradient-to-r from-indigo-500 to-purple-500 h-2 rounded-full"
-                        style={{ width: `${(despesasPorCategoria.infraestrutura / stats.totalDespesas) * 100}%` }}
+                        className="bg-gradient-to-r from-slate-500 to-gray-500 h-2 rounded-full"
+                        style={{ width: `${safePercent(despesasPorCategoria.infraestrutura, stats.totalDespesas)}%` }}
                       />
                     </div>
                   </div>
@@ -802,8 +847,8 @@ const Financeiro: React.FC = () => {
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
-                        className="bg-gradient-to-r from-gray-500 to-slate-500 h-2 rounded-full"
-                        style={{ width: `${(despesasPorCategoria.impostos / stats.totalDespesas) * 100}%` }}
+                        className="bg-gradient-to-r from-fuchsia-500 to-purple-500 h-2 rounded-full"
+                        style={{ width: `${safePercent(despesasPorCategoria.impostos, stats.totalDespesas)}%` }}
                       />
                     </div>
                   </div>
@@ -814,8 +859,8 @@ const Financeiro: React.FC = () => {
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
-                        className="bg-gradient-to-r from-cyan-500 to-teal-500 h-2 rounded-full"
-                        style={{ width: `${(despesasPorCategoria.outros / stats.totalDespesas) * 100}%` }}
+                        className="bg-gradient-to-r from-gray-500 to-slate-500 h-2 rounded-full"
+                        style={{ width: `${safePercent(despesasPorCategoria.outros, stats.totalDespesas)}%` }}
                       />
                     </div>
                   </div>
