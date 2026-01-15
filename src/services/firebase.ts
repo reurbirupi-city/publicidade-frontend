@@ -5,11 +5,15 @@ import { getStorage } from 'firebase/storage';
 import { getAnalytics } from 'firebase/analytics';
 
 // Configuração do Firebase
+const defaultProjectId = 'inspiracao-e5a54';
+
+const resolvedProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || defaultProjectId;
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCQmrD3-ZnwrOHecDxi4q8DljA9bbkq1hE",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "publicidade-35746.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "publicidade-35746",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "publicidade-35746.firebasestorage.app",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || `${resolvedProjectId}.firebaseapp.com`,
+  projectId: resolvedProjectId,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || `${resolvedProjectId}.firebasestorage.app`,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "392020602156",
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:392020602156:web:9669411d3dffed72225089",
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-VG9E54NZ6W"
