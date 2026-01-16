@@ -385,7 +385,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Header */}
-      <header className="relative z-50 backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border-b border-gray-200 dark:border-purple-500/30 sticky top-0 transition-all duration-300">
+      <header className="relative backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border-b border-gray-200 dark:border-purple-500/30 sticky top-0 transition-all duration-300" style={{ zIndex: 50 }}>
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
