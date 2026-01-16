@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTutorial } from '../contexts/TutorialContext';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, onSnapshot, addDoc } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { db, storage } from '../services/firebase';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import {
   FileText,
   Image as ImageIcon,
@@ -1227,8 +1228,22 @@ const ClientPortal: React.FC = () => {
     console.log('🔗 Solicitação vinculada:', contrato.solicitacaoId);
     
     try {
+      // Upload do PDF para Firebase Storage
+      let pdfUrl = '';
+      try {
+        const timestamp = Date.now();
+        const storageRef = ref(storage, `contratos/${user?.uid}/${timestamp}_${nomeArquivo}`);
+        console.log('📤 Fazendo upload do PDF para Storage...');
+        await uploadString(storageRef, pdfBase64, 'data_url');
+        pdfUrl = await getDownloadURL(storageRef);
+        console.log('✅ PDF enviado para Storage. URL:', pdfUrl);
+      } catch (uploadError) {
+        console.error('❌ Erro ao fazer upload do PDF:', uploadError);
+        alert('Erro ao salvar o contrato. Tente novamente.');
+        return;
+      }
+
       // Salvar contrato assinado na coleção contratos_assinados
-      // Usamos o pdfBase64 diretamente pois Firebase Storage requer billing
       const contratoAssinado = {
         contratoId,
         solicitacaoId: contrato.solicitacaoId,
@@ -1242,14 +1257,14 @@ const ClientPortal: React.FC = () => {
         servicos: contrato.servicos || [],
         dataAssinatura: new Date().toISOString(),
         nomeArquivo,
-        pdfBase64, // Salvar o PDF como base64 diretamente no Firestore
+        pdfUrl, // URL do PDF no Storage
         assinaturaBase64,
         status: 'assinado',
         adminId: clientData?.adminId || ''
       };
       
       await addDoc(collection(db, 'contratos_assinados'), contratoAssinado);
-      console.log('✅ Contrato salvo na coleção contratos_assinados (com PDF base64)');
+      console.log('✅ Contrato salvo na coleção contratos_assinados (com URL do Storage)');
 
       // 1. Atualiza proposta/solicitação no Firestore para "contrato-assinado"
       const docRef = doc(db, 'solicitacoes_clientes', contrato.solicitacaoId);
@@ -1257,7 +1272,7 @@ const ClientPortal: React.FC = () => {
         status: 'contrato-assinado',
         dataAssinatura: new Date().toISOString(),
         contratoArquivo: nomeArquivo,
-        contratoAssinadoBase64: true // Flag indicando que o PDF está salvo como base64
+        contratoUrl: pdfUrl // URL do contrato no Storage
       });
       console.log('✅ Status da proposta atualizado no Firestore para: contrato-assinado');
 
