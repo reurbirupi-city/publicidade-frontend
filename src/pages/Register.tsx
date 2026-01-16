@@ -323,6 +323,18 @@ const Register: React.FC = () => {
       const uid = userCredential.user.uid;
       console.log('✅ Conta criada no Firebase Auth. UID:', uid);
 
+      // Aguardar propagação do token e permissões
+      console.log('⏳ Aguardando propagação de permissões...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Forçar renovação do token para garantir permissões atualizadas
+      try {
+        await userCredential.user.getIdToken(true);
+        console.log('✅ Token renovado com permissões atualizadas');
+      } catch (tokenError) {
+        console.warn('⚠️ Erro ao renovar token:', tokenError);
+      }
+
       // 2. Preparar dados do cliente para Firestore
       const clienteParaFirestore: any = {
         id: uid,
@@ -375,7 +387,25 @@ const Register: React.FC = () => {
         console.error('❌ ERRO ao salvar cliente no Firestore:', firestoreError);
         console.error('Código do erro:', firestoreError.code);
         console.error('Mensagem:', firestoreError.message);
-        // Não interrompe o fluxo
+        
+        // Se falhou por permissões, tentar novamente após pequeno delay
+        if (firestoreError.code === 'permission-denied') {
+          console.log('🔄 Tentando novamente após delay...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          try {
+            await setDoc(doc(db, 'clientes', uid), clienteParaFirestore);
+            console.log('✅ Cliente salvo na segunda tentativa!');
+          } catch (retryError: any) {
+            console.error('❌ Falha na segunda tentativa:', retryError);
+            setError(`Erro ao salvar seus dados. Por favor, contate o suporte com este código: ${uid}`);
+            setLoading(false);
+            return;
+          }
+        } else {
+          setError('Erro ao processar seu cadastro. Tente novamente.');
+          setLoading(false);
+          return;
+        }
       }
 
       // 4. Criar documento do usuário no Firestore (coleção users)
