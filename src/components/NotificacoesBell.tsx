@@ -141,7 +141,7 @@ const NotificacoesBell: React.FC = () => {
   };
 
   return (
-    <div className="relative z-[100]" ref={dropdownRef}>
+    <div className="relative z-[9998]" ref={dropdownRef}>
       {/* Botão do Sino */}
       <button
         ref={buttonRef}
@@ -162,13 +162,13 @@ const NotificacoesBell: React.FC = () => {
       {/* Dropdown de Notificações */}
       {isOpen && dropdownPos && createPortal(
         <div
-          className="fixed inset-0 z-[9999]"
+          className="fixed inset-0 z-[99999]"
           onMouseDown={() => setIsOpen(false)}
           style={{ pointerEvents: 'none' }}
         >
           <div
             className="absolute w-96 max-h-[500px] overflow-hidden bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700"
-            style={{ top: dropdownPos.top, left: dropdownPos.left, pointerEvents: 'auto' }}
+            style={{ top: dropdownPos.top, left: dropdownPos.left, pointerEvents: 'auto', zIndex: 99999 }}
             onMouseDown={(e) => e.stopPropagation()}
           >
           {/* Header */}
