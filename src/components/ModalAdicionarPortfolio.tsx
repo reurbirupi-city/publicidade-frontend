@@ -62,6 +62,7 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
   onClose,
   onSalvar
 }) => {
+  const { user } = useAuth();
   const steps = ['Cliente & Projeto', 'Imagens', 'Tags & Resultados'];
   const [step, setStep] = useState(0);
 
@@ -179,11 +180,16 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
 
     setGerandoDescricao(true);
     try {
+      const token = await user?.getIdToken();
       const API_URL = import.meta.env.VITE_API_URL || 'https://publicidade-backend.vercel.app';
       const response = await axios.post(`${API_URL}/api/ia/gerar-descricao-portfolio`, {
         titulo: formData.titulo,
         empresa: formData.clienteEmpresa,
         categoria: formData.categoria
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       
       if (response.data?.descricao) {
@@ -205,10 +211,15 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
 
     setAjustandoDescricao(true);
     try {
+      const token = await user?.getIdToken();
       const API_URL = import.meta.env.VITE_API_URL || 'https://publicidade-backend.vercel.app';
       const response = await axios.post(`${API_URL}/api/ia/ajustar-texto`, {
         texto: formData.descricao,
         contexto: `Portfolio - ${formData.titulo}`
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       
       if (response.data?.textoAjustado) {
