@@ -13,10 +13,16 @@ import {
   User,
   FileText,
   Sparkles,
-  Loader
+  Loader,
+  Wand2,
+  RefreshCw
 } from 'lucide-react';
 import { uploadImage, uploadMultipleImages } from '../services/imageUpload';
 import WizardStepper from './WizardStepper';
+import { db } from '../services/firebase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { useAuth } from '../contexts/AuthContext';
+import axios from 'axios';
 
 // ============================================================================
 // INTERFACES
@@ -84,6 +90,14 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
   const [erros, setErros] = useState<string[]>([]);
   const [uploadingCapa, setUploadingCapa] = useState(false);
   const [uploadingGaleria, setUploadingGaleria] = useState(false);
+  const [clientes, setClientes] = useState<any[]>([]);
+  const [clientesFiltrados, setClientesFiltrados] = useState<any[]>([]);
+  const [loadingClientes, setLoadingClientes] = useState(false);
+  const [clienteSelecionado, setClienteSelecionado] = useState<any>(null);
+  const [buscaCliente, setBuscaCliente] = useState('');
+  const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
+  const [gerandoDescricao, setGerandoDescricao] = useState(false);
+  const [ajustandoDescricao, setAjustandoDescricao] = useState(false);
   
   const inputCapaRef = useRef<HTMLInputElement>(null);
   const inputGaleriaRef = useRef<HTMLInputElement>(null);
@@ -94,8 +108,119 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
     if (isOpen) {
       setStep(0);
       setErros([]);
+      carregarClientes();
     }
   }, [isOpen]);
+
+  const carregarClientes = async () => {
+    setLoadingClientes(true);
+    try {
+      const clientesRef = collection(db, 'clientes');
+      const q = query(clientesRef, where('status', 'in', ['ativo', 'prospect']));
+      const snapshot = await getDocs(q);
+      const clientesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setClientes(clientesData);
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error);
+    } finally {
+      setLoadingClientes(false);
+    }
+  };
+
+  const handleSelecionarCliente = (cliente: any) => {
+    setClienteSelecionado(cliente);
+    setBuscaCliente(`${cliente.nome} - ${cliente.empresa}`);
+    setFormData({
+      ...formData,
+      clienteNome: cliente.nome,
+      clienteEmpresa: cliente.empresa
+    });
+    setMostrarSugestoes(false);
+  };
+
+  const handleBuscaCliente = (valor: string) => {
+    setBuscaCliente(valor);
+    setClienteSelecionado(null);
+    
+    if (valor.trim().length === 0) {
+      setClientesFiltrados([]);
+      setMostrarSugestoes(false);
+      setFormData({
+        ...formData,
+        clienteNome: '',
+        clienteEmpresa: ''
+      });
+      return;
+    }
+
+    if (valor.trim().length >= 2) {
+      const termo = valor.toLowerCase();
+      const filtrados = clientes.filter(c => 
+        c.nome.toLowerCase().includes(termo) || 
+        c.empresa.toLowerCase().includes(termo) ||
+        c.email.toLowerCase().includes(termo)
+      );
+      setClientesFiltrados(filtrados);
+      setMostrarSugestoes(filtrados.length > 0);
+    } else {
+      setClientesFiltrados([]);
+      setMostrarSugestoes(false);
+    }
+  };
+
+  const gerarDescricaoComIA = async () => {
+    if (!formData.titulo || !formData.clienteEmpresa) {
+      alert('Preencha o título e empresa do cliente para gerar descrição com IA');
+      return;
+    }
+
+    setGerandoDescricao(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://publicidade-backend.vercel.app';
+      const response = await axios.post(`${API_URL}/api/ia/gerar-descricao-portfolio`, {
+        titulo: formData.titulo,
+        empresa: formData.clienteEmpresa,
+        categoria: formData.categoria
+      });
+      
+      if (response.data?.descricao) {
+        setFormData({ ...formData, descricao: response.data.descricao });
+      }
+    } catch (error) {
+      console.error('Erro ao gerar descrição:', error);
+      alert('Erro ao gerar descrição com IA. Tente novamente.');
+    } finally {
+      setGerandoDescricao(false);
+    }
+  };
+
+  const ajustarDescricaoComIA = async () => {
+    if (!formData.descricao) {
+      alert('Escreva uma descrição inicial para ajustar com IA');
+      return;
+    }
+
+    setAjustandoDescricao(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://publicidade-backend.vercel.app';
+      const response = await axios.post(`${API_URL}/api/ia/ajustar-texto`, {
+        texto: formData.descricao,
+        contexto: `Portfolio - ${formData.titulo}`
+      });
+      
+      if (response.data?.textoAjustado) {
+        setFormData({ ...formData, descricao: response.data.textoAjustado });
+      }
+    } catch (error) {
+      console.error('Erro ao ajustar descrição:', error);
+      alert('Erro ao ajustar descrição com IA. Tente novamente.');
+    } finally {
+      setAjustandoDescricao(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -337,6 +462,85 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
                 <User className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                 Cliente
               </h3>
+              
+              {/* Busca de Cliente do CRM */}
+              <div className="mb-4 relative">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Buscar Cliente do CRM
+                </label>
+                {loadingClientes ? (
+                  <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 px-4 py-2">
+                    <Loader className="w-4 h-4 animate-spin" />
+                    Carregando clientes...
+                  </div>
+                ) : (
+                  <>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={buscaCliente}
+                        onChange={(e) => handleBuscaCliente(e.target.value)}
+                        onFocus={() => {
+                          if (clientesFiltrados.length > 0) setMostrarSugestoes(true);
+                        }}
+                        placeholder="Digite nome, empresa ou email..."
+                        className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent"
+                      />
+                      {clienteSelecionado && (
+                        <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500" />
+                      )}
+                    </div>
+                    
+                    {/* Sugestões */}
+                    {mostrarSugestoes && clientesFiltrados.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {clientesFiltrados.map(cliente => (
+                          <button
+                            key={cliente.id}
+                            type="button"
+                            onClick={() => handleSelecionarCliente(cliente)}
+                            className="w-full px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="font-semibold text-gray-900 dark:text-white">
+                                  {cliente.nome}
+                                </div>
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
+                                  {cliente.empresa}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-500">
+                                  {cliente.email}
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                <span className={`px-2 py-1 text-xs rounded-full ${
+                                  cliente.status === 'ativo' 
+                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                    : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                }`}>
+                                  {cliente.status}
+                                </span>
+                                {cliente.rating && (
+                                  <div className="flex items-center gap-1">
+                                    <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                                    <span className="text-xs text-gray-600 dark:text-gray-400">{cliente.rating}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      💡 Digite pelo menos 2 caracteres para buscar clientes
+                    </p>
+                  </>
+                )}
+              </div>
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -387,16 +591,59 @@ const ModalAdicionarPortfolio: React.FC<ModalAdicionarPortfolioProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Descrição *
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Descrição *
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={gerarDescricaoComIA}
+                        disabled={gerandoDescricao || !formData.titulo}
+                        className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {gerandoDescricao ? (
+                          <>
+                            <Loader className="w-3 h-3 animate-spin" />
+                            Gerando...
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 className="w-3 h-3" />
+                            Gerar com IA
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={ajustarDescricaoComIA}
+                        disabled={ajustandoDescricao || !formData.descricao}
+                        className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {ajustandoDescricao ? (
+                          <>
+                            <Loader className="w-3 h-3 animate-spin" />
+                            Ajustando...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-3 h-3" />
+                            Ajustar com IA
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                   <textarea
                     value={formData.descricao}
                     onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
                     placeholder="Descreva o projeto, objetivos, estratégias utilizadas..."
-                    rows={4}
+                    rows={5}
                     className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent resize-none"
                   />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    💡 Dica: Use "Gerar com IA" para criar uma descrição completa ou "Ajustar com IA" para melhorar o texto existente
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
