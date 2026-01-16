@@ -788,7 +788,7 @@ const Agenda: React.FC = () => {
             {/* Left Column - Timeline */}
             <div className="col-span-12 lg:col-span-8 space-y-6">
               {/* Day Progress Card */}
-              <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-6">
+              <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-gray-200/50 dark:border-gray-800/50 rounded-2xl p-6 relative z-0">
                 <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
                   <div className="flex items-center gap-3">
                     <button
@@ -984,7 +984,7 @@ const Agenda: React.FC = () => {
               {/* Apenas o calendário e eventos ficam na sidebar */}
 
               {/* Dica do Dia Melhorada */}
-              <div className={`backdrop-blur-xl bg-gradient-to-br ${dicaDoDia.cor} rounded-2xl p-6 text-white relative overflow-hidden transform hover:scale-105 transition-all duration-300 group cursor-pointer`}>
+              <div className={`backdrop-blur-xl bg-gradient-to-br ${dicaDoDia.cor} rounded-2xl p-6 text-white relative overflow-hidden hover:scale-105 transition-all duration-300 group cursor-pointer z-0`}>
                 {/* Efeitos de Background */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl animate-pulse" />
                 <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '1s' }} />
@@ -1030,7 +1030,7 @@ const Agenda: React.FC = () => {
 
       {/* Modal View */}
       {showModal && modalMode === 'view' && selectedEvento && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9000] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-800">
             <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-6 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Detalhes do Evento</h2>
