@@ -237,6 +237,56 @@ const SocialMedia: React.FC = () => {
     try {
       const docRef = await addDoc(collection(db, 'social_media'), conteudoData);
       console.log('✅ Conteúdo criado no Firestore:', docRef.id);
+      
+      // Criar evento automaticamente na agenda (Command Center)
+      try {
+        const horaInicio = novoConteudo.horaPublicacao || '10:00';
+        const [hora, minuto] = horaInicio.split(':');
+        const dataInicio = new Date(`${novoConteudo.dataPublicacao}T${horaInicio}:00`);
+        const dataFim = new Date(dataInicio);
+        dataFim.setHours(dataFim.getHours() + 1); // 1 hora de duração
+
+        const redesLabels: Record<string, string> = {
+          instagram: 'Instagram',
+          facebook: 'Facebook',
+          linkedin: 'LinkedIn',
+          twitter: 'Twitter',
+          youtube: 'YouTube',
+          tiktok: 'TikTok'
+        };
+
+        const evento = {
+          titulo: `📱 ${novoConteudo.titulo}`,
+          descricao: `Publicação de ${novoConteudo.tipoConteudo} no ${redesLabels[novoConteudo.redeSocial]}\n\n${novoConteudo.descricao}`,
+          tipo: 'publicacao' as const,
+          dataInicio: dataInicio.toISOString(),
+          dataFim: dataFim.toISOString(),
+          clienteId: novoConteudo.clienteId,
+          clienteNome: novoConteudo.clienteNome,
+          clienteEmpresa: novoConteudo.clienteEmpresa,
+          projetoId: novoConteudo.projetoId,
+          projetoTitulo: novoConteudo.projetoTitulo,
+          local: redesLabels[novoConteudo.redeSocial],
+          observacoes: `Conteúdo vinculado: ${docRef.id}\nRede Social: ${redesLabels[novoConteudo.redeSocial]}\nTipo: ${novoConteudo.tipoConteudo}`,
+          status: 'agendado' as const,
+          cor: '#E91E63', // Rosa para social media
+          socialMediaId: docRef.id, // Vincula ao conteúdo
+          adminId: user?.uid,
+          criadoEm: new Date().toISOString(),
+          atualizadoEm: new Date().toISOString()
+        };
+
+        const eventoRef = await addDoc(collection(db, 'eventos'), evento);
+        console.log('✅ Evento criado automaticamente no Command Center:', eventoRef.id);
+        
+        // Atualizar conteúdo com ID do evento
+        await updateDoc(doc(db, 'social_media', docRef.id), {
+          eventoVinculadoId: eventoRef.id
+        });
+      } catch (eventoError) {
+        console.error('⚠️ Erro ao criar evento, mas conteúdo foi salvo:', eventoError);
+      }
+      
       setModalCriarOpen(false);
     } catch (error) {
       console.error('❌ Erro ao criar conteúdo no Firestore:', error);
