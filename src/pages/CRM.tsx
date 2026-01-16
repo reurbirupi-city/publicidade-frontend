@@ -230,6 +230,43 @@ const CRM: React.FC = () => {
     carregarClientesFirestore();
   }, [user]);
 
+  // Função para carregar apenas clientes vinculados (via link de convite)
+  const carregarClientesVinculados = async () => {
+    if (!user?.email) {
+      alert('❌ Você precisa estar autenticado.');
+      return;
+    }
+
+    try {
+      console.log('🔗 Carregando apenas clientes vinculados...');
+      const admin = await getAdminByEmail(user.email);
+      
+      if (!admin) {
+        alert('⚠️ Admin não encontrado no sistema.');
+        return;
+      }
+
+      const q = query(
+        collection(db, 'clientes'), 
+        where('adminId', '==', admin.id)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const clientesVinculados: any[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        clientesVinculados.push({ ...doc.data(), id: doc.id });
+      });
+
+      setClientes(clientesVinculados as any[]);
+      console.log(`✅ Carregados ${clientesVinculados.length} clientes vinculados`);
+      alert(`✅ ${clientesVinculados.length} cliente(s) vinculado(s) ao seu link de convite encontrado(s).`);
+    } catch (error) {
+      console.error('❌ Erro ao carregar clientes vinculados:', error);
+      alert('❌ Erro ao carregar clientes vinculados. Verifique o console.');
+    }
+  };
+
   // Salva no localStorage sempre que clientes mudar
   useEffect(() => {
     saveClientes(clientes as any[]);
@@ -712,18 +749,11 @@ const CRM: React.FC = () => {
               </select>
               
               <button
-                onClick={() => {
-                  if (confirm('⚠️ Tem certeza que deseja limpar todos os dados mockados?\n\nIsso apagará todos os clientes atuais!')) {
-                    setClientes([]);
-                    saveClientes([]);
-                    console.log('🔄 Dados mockados limpos do CRM');
-                    alert('✅ Dados limpos! Agora você pode cadastrar clientes reais.');
-                  }
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-all text-sm font-medium"
-                title="Limpar dados mockados"
+                onClick={carregarClientesVinculados}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-all text-sm font-medium"
+                title="Carregar apenas clientes cadastrados via seu link de convite"
               >
-                🔄 Reset
+                🔗 Clientes Vinculados
               </button>
               
               <button
