@@ -239,9 +239,9 @@ const SocialMedia: React.FC = () => {
       console.log('✅ Conteúdo criado no Firestore:', docRef.id);
       
       // Criar evento automaticamente na agenda (Command Center)
+      console.log('📅 Iniciando criação de evento no Command Center...');
       try {
         const horaInicio = novoConteudo.horaPublicacao || '10:00';
-        const [hora, minuto] = horaInicio.split(':');
         const dataInicio = new Date(`${novoConteudo.dataPublicacao}T${horaInicio}:00`);
         const dataFim = new Date(dataInicio);
         dataFim.setHours(dataFim.getHours() + 1); // 1 hora de duração
@@ -255,27 +255,30 @@ const SocialMedia: React.FC = () => {
           tiktok: 'TikTok'
         };
 
-        const evento = {
+        const evento: any = {
           titulo: `📱 ${novoConteudo.titulo}`,
           descricao: `Publicação de ${novoConteudo.tipoConteudo} no ${redesLabels[novoConteudo.redeSocial]}\n\n${novoConteudo.descricao}`,
-          tipo: 'publicacao' as const,
+          tipo: 'publicacao',
           dataInicio: dataInicio.toISOString(),
           dataFim: dataFim.toISOString(),
           clienteId: novoConteudo.clienteId,
           clienteNome: novoConteudo.clienteNome,
           clienteEmpresa: novoConteudo.clienteEmpresa,
-          projetoId: novoConteudo.projetoId,
-          projetoTitulo: novoConteudo.projetoTitulo,
-          local: redesLabels[novoConteudo.redeSocial],
+          local: redesLabels[novoConteudo.redeSocial] || 'Social Media',
           observacoes: `Conteúdo vinculado: ${docRef.id}\nRede Social: ${redesLabels[novoConteudo.redeSocial]}\nTipo: ${novoConteudo.tipoConteudo}`,
-          status: 'agendado' as const,
-          cor: '#E91E63', // Rosa para social media
-          socialMediaId: docRef.id, // Vincula ao conteúdo
+          status: 'agendado',
+          cor: '#E91E63',
+          socialMediaId: docRef.id,
           adminId: user?.uid,
           criadoEm: new Date().toISOString(),
           atualizadoEm: new Date().toISOString()
         };
 
+        // Adicionar campos opcionais apenas se tiverem valor
+        if (novoConteudo.projetoId) evento.projetoId = novoConteudo.projetoId;
+        if (novoConteudo.projetoTitulo) evento.projetoTitulo = novoConteudo.projetoTitulo;
+
+        console.log('📅 Dados do evento a ser criado:', evento);
         const eventoRef = await addDoc(collection(db, 'eventos'), evento);
         console.log('✅ Evento criado automaticamente no Command Center:', eventoRef.id);
         
@@ -283,8 +286,13 @@ const SocialMedia: React.FC = () => {
         await updateDoc(doc(db, 'social_media', docRef.id), {
           eventoVinculadoId: eventoRef.id
         });
-      } catch (eventoError) {
-        console.error('⚠️ Erro ao criar evento, mas conteúdo foi salvo:', eventoError);
+        console.log('✅ Conteúdo atualizado com eventoVinculadoId:', eventoRef.id);
+      } catch (eventoError: any) {
+        console.error('⚠️ Erro ao criar evento no Command Center:', eventoError);
+        console.error('⚠️ Erro código:', eventoError.code);
+        console.error('⚠️ Erro mensagem:', eventoError.message);
+        console.error('⚠️ Stack:', eventoError.stack);
+        alert('Conteúdo criado, mas houve erro ao criar evento na agenda. Verifique o console.');
       }
       
       setModalCriarOpen(false);
