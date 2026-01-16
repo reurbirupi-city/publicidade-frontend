@@ -76,9 +76,9 @@ const compressImageToJpeg = async (file: File, opts: CompressOptions = defaultCo
 };
 
 /**
- * Faz upload de uma imagem para Freeimage.host (gratuito)
+ * Faz upload de uma imagem via backend (Firebase Storage via Admin SDK)
  * @param file Arquivo de imagem
- * @returns URL da imagem hospedada (throw error se falhar)
+ * @returns URL pública (download token)
  */
 export const uploadImage = async (file: File): Promise<string> => {
   // Validar tipo de arquivo
@@ -97,9 +97,8 @@ export const uploadImage = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('file', fileToUpload);
 
-    const resp = await api.post('/uploads/image', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    // Não setar Content-Type manualmente: o browser precisa incluir o boundary.
+    const resp = await api.post('/uploads/image', formData);
 
     const url = resp?.data?.url as string | undefined;
     if (!url) throw new Error('Upload não retornou URL');

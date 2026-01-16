@@ -70,6 +70,30 @@ interface ItemPortfolio {
   criadoEm: string;
 }
 
+const normalizePortfolioItem = (raw: any): ItemPortfolio => {
+  const safeArray = <T,>(v: any, fallback: T[] = []) => (Array.isArray(v) ? v : fallback);
+
+  return {
+    id: String(raw?.id || ''),
+    projetoId: String(raw?.projetoId || ''),
+    clienteId: String(raw?.clienteId || ''),
+    clienteNome: String(raw?.clienteNome || ''),
+    clienteEmpresa: String(raw?.clienteEmpresa || ''),
+    titulo: String(raw?.titulo || ''),
+    descricao: String(raw?.descricao || ''),
+    categoria: (raw?.categoria as CategoriaPortfolio) || 'web',
+    autorizadoPublicacao: Boolean(raw?.autorizadoPublicacao ?? true),
+    imagemCapa: String(raw?.imagemCapa || ''),
+    imagensGaleria: safeArray<string>(raw?.imagensGaleria, []).map((u) => String(u || '')).filter(Boolean),
+    tags: safeArray<string>(raw?.tags, []).map((t) => String(t || '')).filter(Boolean),
+    destaque: Boolean(raw?.destaque ?? false),
+    dataFinalizacao: String(raw?.dataFinalizacao || ''),
+    resultados: raw?.resultados && typeof raw.resultados === 'object' ? raw.resultados : undefined,
+    testemunho: raw?.testemunho && typeof raw.testemunho === 'object' ? raw.testemunho : undefined,
+    criadoEm: String(raw?.criadoEm || new Date().toISOString()),
+  };
+};
+
 const Portfolio: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -161,10 +185,12 @@ const Portfolio: React.FC = () => {
       : query(portfolioRef, where('adminId', '==', user.uid));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ItemPortfolio[];
+      const docs = snapshot.docs.map((docSnap) =>
+        normalizePortfolioItem({
+          id: docSnap.id,
+          ...docSnap.data(),
+        })
+      );
       
       setPortfolio(docs);
       setLoading(false);
@@ -192,9 +218,14 @@ const Portfolio: React.FC = () => {
   // ============================================================================
 
   const portfolioFiltrado = portfolio.filter(item => {
-    const matchSearch = item.titulo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                       item.descricao.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                       item.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+    const q = (searchQuery || '').toLowerCase();
+    const titulo = (item.titulo || '').toLowerCase();
+    const descricao = (item.descricao || '').toLowerCase();
+    const tags = Array.isArray(item.tags) ? item.tags : [];
+
+    const matchSearch = titulo.includes(q) ||
+                       descricao.includes(q) ||
+                       tags.some(tag => (tag || '').toLowerCase().includes(q));
     
     const matchCategoria = filterCategoria === 'todos' || item.categoria === filterCategoria;
     const matchDestaque = !filterDestaque || item.destaque;

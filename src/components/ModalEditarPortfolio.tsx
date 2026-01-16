@@ -82,11 +82,27 @@ const ModalEditarPortfolio: React.FC<ModalEditarPortfolioProps> = ({
 
   const isUploading = uploadingCapa || uploadingGaleria;
 
+  const normalizeItem = (raw: ItemPortfolio): ItemPortfolio => {
+    const safeArray = <T,>(v: any, fallback: T[] = []) => (Array.isArray(v) ? v : fallback);
+
+    return {
+      ...raw,
+      clienteNome: String((raw as any)?.clienteNome || ''),
+      clienteEmpresa: String((raw as any)?.clienteEmpresa || ''),
+      titulo: String((raw as any)?.titulo || ''),
+      descricao: String((raw as any)?.descricao || ''),
+      imagemCapa: String((raw as any)?.imagemCapa || ''),
+      dataFinalizacao: String((raw as any)?.dataFinalizacao || ''),
+      tags: safeArray<string>((raw as any)?.tags, []).map((t) => String(t || '')).filter(Boolean),
+      imagensGaleria: safeArray<string>((raw as any)?.imagensGaleria, []).map((u) => String(u || '')).filter(Boolean),
+    };
+  };
+
   // Inicializa o formulário quando o item mudar
   useEffect(() => {
     if (item) {
       setStep(0);
-      setFormData({ ...item });
+      setFormData(normalizeItem({ ...item }));
       setErros([]);
     }
   }, [item]);
