@@ -6,11 +6,13 @@ interface Servico {
   nome: string;
   descricao: string;
   categoria: string;
-  preco: number;
-  tempo_estimado: string;
-  destaque: boolean;
-  ativo: boolean;
-  recursos: string[];
+  preco?: number;
+  valorBase?: number;
+  tempo_estimado?: string;
+  prazoBaseDias?: number;
+  destaque?: boolean;
+  ativo?: boolean;
+  recursos?: string[];
   padrao?: boolean;
   customizado?: boolean;
 }
@@ -52,11 +54,11 @@ const ModalCriarEditarServico: React.FC<ModalCriarEditarServicoProps> = ({
         nome: servico.nome,
         descricao: servico.descricao,
         categoria: servico.categoria,
-        preco: servico.preco,
-        tempo_estimado: servico.tempo_estimado,
-        destaque: servico.destaque,
-        ativo: servico.ativo,
-        recursos: servico.recursos?.length > 0 ? servico.recursos : ['']
+        preco: servico.preco || servico.valorBase || 0,
+        tempo_estimado: servico.tempo_estimado || (servico.prazoBaseDias ? `${servico.prazoBaseDias} dias` : ''),
+        destaque: servico.destaque || false,
+        ativo: servico.ativo !== false,
+        recursos: (servico.recursos && servico.recursos.length > 0) ? servico.recursos : ['']
       });
     } else {
       setFormData({

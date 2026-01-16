@@ -33,13 +33,18 @@ interface Servico {
   nome: string;
   descricao: string;
   categoria: string;
-  preco: number;
-  tempo_estimado: string;
-  destaque: boolean;
+  valorBase?: number; // do seed
+  preco?: number; // formato antigo
+  prazoBaseDias?: number; // do seed  
+  tempo_estimado?: string; // formato antigo
+  destaque?: boolean;
   ativo: boolean;
-  recursos: string[];
+  recursos?: string[];
   padrao?: boolean;
   customizado?: boolean;
+  seedId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Mapeamento de categorias
@@ -73,7 +78,7 @@ const Servicos: React.FC = () => {
       }
 
       // Depois sincronizar com Firestore
-      const servicosRef = collection(db, 'servicos_catalogo');
+      const servicosRef = collection(db, 'servicos');
       const snapshot = await getDocs(servicosRef);
       
       if (!snapshot.empty) {
@@ -102,7 +107,11 @@ const Servicos: React.FC = () => {
   // Salvar serviço (criar ou editar)
   const salvarServico = async (servico: Servico) => {
     try {
-      await setDoc(doc(db, 'servicos_catalogo', servico.id), servico);
+      // Remove campos undefined antes de salvar no Firestore
+      const cleanServico = Object.fromEntries(
+        Object.entries(servico).filter(([_, v]) => v !== undefined)
+      );
+      await setDoc(doc(db, 'servicos', servico.id), cleanServico);
       await carregarServicos();
       setShowModal(false);
       setServicoEditando(null);
@@ -115,7 +124,7 @@ const Servicos: React.FC = () => {
   // Deletar serviço
   const deletarServico = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'servicos_catalogo', id));
+      await deleteDoc(doc(db, 'servicos', id));
       await carregarServicos();
       setShowDeleteConfirm(null);
     } catch (error) {
@@ -152,8 +161,10 @@ const Servicos: React.FC = () => {
       nome: dadosServico.nome || '',
       descricao: dadosServico.descricao || '',
       categoria: dadosServico.categoria || 'design',
-      preco: dadosServico.preco || 0,
-      tempo_estimado: dadosServico.tempo_estimado || '',
+      preco: dadosServico.preco || dadosServico.valorBase || 0,
+      valorBase: dadosServico.valorBase || dadosServico.preco || 0,
+      tempo_estimado: dadosServico.tempo_estimado || (dadosServico.prazoBaseDias ? `${dadosServico.prazoBaseDias} dias` : ''),
+      prazoBaseDias: dadosServico.prazoBaseDias,
       destaque: dadosServico.destaque || false,
       ativo: dadosServico.ativo !== false,
       recursos: dadosServico.recursos || [],
@@ -364,11 +375,15 @@ const Servicos: React.FC = () => {
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
                   <DollarSign className="w-4 h-4" />
-                  <span className="font-semibold">R$ {servico.preco.toLocaleString('pt-BR')}</span>
+                  <span className="font-semibold">
+                    R$ {((servico.valorBase || servico.preco || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2}))}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
                   <Clock className="w-4 h-4" />
-                  <span>{servico.tempo_estimado}</span>
+                  <span>
+                    {servico.tempo_estimado || (servico.prazoBaseDias ? `${servico.prazoBaseDias} dias` : 'A definir')}
+                  </span>
                 </div>
               </div>
 
