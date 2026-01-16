@@ -96,7 +96,10 @@ const Financeiro: React.FC = () => {
   const [modalVisualizar, setModalVisualizar] = useState(false);
   const [modalEditar, setModalEditar] = useState(false);
   const [modalDeletar, setModalDeletar] = useState(false);
+  const [modalMarcarPago, setModalMarcarPago] = useState(false);
   const [transacaoSelecionada, setTransacaoSelecionada] = useState<Transacao | null>(null);
+  const [formaPagamentoSelecionada, setFormaPagamentoSelecionada] = useState<FormaPagamento>('pix');
+  const [dataPagamentoSelecionada, setDataPagamentoSelecionada] = useState<string>(new Date().toISOString().split('T')[0]);
 
   // Carrega dados
   const clientes = getClientes();
@@ -597,6 +600,53 @@ const Financeiro: React.FC = () => {
     setModalDeletar(true);
   };
 
+  const handleMarcarComoPago = (transacao: Transacao) => {
+    setTransacaoSelecionada(transacao);
+    setDataPagamentoSelecionada(new Date().toISOString().split('T')[0]);
+    setModalMarcarPago(true);
+  };
+
+  const handleConfirmarPagamento = async () => {
+    if (!transacaoSelecionada) return;
+
+    const dadosAtualizados = {
+      status: 'pago' as StatusPagamento,
+      dataPagamento: dataPagamentoSelecionada,
+      formaPagamento: formaPagamentoSelecionada,
+      atualizadoEm: new Date().toISOString()
+    };
+
+    if (useApiMode) {
+      try {
+        const resp = await api.put(`/financeiro/transacoes/${transacaoSelecionada.id}`, dadosAtualizados);
+        const updated = resp.data?.data || resp.data;
+        setTransacoes(transacoes.map(t => (t.id === transacaoSelecionada.id ? (updated as any) : t)));
+        setModalMarcarPago(false);
+        setTransacaoSelecionada(null);
+        return;
+      } catch (e) {
+        console.error('Erro ao marcar pagamento via API:', e);
+        alert('Erro ao marcar pagamento via servidor.');
+        return;
+      }
+    }
+
+    try {
+      await updateDoc(doc(db, 'transacoes', transacaoSelecionada.id), dadosAtualizados);
+      console.log('✅ Transação marcada como paga:', transacaoSelecionada.id);
+      setModalMarcarPago(false);
+      setTransacaoSelecionada(null);
+    } catch (error) {
+      console.error('Erro ao marcar transação como paga no Firestore:', error);
+      // Fallback local
+      setTransacoes(transacoes.map(t => 
+        t.id === transacaoSelecionada.id ? { ...t, ...dadosAtualizados } : t
+      ));
+      setModalMarcarPago(false);
+      setTransacaoSelecionada(null);
+    }
+  };
+
   const handleConfirmarDelecao = (transacao: Transacao) => {
     setTransacoes(prev => prev.filter(t => t.id !== transacao.id));
     console.log('🗑️ Transação deletada:', transacao.id);
@@ -1026,16 +1076,18 @@ const Financeiro: React.FC = () => {
                     return (
                       <div
                         key={transacao.id}
-                        onClick={() => handleVisualizarTransacao(transacao)}
-                        className={`flex items-center justify-between p-4 rounded-lg border-2 cursor-pointer transition-all hover:scale-[1.02] ${
+                        className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
                           isAtrasado
-                            ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 hover:border-red-400 dark:hover:border-red-600'
+                            ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20'
                             : isProximo
-                            ? 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 hover:border-orange-400 dark:hover:border-orange-600'
-                            : 'border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700'
+                            ? 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20'
+                            : 'border-gray-200 dark:border-gray-700'
                         }`}
                       >
-                        <div className="flex items-center gap-3">
+                        <div 
+                          className="flex items-center gap-3 flex-1 cursor-pointer hover:opacity-80"
+                          onClick={() => handleVisualizarTransacao(transacao)}
+                        >
                           <div className={`p-2 rounded-lg ${
                             transacao.tipo === 'receita'
                               ? 'bg-green-100 dark:bg-green-900/30'
@@ -1059,26 +1111,41 @@ const Financeiro: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className={`text-lg font-bold ${
-                            transacao.tipo === 'receita'
-                              ? 'text-green-600 dark:text-green-400'
-                              : 'text-red-600 dark:text-red-400'
-                          }`}>
-                            {transacao.tipo === 'receita' ? '+' : '-'}{formatarMoeda(transacao.valor)}
-                          </p>
-                          <p className={`text-xs font-semibold ${
-                            isAtrasado
-                              ? 'text-red-600 dark:text-red-400'
-                              : isProximo
-                              ? 'text-orange-600 dark:text-orange-400'
-                              : 'text-gray-600 dark:text-gray-400'
-                          }`}>
-                            {isAtrasado
-                              ? `${Math.abs(diasRestantes)} dias atrasado`
-                              : `Vence em ${diasRestantes} ${diasRestantes === 1 ? 'dia' : 'dias'}`
-                            }
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className={`text-lg font-bold ${
+                              transacao.tipo === 'receita'
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-red-600 dark:text-red-400'
+                            }`}>
+                              {transacao.tipo === 'receita' ? '+' : '-'}{formatarMoeda(transacao.valor)}
+                            </p>
+                            <p className={`text-xs font-semibold ${
+                              isAtrasado
+                                ? 'text-red-600 dark:text-red-400'
+                                : isProximo
+                                ? 'text-orange-600 dark:text-orange-400'
+                                : 'text-gray-600 dark:text-gray-400'
+                            }`}>
+                              {isAtrasado
+                                ? `${Math.abs(diasRestantes)} dias atrasado`
+                                : `Vence em ${diasRestantes} ${diasRestantes === 1 ? 'dia' : 'dias'}`
+                              }
+                            </p>
+                          </div>
+                          {(isAtrasado || isProximo) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarcarComoPago(transacao);
+                              }}
+                              className="px-3 py-1.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white text-xs font-semibold rounded-lg transition-all flex items-center gap-1 shadow-md hover:shadow-lg"
+                              title="Marcar como pago"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              Pagar
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -1126,6 +1193,109 @@ const Financeiro: React.FC = () => {
         transacao={transacaoSelecionada}
         onConfirm={handleConfirmarDelecao}
       />
+
+      {/* Modal Marcar Como Pago */}
+      {modalMarcarPago && transacaoSelecionada && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-lg w-full shadow-2xl border border-gray-200 dark:border-gray-800">
+            {/* Header */}
+            <div className="border-b border-gray-200 dark:border-gray-800 p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                  <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                    Confirmar Pagamento
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Registrar pagamento de {transacaoSelecionada.tipo}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              {/* Info da transação */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Descrição:</span>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{transacaoSelecionada.descricao}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Valor:</span>
+                  <span className={`text-sm font-bold ${
+                    transacaoSelecionada.tipo === 'receita' 
+                      ? 'text-green-600 dark:text-green-400' 
+                      : 'text-red-600 dark:text-red-400'
+                  }`}>
+                    {formatarMoeda(transacaoSelecionada.valor)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Vencimento:</span>
+                  <span className="text-sm text-gray-900 dark:text-white">
+                    {new Date(transacaoSelecionada.dataVencimento).toLocaleDateString('pt-BR')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Data do Pagamento */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Data do Pagamento *
+                </label>
+                <input
+                  type="date"
+                  value={dataPagamentoSelecionada}
+                  onChange={(e) => setDataPagamentoSelecionada(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-green-500 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              {/* Forma de Pagamento */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Forma de Pagamento *
+                </label>
+                <select
+                  value={formaPagamentoSelecionada}
+                  onChange={(e) => setFormaPagamentoSelecionada(e.target.value as FormaPagamento)}
+                  className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-green-500 text-gray-900 dark:text-white"
+                >
+                  <option value="pix">PIX</option>
+                  <option value="transferencia">Transferência Bancária</option>
+                  <option value="cartao_credito">Cartão de Crédito</option>
+                  <option value="cartao_debito">Cartão de Débito</option>
+                  <option value="boleto">Boleto</option>
+                  <option value="dinheiro">Dinheiro</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-gray-200 dark:border-gray-800 p-6 flex justify-end gap-3 bg-gray-50 dark:bg-gray-800">
+              <button
+                onClick={() => {
+                  setModalMarcarPago(false);
+                  setTransacaoSelecionada(null);
+                }}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarPagamento}
+                className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg transition-all font-semibold shadow-lg hover:shadow-xl flex items-center gap-2"
+              >
+                <CheckCircle className="w-5 h-5" />
+                Confirmar Pagamento
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tutorial Overlay */}
       <TutorialOverlay page="financeiro" />
