@@ -39,25 +39,45 @@ const Register: React.FC = () => {
       const ref = searchParams.get('ref');
       const type = searchParams.get('type');
       
+      console.log('🔍 URL Params:', { ref, type });
+      
       if (ref) {
         console.log('🔍 Código de convite encontrado na URL:', ref);
         console.log('🔍 Tipo de cadastro:', type === 'admin' ? 'ADMIN' : 'CLIENTE');
         
-        const admin = await getAdminByCodigoConvite(ref);
-        if (admin) {
-          console.log('✅ Admin encontrado:', admin.nome, '-', admin.nomeAgencia, '| Role:', admin.role);
+        try {
+          const admin = await getAdminByCodigoConvite(ref);
+          console.log('🔍 Resultado da busca:', admin);
           
-          // Se é cadastro de admin, verificar se o convite é de um webmaster
-          if (type === 'admin' && admin.role !== 'webmaster') {
-            console.log('⚠️ Apenas webmasters podem convidar novos admins');
-            // Não seta o adminConvite para bloquear
+          if (admin) {
+            console.log('✅ Admin encontrado:', admin.nome, '-', admin.nomeAgencia, '| Role:', admin.role);
+            
+            // Se é cadastro de admin, verificar se o convite é de um webmaster
+            if (type === 'admin') {
+              if (admin.role !== 'webmaster') {
+                console.log('⚠️ Apenas webmasters podem convidar novos admins');
+                setError('Este link de convite não é válido para criar conta de administrador. Apenas webmasters podem convidar admins.');
+              } else {
+                console.log('✅ Convite válido de webmaster para criar admin');
+                setAdminConvite(admin);
+              }
+            } else {
+              // Convite para cliente - qualquer admin pode
+              console.log('✅ Convite válido para criar cliente');
+              setAdminConvite(admin);
+            }
           } else {
-            setAdminConvite(admin);
+            console.log('⚠️ Código de convite não encontrado no banco de dados');
+            setError('Código de convite inválido ou expirado');
           }
-        } else {
-          console.log('⚠️ Código de convite inválido');
+        } catch (error) {
+          console.error('❌ Erro ao buscar admin por convite:', error);
+          setError('Erro ao validar código de convite');
         }
+      } else {
+        console.log('ℹ️ Nenhum código de convite na URL');
       }
+      
       setLoadingAdmin(false);
     };
 
@@ -477,6 +497,18 @@ const Register: React.FC = () => {
     );
   }
 
+  // Mostrar loading enquanto valida código
+  if (loadingAdmin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-purple-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Validando código de convite...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Tela de bloqueio quando não há código de convite válido
   if (!adminConvite) {
     const codigoInformado = searchParams.get('ref');
@@ -511,18 +543,21 @@ const Register: React.FC = () => {
             </div>
 
             <h2 className="text-2xl font-bold text-gray-900 mb-3">
-              {codigoInformado ? 'Código Inválido' : 'Acesso Restrito'}
+              {error || (codigoInformado ? 'Código Inválido' : 'Acesso Restrito')}
             </h2>
 
             <p className="text-gray-600 mb-6">
-              {codigoInformado 
-                ? isAdminRegister
-                  ? `O código de convite "${codigoInformado}" não é válido ou não pertence a um webmaster autorizado.`
-                  : `O código de convite "${codigoInformado}" não é válido ou expirou.`
-                : isAdminRegister
-                  ? 'O cadastro de novos administradores requer um link de convite de um webmaster.'
-                  : 'O cadastro de novos clientes requer um link de convite de uma agência parceira.'
-              }
+              {error ? (
+                <span className="text-red-600">{error}</span>
+              ) : (
+                codigoInformado 
+                  ? isAdminRegister
+                    ? `O código de convite "${codigoInformado}" não é válido ou não pertence a um webmaster autorizado.`
+                    : `O código de convite "${codigoInformado}" não é válido ou expirou.`
+                  : isAdminRegister
+                    ? 'O cadastro de novos administradores requer um link de convite de um webmaster.'
+                    : 'O cadastro de novos clientes requer um link de convite de uma agência parceira.'
+              )}
             </p>
 
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
