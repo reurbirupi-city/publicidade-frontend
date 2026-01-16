@@ -95,6 +95,9 @@ const SocialMedia: React.FC = () => {
   const [filterRede, setFilterRede] = useState<RedeSocial | 'todas'>('todas');
   const [filterStatus, setFilterStatus] = useState<StatusConteudo | 'todos'>('todos');
   const [filterCliente, setFilterCliente] = useState<string>('todos');
+  const [buscaCliente, setBuscaCliente] = useState('');
+  const [clientesFiltrados, setClientesFiltrados] = useState<any[]>([]);
+  const [mostrarSugestoesClientes, setMostrarSugestoesClientes] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const [conteudos, setConteudos] = useState<ConteudoSocial[]>([]);
@@ -148,6 +151,38 @@ const SocialMedia: React.FC = () => {
 
   // Carrega clientes
   const clientes = getClientes();
+
+  // Função para buscar clientes ao digitar
+  const handleBuscaCliente = (valor: string) => {
+    setBuscaCliente(valor);
+    
+    if (valor.trim().length === 0) {
+      setClientesFiltrados([]);
+      setMostrarSugestoesClientes(false);
+      setFilterCliente('todos');
+      return;
+    }
+
+    if (valor.trim().length >= 2) {
+      const termo = valor.toLowerCase();
+      const filtrados = clientes.filter((c: any) => 
+        c.nome?.toLowerCase().includes(termo) || 
+        c.empresa?.toLowerCase().includes(termo) ||
+        c.email?.toLowerCase().includes(termo)
+      );
+      setClientesFiltrados(filtrados);
+      setMostrarSugestoesClientes(filtrados.length > 0);
+    } else {
+      setClientesFiltrados([]);
+      setMostrarSugestoesClientes(false);
+    }
+  };
+
+  const handleSelecionarCliente = (clienteId: string, clienteNome: string) => {
+    setFilterCliente(clienteId);
+    setBuscaCliente(clienteNome);
+    setMostrarSugestoesClientes(false);
+  };
 
   // ============================================================================
   // ESTADOS DOS MODAIS
@@ -763,16 +798,51 @@ const SocialMedia: React.FC = () => {
                 ))}
               </select>
 
-              <select
-                value={filterCliente}
-                onChange={(e) => setFilterCliente(e.target.value)}
-                className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none text-gray-900 dark:text-white"
-              >
-                <option value="todos">Todos os Clientes</option>
-                {clientes.map((cliente: any) => (
-                  <option key={cliente.id} value={cliente.id}>{cliente.empresa}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={buscaCliente}
+                  onChange={(e) => handleBuscaCliente(e.target.value)}
+                  onFocus={() => {
+                    if (clientesFiltrados.length > 0) setMostrarSugestoesClientes(true);
+                  }}
+                  placeholder="Buscar cliente..."
+                  className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none text-gray-900 dark:text-white w-64"
+                />
+                {filterCliente !== 'todos' && (
+                  <button
+                    onClick={() => {
+                      setFilterCliente('todos');
+                      setBuscaCliente('');
+                      setClientesFiltrados([]);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+                
+                {/* Sugestões de clientes */}
+                {mostrarSugestoesClientes && clientesFiltrados.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {clientesFiltrados.map((cliente: any) => (
+                      <button
+                        key={cliente.id}
+                        type="button"
+                        onClick={() => handleSelecionarCliente(cliente.id, cliente.empresa)}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {cliente.empresa}
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          {cliente.nome}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* View Modes */}
