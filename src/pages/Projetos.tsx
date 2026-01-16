@@ -294,49 +294,39 @@ const Projetos: React.FC = () => {
   // ESTADO INICIAL
   // ============================================================================
 
-  // Inicializa estado com função lazy - carrega do localStorage ou começa vazio
-  const [projetos, setProjetos] = useState<Projeto[]>(() => {
-    const stored = getProjetos() as any[];
-    if (stored && Array.isArray(stored) && stored.length > 0) {
-      console.log('✅ Projetos carregados do localStorage:', stored.length);
-      return stored as Projeto[];
-    }
-    console.log('⚠️ Nenhum projeto encontrado, iniciando lista vazia');
-    return [];
-  });
+  const [projetos, setProjetos] = useState<Projeto[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Persiste projetos no localStorage sempre que mudarem
-  useEffect(() => {
-    saveProjetos(projetos);
-    console.log('💾 Projetos salvos no localStorage:', projetos.length);
-  }, [projetos]);
-
-  // Listener em tempo real para sincronizar aprovações do cliente
+  // Listener em tempo real do Firestore - sincroniza todos os projetos
   useEffect(() => {
     if (authLoading) return;
     if (!user?.uid) return;
 
+    setLoading(true);
     const projetosRef = collection(db, 'projetos');
+    
     const unsubscribe = onSnapshot(projetosRef, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'modified') {
-          const projetoAtualizado = { id: change.doc.id, ...change.doc.data() } as any;
-          
-          // Se o projeto foi aprovado pelo cliente (mudou para concluído)
-          if (projetoAtualizado.aprovadoPorCliente && projetoAtualizado.status === 'concluido') {
-            console.log('✅ Cliente aprovou projeto:', projetoAtualizado.id);
-            
-            // Atualiza o estado local
-            setProjetos(prev => prev.map(p => 
-              p.id === projetoAtualizado.id 
-                ? { ...p, status: 'concluido' as StatusProjeto, aprovadoPorCliente: true, aprovadoEm: projetoAtualizado.aprovadoEm }
-                : p
-            ));
-          }
-        }
-      });
+      const projetosFirestore = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Projeto));
+      
+      console.log('✅ Projetos carregados do Firestore:', projetosFirestore.length);
+      setProjetos(projetosFirestore);
+      
+      // Sincroniza com localStorage como backup
+      saveProjetos(projetosFirestore);
+      setLoading(false);
     }, (error) => {
-      console.error('❌ Erro no listener de projetos:', error);
+      console.error('❌ Erro ao carregar projetos do Firestore:', error);
+      
+      // Fallback: tenta carregar do localStorage
+      const stored = getProjetos() as any[];
+      if (stored && Array.isArray(stored) && stored.length > 0) {
+        console.log('⚠️ Usando projetos do localStorage como fallback:', stored.length);
+        setProjetos(stored as Projeto[]);
+      }
+      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -827,7 +817,37 @@ const Projetos: React.FC = () => {
           </div>
         </div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
+            <p className="mt-4 text-gray-600 dark:text-gray-400">Carregando projetos...</p>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && projetos.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Briefcase className="w-16 h-16 text-gray-400 dark:text-gray-600 mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              Nenhum projeto encontrado
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">
+              Comece criando seu primeiro projeto
+            </p>
+            <button
+              onClick={() => setShowModalCriar(true)}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              Criar Primeiro Projeto
+            </button>
+          </div>
+        )}
+
         {/* Content Area */}
+        {!loading && projetos.length > 0 && (
+          <>
         {viewMode === 'kanban' && (
           <div className="grid grid-cols-1 lg:grid-cols-4 xl:grid-cols-7 gap-4 overflow-x-auto pb-4">
             {/* Coluna: Planejamento */}
@@ -1072,6 +1092,8 @@ const Projetos: React.FC = () => {
               </div>
             ))}
           </div>
+        )}
+        </>
         )}
       </div>
 
